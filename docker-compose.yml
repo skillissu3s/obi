@@ -1,0 +1,33 @@
+services:
+  obi:
+    build: .
+    # image: ghcr.io/you/obi:latest   # if you publish the image instead of building
+    container_name: obi
+    restart: unless-stopped
+    environment:
+      # Required in production: used to encrypt GitHub tokens and sign sessions.
+      # Generate one with:  openssl rand -base64 48
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in your .env}
+      # First-run admin account (created automatically if it doesn't exist yet)
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in your .env}
+      # Set to 1 once to force-reset the admin password, then remove it again
+      ADMIN_RESET_PASSWORD: ${ADMIN_RESET_PASSWORD:-0}
+      APP_NAME: ${APP_NAME:-Obi}
+      PORT: "3000"
+      DATA_DIR: /data
+      SESSION_DAYS: ${SESSION_DAYS:-30}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - obi-data:/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  obi-data:

@@ -1,0 +1,13 @@
+{
+  "name": "Obi Notes",
+  "short_name": "Obi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121211",
+  "theme_color": "#121211",
+  "description": "A calm, fast home for your markdown notes — cloud or GitHub backed.",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

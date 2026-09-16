@@ -1,0 +1,151 @@
+import { DatabaseSync } from 'node:sqlite'
+import path from 'node:path'
+import { DATA_DIR } from './config.js'
+
+export const db = new DatabaseSync(path.join(DATA_DIR, 'obi.db'))
+
+db.exec(`
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = NORMAL;
+PRAGMA foreign_keys = ON;
+PRAGMA busy_timeout = 5000;
+
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  is_admin INTEGER NOT NULL DEFAULT 0,
+  disabled INTEGER NOT NULL DEFAULT 0,
+  must_change_password INTEGER NOT NULL DEFAULT 0,
+  color TEXT NOT NULL,
+  settings TEXT NOT NULL DEFAULT '{}',
+  created_at INTEGER NOT NULL,
+  last_login_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  user_agent TEXT,
+  ip TEXT
+);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS workspaces (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('online','github')),
+  owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  icon TEXT NOT NULL DEFAULT '',
+  is_default INTEGER NOT NULL DEFAULT 0,
+  github_repo TEXT,
+  github_branch TEXT,
+  github_token TEXT,
+  settings TEXT NOT NULL DEFAULT '{}',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  last_sync_at INTEGER,
+  sync_error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS members (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner','editor','viewer')),
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS members_user ON members(user_id);
+
+CREATE TABLE IF NOT EXISTS note_shares (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  path TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('editor','viewer')),
+  shared_by TEXT,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, path, user_id)
+);
+CREATE INDEX IF NOT EXISTS note_shares_user ON note_shares(user_id);
+
+CREATE TABLE IF NOT EXISTS published (
+  slug TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  path TEXT NOT NULL,
+  created_by TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE (workspace_id, path)
+);
+
+CREATE TABLE IF NOT EXISTS versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  path TEXT NOT NULL,
+  content TEXT NOT NULL,
+  user_id TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS versions_path ON versions(workspace_id, path, created_at);
+
+CREATE TABLE IF NOT EXISTS trash (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  original_path TEXT NOT NULL,
+  trash_name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  deleted_by TEXT,
+  deleted_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS trash_ws ON trash(workspace_id, deleted_at);
+
+CREATE TABLE IF NOT EXISTS invites (
+  token_hash TEXT PRIMARY KEY,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  used_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+`)
+
+export const now = () => Date.now()
+
+export function one(sql, ...params) {
+  return db.prepare(sql).get(...params) ?? null
+}
+export function all(sql, ...params) {
+  return db.prepare(sql).all(...params)
+}
+export function run(sql, ...params) {
+  return db.prepare(sql).run(...params)
+}
+
+export function tx(fn) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    const r = fn()
+    db.exec('COMMIT')
+    return r
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+export function parseJSON(s, fallback = {}) {
+  try {
+    return s ? JSON.parse(s) : fallback
+  } catch {
+    return fallback
+  }
+}

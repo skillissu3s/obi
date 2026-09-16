@@ -1,0 +1,31 @@
+import path from 'node:path'
+import fs from 'node:fs'
+import crypto from 'node:crypto'
+
+const env = process.env
+
+export const DATA_DIR = path.resolve(env.DATA_DIR || './data')
+export const WORKSPACES_DIR = path.join(DATA_DIR, 'workspaces')
+export const PORT = Number(env.PORT || 3000)
+export const HOST = env.HOST || '0.0.0.0'
+export const IS_PROD = env.NODE_ENV === 'production'
+export const ALLOW_FILE_REMOTES = env.ALLOW_FILE_REMOTES === '1'
+export const SESSION_DAYS = Number(env.SESSION_DAYS || 30)
+export const MAX_UPLOAD_MB = Number(env.MAX_UPLOAD_MB || 50)
+export const APP_NAME = env.APP_NAME || 'Obi'
+
+fs.mkdirSync(WORKSPACES_DIR, { recursive: true })
+
+function loadSecret() {
+  if (env.APP_SECRET && env.APP_SECRET.length >= 16) return env.APP_SECRET
+  const file = path.join(DATA_DIR, 'secret.key')
+  try {
+    return fs.readFileSync(file, 'utf8').trim()
+  } catch {
+    const s = crypto.randomBytes(48).toString('base64url')
+    fs.writeFileSync(file, s, { mode: 0o600 })
+    return s
+  }
+}
+
+export const APP_SECRET = loadSecret()

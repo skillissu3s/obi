@@ -1,0 +1,99 @@
+import { useEffect, useState } from 'react'
+import { RefreshCw, Check, CloudOff, AlertTriangle, Cloud, Wifi, WifiOff, GitBranch, Users, FileText, Loader2 } from 'lucide-react'
+import { useApp } from '../store/app.js'
+import { useLayout } from '../store/layout.js'
+import { useUI } from '../store/ui.js'
+import { syncNow } from '../lib/actions.js'
+import { timeAgo, readingTime } from '../lib/util.js'
+import { AvatarStack } from './ui.jsx'
+
+export function StatusBar() {
+  const connection = useApp((s) => s.connection)
+  const sync = useApp((s) => s.sync)
+  const wsId = useApp((s) => s.wsId)
+  const workspaces = useApp((s) => s.workspaces)
+  const presence = useApp((s) => s.presence)
+  const user = useApp((s) => s.user)
+  const tab = useLayout((s) => {
+    const pane = s.panes.find((p) => p.id === s.activePane)
+    return pane?.tabs.find((t) => t.id === pane.active)
+  })
+  const [stats, setStats] = useState(null)
+  const [, tick] = useState(0)
+  const ws = workspaces.find((w) => w.id === wsId)
+
+  useEffect(() => {
+    const onStats = (e) => setStats(e.detail)
+    window.addEventListener('obi:stats', onStats)
+    const t = setInterval(() => tick((n) => n + 1), 30000)
+    return () => {
+      window.removeEventListener('obi:stats', onStats)
+      clearInterval(t)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!tab || tab.kind !== 'note') setStats(null)
+  }, [tab?.id, tab?.kind])
+
+  const everyone = new Map()
+  for (const list of Object.values(presence || {})) for (const u of list) if (u.id !== user?.id) everyone.set(u.id, u)
+  const others = [...everyone.values()]
+
+  const syncIcon = () => {
+    if (!sync) return null
+    if (sync.state === 'syncing' || sync.state === 'cloning') return <RefreshCw className="spin" />
+    if (sync.state === 'error') return <AlertTriangle style={{ color: 'var(--danger)' }} />
+    if (sync.state === 'dirty' || sync.pending) return <Cloud />
+    return <Check />
+  }
+  const syncLabel = () => {
+    if (!sync) return ''
+    if (sync.state === 'cloning') return 'Cloning repository…'
+    if (sync.state === 'syncing') return 'Syncing…'
+    if (sync.state === 'error') return 'Sync failed'
+    if (sync.pending) return `${sync.pending} change${sync.pending === 1 ? '' : 's'} pending`
+    return sync.lastSync ? `Synced ${timeAgo(sync.lastSync)}` : 'Not synced yet'
+  }
+
+  return (
+    <div className="statusbar">
+      {ws?.type === 'github' && (
+        <button className="status-item" onClick={syncNow} title={sync?.error || `${ws.github?.label} · ${ws.github?.branch}\nClick to sync now`}>
+          {syncIcon()}
+          {syncLabel()}
+        </button>
+      )}
+      {ws?.type === 'online' && (
+        <span className="status-item desktop-only" title="Notes are stored on this server">
+          <Cloud /> Online workspace
+        </span>
+      )}
+      <span className="status-item" title={connection === 'online' ? 'Connected — changes save instantly' : 'Reconnecting…'}>
+        <span className={`status-dot ${connection === 'online' ? '' : connection === 'offline' ? 'offline' : 'connecting'}`} />
+        {connection === 'online' ? 'Live' : connection === 'reconnecting' ? 'Reconnecting…' : connection === 'offline' ? 'Offline' : 'Connecting…'}
+      </span>
+      {others.length > 0 && (
+        <span className="status-item" title={others.map((o) => o.name).join(', ')}>
+          <AvatarStack users={others} size={16} max={5} />
+        </span>
+      )}
+      <span className="status-spacer" />
+      {stats && (
+        <>
+          {stats.selWords > 0 && <span className="status-item desktop-only">{stats.selWords} selected</span>}
+          <span className="status-item desktop-only">{readingTime(stats.words)}</span>
+          <span className="status-item">
+            {stats.words} words
+            {stats.chars != null && <span className="desktop-only"> · {stats.chars} chars</span>}
+          </span>
+          {stats.line != null && (
+            <span className="status-item desktop-only">
+              Ln {stats.line}, Col {stats.col}
+            </span>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,55 @@
+{
+  "name": "obi-notes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted, real-time, GitHub-backed note taking app",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:server": "node --watch --disable-warning=ExperimentalWarning server/index.js",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "node --disable-warning=ExperimentalWarning server/index.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.2",
+    "diff-match-patch": "^1.0.5",
+    "express": "^5.2.1",
+    "fflate": "^0.8.3",
+    "lib0": "^0.2.117",
+    "markdown-it": "^15.0.2",
+    "ws": "^8.21.3",
+    "y-protocols": "^1.0.7",
+    "yaml": "^2.9.1",
+    "yjs": "^13.6.32"
+  },
+  "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/language-data": "^6.5.2",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.5",
+    "@codemirror/view": "^6.43.12",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@lezer/highlight": "^1.2.3",
+    "@lezer/markdown": "^1.7.2",
+    "@vitejs/plugin-react": "^6.1.1",
+    "d3-force": "^3.0.0",
+    "dompurify": "^3.4.15",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.18.7",
+    "lucide-react": "^1.46.0",
+    "mermaid": "^12.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "vite": "^8.3.0",
+    "y-codemirror.next": "^0.3.6",
+    "zustand": "^5.0.15"
+  }
+}

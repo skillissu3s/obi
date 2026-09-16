@@ -1,0 +1,16 @@
+node_modules
+dist
+data
+data-test
+.git
+.gitignore
+*.log
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+.claude
+README.md
+docker-compose*.yml
+scripts/dev.js
