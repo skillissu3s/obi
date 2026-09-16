@@ -32,6 +32,10 @@ COPY --from=build /app/dist ./dist
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
 
+# /data must be backed by a named volume or bind mount (docker-compose.yml declares one).
+# Without one, this VOLUME gives each new container an empty unnamed volume, so a redeploy
+# looks like a wipe; the old data survives in the orphaned volume (scripts/find-obi-data.sh
+# finds it) and the server logs a warning at startup.
 VOLUME ["/data"]
 EXPOSE 3000
 

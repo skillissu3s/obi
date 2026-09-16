@@ -88,8 +88,14 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 Dokploy → *Create Service* → **Application** → Build type **Dockerfile**:
 
 - Port: `3000`
-- Mount a volume at `/data`
 - Same environment variables as above
+- **Required:** *Advanced → Mounts → Add Mount* → **Volume Mount**, volume name `obi-data`, mount path `/data`
+
+> ⚠️ **Without that mount every redeploy starts from an empty database.** An Application service gets a brand-new
+> container on each deploy, and the image's `/data` falls back to an unnamed volume that the new container never
+> sees again — users, workspaces and online notes appear to vanish (the admin comes back because it is re-created
+> from `ADMIN_USERNAME`/`ADMIN_PASSWORD`). Obi detects this: the startup log prints a warning and admins see a red
+> banner in the app and in `/admin`. The Compose option above doesn't have this problem — it declares the volume.
 
 ### Option C — plain Docker
 
@@ -97,6 +103,34 @@ Dokploy → *Create Service* → **Application** → Build type **Dockerfile**:
 cp .env.example .env && nano .env
 docker compose up -d --build
 ```
+
+### Recovering data after a redeploy wiped it
+
+The old data is usually still on the server — each deploy without a mount left its database behind in an unnamed
+volume, and Docker doesn't delete those on its own. On the Dokploy host (SSH in as root):
+
+```bash
+# 1. list every volume that holds an Obi database, newest first
+#    (copy the script over first: scp scripts/find-obi-data.sh root@your-server:~ )
+sh ~/find-obi-data.sh
+
+LAST WRITE                VOLUME                                   USERS  WORKSPACES  USERNAMES
+2026-09-16T09:58:22.412Z  f546842d…                                users=1  workspaces=1  admin
+2026-09-16T09:58:15.163Z  814109e2…                                users=2  workspaces=2  admin,carol   ← the one you want
+
+# 2. copy that volume into the named volume the app will use from now on
+OLD=<volume id from the list>
+docker volume create obi-data
+docker run --rm -v "$OLD":/from:ro -v obi-data:/to alpine sh -c 'cp -a /from/. /to/'
+```
+
+Then add the `obi-data` → `/data` Volume Mount in Dokploy (Option B above) and redeploy. Anything created since the
+wipe lives in the newest volume and is replaced by this copy, so pick the volume you want to keep.
+
+If the old deploy ran without `APP_SECRET` and the new one sets it (or the other way round), passwords still work
+but saved GitHub tokens can't be decrypted — re-enter them in *Settings → GitHub sync*.
+
+The script is read-only: it mounts each volume `:ro` and inspects a copy of the database.
 
 ### Updating
 

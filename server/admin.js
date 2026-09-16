@@ -7,6 +7,8 @@ import { HttpError } from './fsutil.js'
 import { disposeRuntime, peekRuntime } from './runtime.js'
 import { onlineUserIds } from './hub.js'
 import { repoLabel } from './git.js'
+import { storageReport } from './storage.js'
+import { DATA_DIR } from './config.js'
 
 export const adminRouter = express.Router()
 adminRouter.use(requireAdmin)
@@ -59,7 +61,13 @@ adminRouter.get('/overview', (req, res) => {
       uptime: process.uptime(),
       memory: process.memoryUsage().rss,
     },
+    storage: storageReport(DATA_DIR),
   })
+})
+
+// lightweight check the app shell uses to warn admins about non-persistent storage
+adminRouter.get('/storage', (req, res) => {
+  res.json({ storage: storageReport(DATA_DIR) })
 })
 
 adminRouter.post('/users', async (req, res) => {

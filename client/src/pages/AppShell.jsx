@@ -22,6 +22,7 @@ import { SettingsModal } from '../components/modals/Settings.jsx'
 import { NewWorkspaceModal, ShareModal, HistoryModal, MoveModal, ImportModal, ShortcutsModal } from '../components/modals/Misc.jsx'
 import { Modal, WsIcon, Avatar, Spinner, menuFromElement } from '../components/ui.jsx'
 import { PasswordInput } from './Auth.jsx'
+import { StorageWarning } from '../components/StorageWarning.jsx'
 import { basename, stripExt } from '@shared/paths.js'
 
 export default function AppShell() {
@@ -136,6 +137,7 @@ export default function AppShell() {
 
   return (
     <div className={`app ${layout.focus ? 'focus-mode' : ''}`}>
+      {user?.isAdmin && <StorageWarning compact />}
       <MobileHeader ws={ws} activeTab={activeTab} />
       <div className="app-body">
         <Ribbon user={user} />

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Users, FolderGit2, Globe, Activity, UserPlus, Link2, MoreHorizontal, ShieldCheck, Trash2, KeyRound, Ban, CheckCircle2, ArrowLeft, RefreshCw, Copy, Cloud, Cpu, Radio } from 'lucide-react'
+import { Users, FolderGit2, Globe, Activity, UserPlus, HardDrive, Link2, MoreHorizontal, ShieldCheck, Trash2, KeyRound, Ban, CheckCircle2, ArrowLeft, RefreshCw, Copy, Cloud, Cpu, Radio } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { useApp } from '../store/app.js'
 import { navigate } from '../lib/router.js'
@@ -7,6 +7,7 @@ import { Avatar, Modal, Switch, Spinner, menuFromElement } from '../components/u
 import { PasswordInput } from './Auth.jsx'
 import { useUI, toast, confirmDialog, promptDialog } from '../store/ui.js'
 import { timeAgo, formatBytes, copyText } from '../lib/util.js'
+import { StorageWarning } from '../components/StorageWarning.jsx'
 
 export default function AdminPage() {
   const user = useApp((s) => s.user)
@@ -155,6 +156,7 @@ export default function AdminPage() {
           </div>
         ) : (
           <>
+            <StorageWarning storage={data.storage} />
             <div className="stats">
               <Stat icon={Users} label="Users" value={s.users} />
               <Stat icon={Radio} label="Online now" value={s.online} />
@@ -162,6 +164,13 @@ export default function AdminPage() {
               <Stat icon={FolderGit2} label="GitHub synced" value={s.github} />
               <Stat icon={Globe} label="Published notes" value={s.publishedNotes} />
               <Stat icon={Cpu} label="Memory" value={formatBytes(s.memory)} />
+              <Stat
+                icon={HardDrive}
+                label="Storage"
+                value={data.storage.persistent ? 'Persistent' : 'Temporary'}
+                sub={`${data.storage.source || data.storage.kind} · data since ${new Date(data.storage.createdAt).toLocaleDateString()}`}
+                tone={data.storage.persistent ? null : 'danger'}
+              />
             </div>
 
             <div className="card">
@@ -364,13 +373,14 @@ export default function AdminPage() {
   )
 }
 
-function Stat({ icon: Icon, label, value }) {
+function Stat({ icon: Icon, label, value, sub, tone }) {
   return (
-    <div className="stat">
+    <div className={`stat ${tone ? `stat-${tone}` : ''}`}>
       <div className="stat-label">
         <Icon /> {label}
       </div>
       <div className="stat-value">{value}</div>
+      {sub && <div className="stat-sub" title={sub}>{sub}</div>}
     </div>
   )
 }

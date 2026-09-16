@@ -107,6 +107,7 @@ export const api = {
 
   // admin
   adminOverview: () => request('GET', '/api/admin/overview'),
+  adminStorage: () => request('GET', '/api/admin/storage'),
   adminCreateUser: (body) => request('POST', '/api/admin/users', body),
   adminUpdateUser: (id, body) => request('PATCH', `/api/admin/users/${id}`, body),
   adminDeleteUser: (id) => request('DELETE', `/api/admin/users/${id}`),

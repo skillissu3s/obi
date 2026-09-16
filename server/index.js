@@ -14,6 +14,7 @@ import { attachWebSocket } from './wsserver.js'
 import { shutdownAll, workspaceDir } from './runtime.js'
 import { createUser } from './users.js'
 import { hashPassword } from './security.js'
+import { warnIfEphemeral, dataCreatedAt } from './storage.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DIST = path.resolve(__dirname, '../dist')
@@ -103,6 +104,8 @@ function housekeeping() {
 }
 
 await bootstrapAdmin()
+dataCreatedAt()
+warnIfEphemeral(DATA_DIR)
 housekeeping()
 setInterval(housekeeping, 6 * 3600 * 1000).unref()
 
