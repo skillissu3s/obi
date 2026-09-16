@@ -582,6 +582,10 @@
   margin-top: 3px;
   font-size: 15px;
 }
+.task-row.busy {
+  opacity: 0.5;
+  cursor: progress;
+}
 .task-row.done .task-text {
   color: var(--text-3);
   text-decoration: line-through;
@@ -893,6 +897,30 @@
 .setting-name {
   font-weight: 550;
   font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.save-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  animation: fadeIn 140ms var(--ease);
+}
+.save-hint.saved {
+  color: var(--success);
+}
+.save-hint svg {
+  width: 12px;
+  height: 12px;
+}
+.save-hint .spinner {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
 }
 .setting-desc {
   font-size: 12px;

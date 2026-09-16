@@ -15,16 +15,37 @@ import { timeAgo, formatBytes, copyText, modKey } from '../../lib/util.js'
 import { PasswordInput } from '../../pages/Auth.jsx'
 import { basename, stripExt } from '@shared/paths.js'
 
-function Setting({ name, desc, children }) {
+function Setting({ name, desc, children, status }) {
   return (
     <div className="setting">
       <div className="setting-text">
-        <div className="setting-name">{name}</div>
+        <div className="setting-name">
+          {name}
+          {status === 'saving' && <span className="save-hint"><span className="spinner sm" /> Saving…</span>}
+          {status === 'saved' && <span className="save-hint saved"><Check /> Saved</span>}
+        </div>
         {desc && <div className="setting-desc">{desc}</div>}
       </div>
       <div className="setting-control">{children}</div>
     </div>
   )
+}
+
+// tracks per-field save state: idle -> saving -> saved (fades back to idle)
+function useSaveStatus() {
+  const [status, setStatus] = useState({})
+  const run = async (key, fn) => {
+    setStatus((s) => ({ ...s, [key]: 'saving' }))
+    try {
+      await fn()
+      setStatus((s) => ({ ...s, [key]: 'saved' }))
+      setTimeout(() => setStatus((s) => (s[key] === 'saved' ? { ...s, [key]: undefined } : s)), 2000)
+    } catch (e) {
+      setStatus((s) => ({ ...s, [key]: undefined }))
+      toast.error(e)
+    }
+  }
+  return [status, run]
 }
 
 export function SettingsModal({ section: initial }) {
@@ -95,22 +116,25 @@ function AccountSection({ user }) {
     api.sessions().then((r) => setSessions(r.sessions)).catch(() => {})
   }, [])
 
-  const saveName = async () => {
-    try {
+  const [status, run] = useSaveStatus()
+  const [pwBusy, setPwBusy] = useState(false)
+  const saveName = () => {
+    if (name === user.displayName) return
+    run('name', async () => {
       const { user: u } = await api.updateMe({ displayName: name })
       useApp.getState().setUser(u)
-      toast.success('Saved')
-    } catch (e) {
-      toast.error(e)
-    }
+    })
   }
   const changePw = async () => {
+    setPwBusy(true)
     try {
       await api.changePassword(pw.current, pw.next)
       setPw({ current: '', next: '' })
       toast.success('Password changed — other devices were signed out')
     } catch (e) {
       toast.error(e)
+    } finally {
+      setPwBusy(false)
     }
   }
 
@@ -127,20 +151,22 @@ function AccountSection({ user }) {
           </div>
         </div>
       </div>
-      <Setting name="Display name" desc="Shown to collaborators on shared notes.">
+      <Setting name="Display name" desc="Shown to collaborators on shared notes." status={status.name}>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} />
       </Setting>
-      <Setting name="Cursor colour" desc="Your colour in shared documents.">
+      <Setting name="Cursor colour" desc="Your colour in shared documents." status={status.color}>
         <div className="accent-swatches">
           {['#2f9e78', '#d1703f', '#b8604f', '#c0913a', '#2a93a3', '#5566cf', '#96549e', '#7f9a44', '#c26a8a', '#7c776d'].map((c) => (
             <button
               key={c}
               className={`swatch ${user.color === c ? 'active' : ''}`}
               style={{ background: c, color: c }}
-              onClick={async () => {
-                const { user: u } = await api.updateMe({ color: c })
-                useApp.getState().setUser(u)
-              }}
+              onClick={() =>
+                run('color', async () => {
+                  const { user: u } = await api.updateMe({ color: c })
+                  useApp.getState().setUser(u)
+                })
+              }
             />
           ))}
         </div>
@@ -154,8 +180,8 @@ function AccountSection({ user }) {
         <label>New password</label>
         <PasswordInput value={pw.next} onChange={(v) => setPw({ ...pw, next: v })} autoComplete="new-password" placeholder="At least 8 characters" />
       </div>
-      <button className="btn btn-primary" disabled={!pw.current || pw.next.length < 8} onClick={changePw}>
-        <KeyRound /> Update password
+      <button className="btn btn-primary" disabled={!pw.current || pw.next.length < 8 || pwBusy} onClick={changePw}>
+        {pwBusy ? <Spinner size="sm" /> : <KeyRound />} {pwBusy ? 'Updating…' : 'Update password'}
       </button>
 
       <h3>Sessions</h3>
@@ -327,20 +353,18 @@ function EditorSection() {
 function WorkspaceSection({ ws, isOwner }) {
   const [name, setName] = useState(ws?.name || '')
   const [icon, setIcon] = useState(ws?.icon || '')
+  const [status, run] = useSaveStatus()
   useEffect(() => {
     setName(ws?.name || '')
     setIcon(ws?.icon || '')
   }, [ws?.id])
   if (!ws) return null
 
-  const save = async (patch) => {
-    try {
+  const save = (patch, key = Object.keys(patch)[0]) =>
+    run(key, async () => {
       await api.updateWorkspace(ws.id, patch)
       await useApp.getState().loadWorkspaces()
-    } catch (e) {
-      toast.error(e)
-    }
-  }
+    })
 
   return (
     <>
@@ -366,10 +390,10 @@ function WorkspaceSection({ ws, isOwner }) {
           </div>
         </div>
       </div>
-      <Setting name="Name">
+      <Setting name="Name" status={status.name}>
         <input className="input" value={name} disabled={!isOwner} onChange={(e) => setName(e.target.value)} onBlur={() => name !== ws.name && save({ name })} />
       </Setting>
-      <Setting name="Icon">
+      <Setting name="Icon" status={status.icon}>
         <div style={{ width: 260 }}>
           <EmojiPicker
             value={icon}
@@ -427,17 +451,14 @@ function GithubSection({ ws, isOwner }) {
   const [branch, setBranch] = useState(ws?.github?.branch || '')
   const [repo, setRepo] = useState(ws?.github?.repo || '')
   const [saving, setSaving] = useState(false)
+  const [status, run] = useSaveStatus()
   const s = ws?.settings || {}
 
-  const save = async (patch) => {
-    try {
+  const save = (patch, key = Object.keys(patch.settings || patch)[0]) =>
+    run(key, async () => {
       await api.updateWorkspace(ws.id, patch)
       await useApp.getState().loadWorkspaces()
-      toast.success('Saved')
-    } catch (e) {
-      toast.error(e)
-    }
-  }
+    })
 
   return (
     <>
@@ -468,19 +489,35 @@ function GithubSection({ ws, isOwner }) {
         </div>
       </div>
 
-      <Setting name="Automatic sync" desc="Push your edits and pull remote changes in the background.">
+      <Setting name="Automatic sync" desc="Push your edits and pull remote changes in the background." status={status.autoSync}>
         <Switch checked={s.autoSync !== false} onChange={(v) => save({ settings: { autoSync: v } })} />
       </Setting>
-      <Setting name="Push after" desc="Seconds of inactivity before committing and pushing.">
-        <input className="input" type="number" min="5" max="600" defaultValue={s.autoSyncSeconds ?? 30} onBlur={(e) => save({ settings: { autoSyncSeconds: Number(e.target.value) } })} style={{ width: 110 }} />
+      <Setting name="Push after" desc="Seconds of inactivity before committing and pushing." status={status.autoSyncSeconds}>
+        <input
+          className="input"
+          type="number"
+          min="5"
+          max="600"
+          defaultValue={s.autoSyncSeconds ?? 30}
+          onBlur={(e) => Number(e.target.value) !== (s.autoSyncSeconds ?? 30) && save({ settings: { autoSyncSeconds: Number(e.target.value) } })}
+          style={{ width: 110 }}
+        />
       </Setting>
-      <Setting name="Pull every" desc="Seconds between checks for changes made elsewhere (e.g. Obsidian).">
-        <input className="input" type="number" min="30" max="3600" defaultValue={s.pullIntervalSeconds ?? 120} onBlur={(e) => save({ settings: { pullIntervalSeconds: Number(e.target.value) } })} style={{ width: 110 }} />
+      <Setting name="Pull every" desc="Seconds between checks for changes made elsewhere (e.g. Obsidian)." status={status.pullIntervalSeconds}>
+        <input
+          className="input"
+          type="number"
+          min="30"
+          max="3600"
+          defaultValue={s.pullIntervalSeconds ?? 120}
+          onBlur={(e) => Number(e.target.value) !== (s.pullIntervalSeconds ?? 120) && save({ settings: { pullIntervalSeconds: Number(e.target.value) } })}
+          style={{ width: 110 }}
+        />
       </Setting>
-      <Setting name="Commit author" desc="Name and email used for commits Obi creates.">
+      <Setting name="Commit author" desc="Name and email used for commits Obi creates." status={status.authorName || status.authorEmail}>
         <div className="row">
-          <input className="input" placeholder="Name" defaultValue={s.authorName || ''} onBlur={(e) => save({ settings: { authorName: e.target.value } })} style={{ width: 130 }} />
-          <input className="input" placeholder="email@example.com" defaultValue={s.authorEmail || ''} onBlur={(e) => save({ settings: { authorEmail: e.target.value } })} style={{ width: 180 }} />
+          <input className="input" placeholder="Name" defaultValue={s.authorName || ''} onBlur={(e) => e.target.value !== (s.authorName || '') && save({ settings: { authorName: e.target.value } })} style={{ width: 130 }} />
+          <input className="input" placeholder="email@example.com" defaultValue={s.authorEmail || ''} onBlur={(e) => e.target.value !== (s.authorEmail || '') && save({ settings: { authorEmail: e.target.value } })} style={{ width: 180 }} />
         </div>
       </Setting>
 
@@ -495,12 +532,19 @@ function GithubSection({ ws, isOwner }) {
                 disabled={!token || saving}
                 onClick={async () => {
                   setSaving(true)
-                  await save({ github: { token } })
-                  setToken('')
-                  setSaving(false)
+                  try {
+                    await api.updateWorkspace(ws.id, { github: { token } })
+                    await useApp.getState().loadWorkspaces()
+                    setToken('')
+                    toast.success('Token updated — reconnecting')
+                  } catch (e) {
+                    toast.error(e)
+                  } finally {
+                    setSaving(false)
+                  }
                 }}
               >
-                Update
+                {saving ? <Spinner size="sm" /> : null} {saving ? 'Checking…' : 'Update'}
               </button>
             </div>
           </Setting>
@@ -529,26 +573,43 @@ function GithubSection({ ws, isOwner }) {
 }
 
 function MembersSection({ ws, isOwner }) {
-  const [members, setMembers] = useState([])
+  const [members, setMembers] = useState(null)
   const [users, setUsers] = useState([])
   const [username, setUsername] = useState('')
   const [role, setRole] = useState('editor')
+  const [adding, setAdding] = useState(false)
+  const [busyId, setBusyId] = useState(null)
   const me = useApp((s) => s.user)
 
-  const load = () => api.members(ws.id).then((r) => setMembers(r.members)).catch(() => {})
+  const load = () => api.members(ws.id).then((r) => setMembers(r.members)).catch(() => setMembers([]))
   useEffect(() => {
     load()
     api.users().then((r) => setUsers(r.users)).catch(() => {})
   }, [ws.id])
 
   const add = async () => {
+    setAdding(true)
     try {
       await api.addMember(ws.id, username.replace(/^@/, ''), role)
       setUsername('')
-      load()
+      await load()
       toast.success('Member added')
     } catch (e) {
       toast.error(e)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const withBusy = async (id, fn) => {
+    setBusyId(id)
+    try {
+      await fn()
+      await load()
+    } catch (e) {
+      toast.error(e)
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -570,12 +631,17 @@ function MembersSection({ ws, isOwner }) {
             <option value="editor">Can edit</option>
             <option value="viewer">Can view</option>
           </select>
-          <button className="btn btn-primary" disabled={!username} onClick={add}>
-            <Plus /> Invite
+          <button className="btn btn-primary" disabled={!username || adding} onClick={add}>
+            {adding ? <Spinner size="sm" /> : <Plus />} {adding ? 'Adding…' : 'Invite'}
           </button>
         </div>
       )}
-      {members.map((m) => (
+      {!members && (
+        <div className="row faint" style={{ gap: 8 }}>
+          <Spinner size="sm" /> Loading members…
+        </div>
+      )}
+      {(members || []).map((m) => (
         <div className="person-row" key={m.id}>
           <Avatar name={m.displayName} color={m.color} size={32} />
           <div className="grow">
@@ -593,23 +659,14 @@ function MembersSection({ ws, isOwner }) {
               <select
                 className="select"
                 value={m.role}
-                onChange={async (e) => {
-                  await api.setMemberRole(ws.id, m.id, e.target.value)
-                  load()
-                }}
+                disabled={busyId === m.id}
+                onChange={(e) => withBusy(m.id, () => api.setMemberRole(ws.id, m.id, e.target.value))}
               >
                 <option value="editor">Can edit</option>
                 <option value="viewer">Can view</option>
               </select>
-              <button
-                className="icon-btn"
-                title="Remove"
-                onClick={async () => {
-                  await api.removeMember(ws.id, m.id)
-                  load()
-                }}
-              >
-                <X />
+              <button className="icon-btn" title="Remove" disabled={busyId === m.id} onClick={() => withBusy(m.id, () => api.removeMember(ws.id, m.id))}>
+                {busyId === m.id ? <Spinner size="sm" /> : <X />}
               </button>
             </>
           ) : (
@@ -623,35 +680,35 @@ function MembersSection({ ws, isOwner }) {
 
 function NotesSection({ ws, isOwner }) {
   const s = ws?.settings || {}
-  const save = async (patch) => {
-    try {
-      await api.updateWorkspace(ws.id, { settings: patch })
+  const [status, run] = useSaveStatus()
+  const save = (key, value, fallback) => (e) => {
+    if (e.target.value === (s[key] ?? fallback)) return
+    run(key, async () => {
+      await api.updateWorkspace(ws.id, { settings: { [key]: e.target.value } })
       await useApp.getState().loadWorkspaces()
-    } catch (e) {
-      toast.error(e)
-    }
+    })
   }
   return (
     <>
       <h2>Notes & daily notes</h2>
-      <p className="section-sub">Where new things go.</p>
-      <Setting name="Daily notes folder" desc="Daily notes are created here.">
-        <input className="input" defaultValue={s.dailyFolder ?? 'Daily'} onBlur={(e) => save({ dailyFolder: e.target.value })} />
+      <p className="section-sub">Where new things go. Changes save when you click away.</p>
+      <Setting name="Daily notes folder" desc="Daily notes are created here." status={status.dailyFolder}>
+        <input className="input" defaultValue={s.dailyFolder ?? 'Daily'} onBlur={save('dailyFolder', null, 'Daily')} />
       </Setting>
-      <Setting name="Daily note format" desc="Tokens: YYYY MM DD ddd. Example: YYYY-MM-DD or YYYY/MM/YYYY-MM-DD.">
-        <input className="input" defaultValue={s.dailyFormat ?? 'YYYY-MM-DD'} onBlur={(e) => save({ dailyFormat: e.target.value })} />
+      <Setting name="Daily note format" desc="Tokens: YYYY MM DD ddd. Example: YYYY-MM-DD or YYYY/MM/YYYY-MM-DD." status={status.dailyFormat}>
+        <input className="input" defaultValue={s.dailyFormat ?? 'YYYY-MM-DD'} onBlur={save('dailyFormat', null, 'YYYY-MM-DD')} />
       </Setting>
-      <Setting name="Daily note template" desc="Path to a note used as the template, e.g. Templates/Daily.md.">
-        <input className="input" defaultValue={s.dailyTemplate ?? ''} placeholder="Templates/Daily.md" onBlur={(e) => save({ dailyTemplate: e.target.value })} />
+      <Setting name="Daily note template" desc="Path to a note used as the template, e.g. Templates/Daily.md." status={status.dailyTemplate}>
+        <input className="input" defaultValue={s.dailyTemplate ?? ''} placeholder="Templates/Daily.md" onBlur={save('dailyTemplate', null, '')} />
       </Setting>
-      <Setting name="Templates folder" desc="Notes here show up in the / menu and “Insert template”.">
-        <input className="input" defaultValue={s.templatesFolder ?? 'Templates'} onBlur={(e) => save({ templatesFolder: e.target.value })} />
+      <Setting name="Templates folder" desc="Notes here show up in the / menu and “Insert template”." status={status.templatesFolder}>
+        <input className="input" defaultValue={s.templatesFolder ?? 'Templates'} onBlur={save('templatesFolder', null, 'Templates')} />
       </Setting>
-      <Setting name="Attachments folder" desc="Pasted images and uploads are saved here.">
-        <input className="input" defaultValue={s.attachmentsFolder ?? 'attachments'} onBlur={(e) => save({ attachmentsFolder: e.target.value })} />
+      <Setting name="Attachments folder" desc="Pasted images and uploads are saved here." status={status.attachmentsFolder}>
+        <input className="input" defaultValue={s.attachmentsFolder ?? 'attachments'} onBlur={save('attachmentsFolder', null, 'attachments')} />
       </Setting>
-      <Setting name="New note location" desc="Leave empty to create notes next to the note you're reading.">
-        <input className="input" defaultValue={s.newNoteFolder ?? ''} placeholder="(same folder)" onBlur={(e) => save({ newNoteFolder: e.target.value })} />
+      <Setting name="New note location" desc="Leave empty to create notes next to the note you're reading." status={status.newNoteFolder}>
+        <input className="input" defaultValue={s.newNoteFolder ?? ''} placeholder="(same folder)" onBlur={save('newNoteFolder', null, '')} />
       </Setting>
     </>
   )
@@ -659,13 +716,25 @@ function NotesSection({ ws, isOwner }) {
 
 function DataSection({ ws }) {
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
   return (
     <>
       <h2>Import & export</h2>
       <p className="section-sub">Your notes are plain markdown — take them anywhere.</p>
-      <Setting name="Export workspace" desc="Download every note and attachment as a .zip archive.">
-        <button className="btn" onClick={() => A.exportWorkspace()}>
-          <Download /> Export .zip
+      <Setting name="Export workspace" desc="Download every note and attachment as a .zip archive." status={exporting ? 'saving' : undefined}>
+        <button
+          className="btn"
+          disabled={exporting}
+          onClick={async () => {
+            setExporting(true)
+            try {
+              await A.exportWorkspace()
+            } finally {
+              setExporting(false)
+            }
+          }}
+        >
+          {exporting ? <Spinner size="sm" /> : <Download />} {exporting ? 'Preparing…' : 'Export .zip'}
         </button>
       </Setting>
       <Setting name="Import files" desc="Upload markdown files, folders or a .zip (for example an Obsidian vault).">
@@ -712,15 +781,31 @@ function DataSection({ ws }) {
 
 function TrashSection({ ws }) {
   const [items, setItems] = useState(null)
+  const [busyId, setBusyId] = useState(null)
   const load = () => api.trash(ws.id).then((r) => setItems(r.items)).catch(() => setItems([]))
   useEffect(() => {
     load()
   }, [ws.id])
+  const withBusy = async (id, fn) => {
+    setBusyId(id)
+    try {
+      await fn()
+      await load()
+    } catch (e) {
+      toast.error(e)
+    } finally {
+      setBusyId(null)
+    }
+  }
   return (
     <>
       <h2>Trash</h2>
       <p className="section-sub">Deleted notes are kept for 30 days.</p>
-      {!items && <Spinner size="sm" />}
+      {!items && (
+        <div className="row faint" style={{ gap: 8 }}>
+          <Spinner size="sm" /> Loading trash…
+        </div>
+      )}
       {items?.length === 0 && <div className="empty">Trash is empty</div>}
       {items?.map((i) => (
         <div className="setting" key={i.id}>
@@ -733,23 +818,25 @@ function TrashSection({ ws }) {
           <div className="setting-control">
             <button
               className="btn btn-sm"
-              onClick={async () => {
-                const { path } = await api.restoreTrash(ws.id, i.id)
-                toast.success(`Restored to ${path}`)
-                useApp.getState().refreshTree()
-                useApp.getState().refreshIndex()
-                load()
-              }}
+              disabled={busyId === i.id}
+              onClick={() =>
+                withBusy(i.id, async () => {
+                  const { path } = await api.restoreTrash(ws.id, i.id)
+                  toast.success(`Restored to ${path}`)
+                  useApp.getState().refreshTree()
+                  useApp.getState().refreshIndex()
+                })
+              }
             >
-              Restore
+              {busyId === i.id ? <Spinner size="sm" /> : null} {busyId === i.id ? 'Restoring…' : 'Restore'}
             </button>
             <button
               className="icon-btn"
               title="Delete permanently"
+              disabled={busyId === i.id}
               onClick={async () => {
                 if (!(await confirmDialog({ title: 'Delete permanently?', danger: true, confirmText: 'Delete' }))) return
-                await api.purgeTrash(ws.id, i.id)
-                load()
+                withBusy(i.id, () => api.purgeTrash(ws.id, i.id))
               }}
             >
               <Trash2 />

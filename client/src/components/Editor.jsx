@@ -6,6 +6,7 @@ import { editorCtx, refreshEffect } from '../editor/livePreview.js'
 import { usePrefs } from '../store/prefs.js'
 import { useApp } from '../store/app.js'
 import { buildEditorCtx, uploadFiles } from '../lib/actions.js'
+import { toast } from '../store/ui.js'
 
 const scrollMemory = new Map()
 
@@ -158,16 +159,20 @@ function flashLine(view, pos) {
 }
 
 async function handlePasteFiles(view, files, pos) {
-  const ctx = view.state.facet(editorCtx)
   const at = pos ?? view.state.selection.main.head
-  const placeholder = `![[uploading ${files.length} file…]]`
-  view.dispatch({ changes: { from: at, insert: placeholder } })
-  const paths = await uploadFiles(files)
-  const text = paths.map((p) => `![[${p.split('/').pop()}]]`).join('\n')
+  // visible placeholder while the upload runs, swapped for the embed when it lands
+  const placeholder = `⏳ Uploading ${files.length === 1 ? files[0].name || 'file' : `${files.length} files`}…`
+  view.dispatch({ changes: { from: at, insert: placeholder }, selection: { anchor: at + placeholder.length } })
+  let text = ''
+  try {
+    const paths = await uploadFiles(files)
+    text = paths.map((p) => `![[${p.split('/').pop()}]]`).join('\n')
+  } catch (e) {
+    toast.error(e)
+  }
   const cur = view.state.doc.toString().indexOf(placeholder)
-  if (cur >= 0) view.dispatch({ changes: { from: cur, to: cur + placeholder.length, insert: text || '' } })
+  if (cur >= 0) view.dispatch({ changes: { from: cur, to: cur + placeholder.length, insert: text }, selection: { anchor: cur + text.length } })
   else if (text) view.dispatch({ changes: { from: view.state.selection.main.head, insert: text } })
-  void ctx
 }
 
 function statsFor(state) {

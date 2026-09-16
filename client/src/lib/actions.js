@@ -58,16 +58,20 @@ export async function openLink(ws, fromPath, linkText, opts = {}) {
   const folder = wsSettings().newNoteFolder || dirname(fromPath || '')
   const name = decodeTarget(target).endsWith('.md') ? decodeTarget(target) : `${decodeTarget(target)}.md`
   const path = name.includes('/') ? name : joinPath(folder, name)
+  app().addEntry(path)
+  app().setPending(ws, path, 'creating')
+  openPath(ws, path, opts)
   try {
     await api.writeNote(s.wsId, path, `# ${stripExt(basename(path))}\n\n`, { mustNotExist: true })
-    app().addEntry(path)
+    app().clearPending(ws, path)
   } catch (e) {
+    app().clearPending(ws, path)
     if (e.status !== 409) {
+      app().removeEntry(path)
+      layout().closePaths(ws, path)
       toast.error(e)
-      return
     }
   }
-  openPath(ws, path, opts)
 }
 
 const decodeTarget = (t) => {
@@ -82,16 +86,25 @@ export function scrollToHeading(subpath) {
   window.dispatchEvent(new CustomEvent('obi:scroll-to', { detail: { subpath } }))
 }
 
+// Creates the note optimistically: it shows up in the tree and opens straight away,
+// marked as pending until the server confirms it.
 export async function createNote({ folder = '', title, content, open = true, newTab = false } = {}) {
   const s = app()
+  const ws = s.wsId
   const base = title ? safeName(title) : 'Untitled'
   const path = uniquePath(joinPath(folder, `${base}.md`))
+  s.addEntry(path)
+  s.setPending(ws, path, 'creating')
+  if (open) layout().openNote(ws, path, { newTab })
   try {
-    await api.writeNote(s.wsId, path, content ?? '', { mustNotExist: true })
-    s.addEntry(path)
-    if (open) layout().openNote(s.wsId, path, { newTab, focusTitle: !title })
+    await api.writeNote(ws, path, content ?? '', { mustNotExist: true })
+    app().clearPending(ws, path)
+    if (open && !title) layout().updateTab(layout().panes.flatMap((p) => p.tabs).find((t) => t.kind === 'note' && t.ws === ws && t.path === path)?.id, { focusTitle: true })
     return path
   } catch (e) {
+    app().clearPending(ws, path)
+    app().removeEntry(path)
+    layout().closePaths(ws, path)
     toast.error(e)
     return null
   }
@@ -100,12 +113,18 @@ export async function createNote({ folder = '', title, content, open = true, new
 export async function createFolder(parent = '') {
   const name = await promptDialog({ title: 'New folder', placeholder: 'Folder name', confirmText: 'Create' })
   if (!name) return
+  const s = app()
+  const ws = s.wsId
   const path = uniquePath(joinPath(parent, safeName(name)))
+  s.addEntry(path, 'folder')
+  s.setPending(ws, path, 'creating')
+  s.setExpanded(path, true)
   try {
-    await api.createFolder(app().wsId, path)
-    app().addEntry(path, 'folder')
-    app().setExpanded(path, true)
+    await api.createFolder(ws, path)
+    app().clearPending(ws, path)
   } catch (e) {
+    app().clearPending(ws, path)
+    app().removeEntry(path)
     toast.error(e)
   }
 }
@@ -119,25 +138,27 @@ export async function renameEntry(path) {
   const clean = safeName(name)
   if (!clean) return
   const target = joinPath(dirname(path), isFile && isNote(path) && !clean.endsWith('.md') ? `${clean}.md` : clean)
-  if (target === path) return
-  try {
-    await api.move(app().wsId, path, target)
-    layout().renamePaths(app().wsId, path, target)
-    app().refreshTree()
-  } catch (e) {
-    toast.error(e)
-  }
+  return moveTo(path, target)
 }
 
 export async function moveEntry(path, destFolder) {
-  const target = joinPath(destFolder, basename(path))
+  return moveTo(path, joinPath(destFolder, basename(path)))
+}
+
+export async function moveTo(path, target) {
   if (target === path) return
+  const ws = app().wsId
+  app().setPending(ws, path, 'renaming')
   try {
-    await api.move(app().wsId, path, target)
-    layout().renamePaths(app().wsId, path, target)
+    await api.move(ws, path, target)
+    app().clearPending(ws, path)
+    layout().renamePaths(ws, path, target)
     app().refreshTree()
+    return target
   } catch (e) {
+    app().clearPending(ws, path)
     toast.error(e)
+    return null
   }
 }
 
@@ -158,24 +179,34 @@ export async function deleteEntry(path) {
     })
     if (!ok) return
   }
+  const wsId = app().wsId
+  app().setPending(wsId, path, 'deleting')
   try {
-    await api.remove(app().wsId, path)
-    layout().closePaths(app().wsId, path)
+    await api.remove(wsId, path)
+    app().clearPending(wsId, path)
+    layout().closePaths(wsId, path)
     app().refreshTree()
     toast.success(`Deleted ${basename(path)}`)
   } catch (e) {
+    app().clearPending(wsId, path)
     toast.error(e)
   }
 }
 
 export async function duplicateNote(path) {
+  const ws = app().wsId
+  const target = uniquePath(`${stripExt(path)} copy.md`)
+  app().addEntry(target)
+  app().setPending(ws, target, 'creating')
+  layout().openNote(ws, target)
   try {
-    const { content } = await api.readNote(app().wsId, path)
-    const target = uniquePath(`${stripExt(path)} copy.md`)
-    await api.writeNote(app().wsId, target, content, { mustNotExist: true })
-    app().addEntry(target)
-    layout().openNote(app().wsId, target)
+    const { content } = await api.readNote(ws, path)
+    await api.writeNote(ws, target, content, { mustNotExist: true })
+    app().clearPending(ws, target)
   } catch (e) {
+    app().clearPending(ws, target)
+    app().removeEntry(target)
+    layout().closePaths(ws, target)
     toast.error(e)
   }
 }
@@ -208,25 +239,33 @@ export function dailyNotePath(date = new Date(), settings = wsSettings()) {
 
 export async function openDailyNote(date = new Date(), { newTab } = {}) {
   const s = app()
+  const ws = s.wsId
   const settings = wsSettings()
   const path = dailyNotePath(date, settings)
-  if (!s.treeMap.has(path)) {
-    let content = `# ${formatDate(date, 'dddd, D MMMM YYYY')}\n\n`
-    const tpl = settings.dailyTemplate
-    if (tpl && s.treeMap.has(tpl)) {
-      try {
-        content = applyTemplate(await fetchNote(s.wsId, tpl), { date, title: formatDate(date, settings.dailyFormat || 'YYYY-MM-DD') })
-      } catch {}
-    }
-    try {
-      await api.writeNote(s.wsId, path, content, { ifMissing: true })
-      s.addEntry(path)
-    } catch (e) {
-      toast.error(e)
-      return
-    }
+  if (s.treeMap.has(path)) {
+    layout().openNote(ws, path, { newTab })
+    return
   }
-  layout().openNote(s.wsId, path, { newTab })
+  // create it optimistically — the tab opens now and fills in when the server confirms
+  s.addEntry(path)
+  s.setPending(ws, path, 'creating')
+  layout().openNote(ws, path, { newTab })
+  let content = `# ${formatDate(date, 'dddd, D MMMM YYYY')}\n\n`
+  const tpl = settings.dailyTemplate
+  if (tpl && s.treeMap.has(tpl)) {
+    try {
+      content = applyTemplate(await fetchNote(ws, tpl), { date, title: formatDate(date, settings.dailyFormat || 'YYYY-MM-DD') })
+    } catch {}
+  }
+  try {
+    await api.writeNote(ws, path, content, { ifMissing: true })
+    app().clearPending(ws, path)
+  } catch (e) {
+    app().clearPending(ws, path)
+    app().removeEntry(path)
+    layout().closePaths(ws, path)
+    toast.error(e)
+  }
 }
 
 export function applyTemplate(text, { date = new Date(), title = '' } = {}) {
@@ -290,9 +329,11 @@ export function copyNoteLink(ws, path) {
   toast.success('Link copied')
 }
 
-export function exportWorkspace() {
+// streams straight to disk, so we only hold the button busy long enough to acknowledge the click
+export async function exportWorkspace() {
   downloadUrl(api.exportUrl(app().wsId))
-  toast.info('Preparing download…')
+  await new Promise((r) => setTimeout(r, 900))
+  toast.success('Download started')
 }
 
 export async function importFiles(files, folder = '') {

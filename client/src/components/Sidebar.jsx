@@ -73,6 +73,7 @@ export function FileTree() {
   const scrollRef = useRef(null)
 
   const me = useApp((s) => s.user?.id)
+  const pending = useApp((s) => s.pending)
   const rootNode = useMemo(() => buildTree(tree, prefs.sortBy), [tree, prefs.sortBy])
   const rows = useMemo(() => flatten(rootNode, expanded), [rootNode, expanded])
 
@@ -162,10 +163,11 @@ export function FileTree() {
       {rows.map(({ node, depth }) => {
         const Icon = node.type === 'folder' ? (expanded.has(node.path) ? FolderOpen : Folder) : fileIcon(node.path)
         const viewers = (presence[node.path] || []).filter((u) => u.id !== me)
+        const busy = pending[`${wsId}:${node.path}`]
         return (
           <div
             key={node.path}
-            className={`tree-row ${activePath === node.path ? 'active' : ''} ${selected === node.path ? 'selected' : ''} ${dropTarget === node.path ? 'drop-target' : ''}`}
+            className={`tree-row ${activePath === node.path ? 'active' : ''} ${selected === node.path ? 'selected' : ''} ${dropTarget === node.path ? 'drop-target' : ''} ${busy ? `is-${busy}` : ''}`}
             style={{ paddingLeft: 4 + depth * 13 }}
             draggable={!renaming}
             onDragStart={(e) => {
@@ -200,7 +202,7 @@ export function FileTree() {
             ) : (
               <span style={{ width: 4 }} />
             )}
-            <Icon className="file-icon" />
+            {busy ? <span className="spinner sm file-icon" title={busy === 'creating' ? 'Creating…' : busy === 'deleting' ? 'Deleting…' : 'Renaming…'} /> : <Icon className="file-icon" />}
             {renaming === node.path ? (
               <input
                 className="tree-rename"
@@ -211,16 +213,7 @@ export function FileTree() {
                   const v = e.target.value.trim()
                   setRenaming(null)
                   const cur = isNote(node.path) ? stripExt(node.name) : node.name
-                  if (v && v !== cur) {
-                    const target = joinPath(dirname(node.path), isNote(node.path) ? `${v}.md` : v)
-                    api
-                      .move(wsId, node.path, target)
-                      .then(() => {
-                        useLayout.getState().renamePaths(wsId, node.path, target)
-                        useApp.getState().refreshTree()
-                      })
-                      .catch(toast.error)
-                  }
+                  if (v && v !== cur) A.moveTo(node.path, joinPath(dirname(node.path), isNote(node.path) ? `${v}.md` : v))
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') e.target.blur()
@@ -345,7 +338,7 @@ export function SearchPanel() {
           <span>
             {results.length} note{results.length === 1 ? '' : 's'} · {total} match{total === 1 ? '' : 'es'}
           </span>
-          <span>{busy ? '…' : `${took}ms`}</span>
+          <span className="row" style={{ gap: 5 }}>{busy ? <><span className="spinner sm" /> searching</> : `${took}ms`}</span>
         </div>
       )}
       <div className="sidebar-scroll">

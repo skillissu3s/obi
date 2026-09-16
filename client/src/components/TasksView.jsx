@@ -119,7 +119,7 @@ export function TasksView() {
               <span className="badge">{list.length}</span>
             </div>
             {list.map((t) => (
-              <div className={`task-row ${t.checked ? 'done' : ''}`} key={`${t.path}:${t.line}`}>
+              <div className={`task-row ${t.checked ? 'done' : ''} ${busy === `${t.path}:${t.line}` ? 'busy' : ''}`} key={`${t.path}:${t.line}`}>
                 <input type="checkbox" className="task-cb" checked={t.checked} disabled={busy === `${t.path}:${t.line}`} onChange={() => toggle(t)} />
                 <div className="task-text" dangerouslySetInnerHTML={{ __html: renderInline(t.text.replace(/📅\s*(\d{4}-\d{2}-\d{2})/, ''), { ws: wsId, path: t.path }) }} />
                 {t.due && <span className={`due-chip ${!t.checked && t.due < today() ? 'overdue' : t.due === today() ? 'today' : ''}`}>{t.due}</span>}

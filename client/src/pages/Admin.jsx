@@ -14,6 +14,7 @@ export default function AdminPage() {
   const [creating, setCreating] = useState(false)
   const [invite, setInvite] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [busyRow, setBusyRow] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -46,6 +47,19 @@ export default function AdminPage() {
     )
   }
 
+  const runFor = async (id, fn, okMessage) => {
+    setBusyRow(id)
+    try {
+      await fn()
+      if (okMessage) toast.success(okMessage)
+      await load()
+    } catch (err) {
+      toast.error(err)
+    } finally {
+      setBusyRow(null)
+    }
+  }
+
   const userMenu = (e, u) => {
     const self = u.id === user.id
     useUI.getState().showContextMenu(menuFromElement(e.currentTarget), [
@@ -55,12 +69,7 @@ export default function AdminPage() {
         run: async () => {
           const pw = await promptDialog({ title: `Reset password for ${u.displayName}`, message: 'They will be signed out everywhere and asked to choose a new password on next login.', placeholder: 'New password (min 8 characters)' })
           if (!pw) return
-          try {
-            await api.adminUpdateUser(u.id, { password: pw, mustChangePassword: !self })
-            toast.success('Password updated')
-          } catch (err) {
-            toast.error(err)
-          }
+          runFor(u.id, () => api.adminUpdateUser(u.id, { password: pw, mustChangePassword: !self }), 'Password updated')
         },
       },
       {
@@ -69,25 +78,18 @@ export default function AdminPage() {
         run: async () => {
           const name = await promptDialog({ title: 'Display name', value: u.displayName })
           if (!name) return
-          await api.adminUpdateUser(u.id, { displayName: name }).catch(toast.error)
-          load()
+          runFor(u.id, () => api.adminUpdateUser(u.id, { displayName: name }))
         },
       },
       !self && {
         label: u.isAdmin ? 'Remove admin access' : 'Make admin',
         icon: ShieldCheck,
-        run: async () => {
-          await api.adminUpdateUser(u.id, { isAdmin: !u.isAdmin }).catch(toast.error)
-          load()
-        },
+        run: () => runFor(u.id, () => api.adminUpdateUser(u.id, { isAdmin: !u.isAdmin }), u.isAdmin ? 'Admin access removed' : 'Now an admin'),
       },
       !self && {
         label: u.disabled ? 'Enable account' : 'Disable account',
         icon: u.disabled ? CheckCircle2 : Ban,
-        run: async () => {
-          await api.adminUpdateUser(u.id, { disabled: !u.disabled }).catch(toast.error)
-          load()
-        },
+        run: () => runFor(u.id, () => api.adminUpdateUser(u.id, { disabled: !u.disabled }), u.disabled ? 'Account enabled' : 'Account disabled'),
       },
       !self && 'divider',
       !self && {
@@ -97,13 +99,7 @@ export default function AdminPage() {
         run: async () => {
           const ok = await confirmDialog({ title: `Delete ${u.displayName}?`, message: 'This permanently deletes the user and every workspace they own (GitHub repositories themselves are not touched).', danger: true, confirmText: 'Delete user' })
           if (!ok) return
-          try {
-            await api.adminDeleteUser(u.id)
-            toast.success('User deleted')
-            load()
-          } catch (err) {
-            toast.error(err)
-          }
+          runFor(u.id, () => api.adminDeleteUser(u.id), 'User deleted')
         },
       },
     ])
@@ -218,9 +214,13 @@ export default function AdminPage() {
                         <td>{u.workspaceCount}</td>
                         <td className="faint">{u.lastLoginAt ? timeAgo(u.lastLoginAt) : 'Never'}</td>
                         <td style={{ textAlign: 'right' }}>
-                          <button className="icon-btn" onClick={(e) => userMenu(e, u)}>
-                            <MoreHorizontal />
-                          </button>
+                          {busyRow === u.id ? (
+                            <Spinner size="sm" />
+                          ) : (
+                            <button className="icon-btn" onClick={(e) => userMenu(e, u)}>
+                              <MoreHorizontal />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -266,14 +266,14 @@ export default function AdminPage() {
                           <button
                             className="icon-btn"
                             title="Delete workspace"
+                            disabled={busyRow === w.id}
                             onClick={async () => {
                               const ok = await confirmDialog({ title: `Delete “${w.name}”?`, message: w.type === 'github' ? 'Removes the server copy. The GitHub repository is not affected.' : 'All notes in this workspace will be permanently deleted.', danger: true, confirmText: 'Delete' })
                               if (!ok) return
-                              await api.adminDeleteWorkspace(w.id).catch(toast.error)
-                              load()
+                              runFor(w.id, () => api.adminDeleteWorkspace(w.id), 'Workspace deleted')
                             }}
                           >
-                            <Trash2 />
+                            {busyRow === w.id ? <Spinner size="sm" /> : <Trash2 />}
                           </button>
                         </td>
                       </tr>

@@ -26,6 +26,19 @@ export const useApp = create((set, get) => ({
   shared: [],
   expanded: new Set(),
   selectedPath: null,
+  pending: {}, // `${ws}:${path}` -> 'creating' | 'renaming' | 'deleting' | 'saving'
+
+  setPending(ws, path, kind) {
+    useApp.setState({ pending: { ...get().pending, [`${ws}:${path}`]: kind } })
+  },
+  clearPending(ws, path) {
+    const next = { ...get().pending }
+    delete next[`${ws}:${path}`]
+    useApp.setState({ pending: next })
+  },
+  isPending(ws, path) {
+    return get().pending[`${ws}:${path}`] || null
+  },
 
   setUser(user) {
     set({ user })
@@ -125,6 +138,13 @@ export const useApp = create((set, get) => ({
       d = dirname(d)
     }
     get().applyTree(entries)
+  },
+
+  // roll back an optimistic insert
+  removeEntry(path) {
+    const s = get()
+    if (!s.treeMap.has(path)) return
+    get().applyTree(s.tree.filter((e) => e.path !== path && !e.path.startsWith(path + '/')))
   },
 
   setExpanded(path, open) {

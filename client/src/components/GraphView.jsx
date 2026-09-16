@@ -63,7 +63,7 @@ export function GraphView() {
   const { renderer, hover, count, links } = useGraph(canvasRef, {
     options,
     onClick: (node, e) => {
-      if (node.type === 'note') useLayout.getState().openNote(wsId, node.path, { newTab: e.metaKey || e.ctrlKey })
+      if (node.type === 'note') useLayout.getState().openNote(wsId, node.path, { newTab: e.metaKey || e.ctrlKey || e.button === 1 })
       else if (node.type === 'tag') window.dispatchEvent(new CustomEvent('obi:search', { detail: { query: `tag:${node.label.slice(1)}` } }))
     },
   })

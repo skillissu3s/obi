@@ -188,6 +188,8 @@ export function ShareModal({ ws: wsId, path }) {
   const [username, setUsername] = useState('')
   const [role, setRole] = useState('editor')
   const [busy, setBusy] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [removing, setRemoving] = useState(null)
 
   const load = () => api.shares(wsId, path).then(setData).catch((e) => toast.error(e))
   useEffect(() => {
@@ -200,7 +202,7 @@ export function ShareModal({ ws: wsId, path }) {
     try {
       await api.shareNote(wsId, path, username.replace(/^@/, ''), role)
       setUsername('')
-      load()
+      await load()
     } catch (e) {
       toast.error(e)
     } finally {
@@ -228,7 +230,7 @@ export function ShareModal({ ws: wsId, path }) {
               <option value="viewer">Can view</option>
             </select>
             <button className="btn btn-primary" disabled={!username || busy} onClick={share}>
-              Share
+              {busy ? <Spinner size="sm" /> : null} {busy ? 'Sharing…' : 'Share'}
             </button>
           </div>
           {data?.shares?.map((s) => (
@@ -244,15 +246,28 @@ export function ShareModal({ ws: wsId, path }) {
               <button
                 className="icon-btn"
                 title="Remove access"
+                disabled={removing === s.id}
                 onClick={async () => {
-                  await api.unshareNote(wsId, path, s.id)
-                  load()
+                  setRemoving(s.id)
+                  try {
+                    await api.unshareNote(wsId, path, s.id)
+                    await load()
+                  } catch (e) {
+                    toast.error(e)
+                  } finally {
+                    setRemoving(null)
+                  }
                 }}
               >
-                <X />
+                {removing === s.id ? <Spinner size="sm" /> : <X />}
               </button>
             </div>
           ))}
+          {!data && (
+            <div className="row faint" style={{ gap: 8, padding: '6px 0' }}>
+              <Spinner size="sm" /> Loading who has access…
+            </div>
+          )}
           {data && !data.shares.length && <div className="hint">Not shared with anyone yet. People you share with see only this note.</div>}
           <div className="hint" style={{ marginTop: 10 }}>
             Want to share everything? Add members to the workspace in <b>Settings → Members</b>.
@@ -269,17 +284,25 @@ export function ShareModal({ ws: wsId, path }) {
           <Globe size={16} style={{ color: publicUrl ? 'var(--success)' : 'var(--text-3)' }} />
           <div className="grow">
             <div className="setting-name">Publish to the web</div>
-            <div className="setting-desc">Anyone with the link can read this note. It updates live.</div>
+            <div className="setting-desc">
+              {publishing ? (publicUrl ? 'Unpublishing…' : 'Publishing…') : 'Anyone with the link can read this note. It updates live.'}
+            </div>
           </div>
+          {publishing && <Spinner size="sm" />}
           <Switch
             checked={!!publicUrl}
+            disabled={publishing}
             onChange={async (v) => {
+              setPublishing(true)
               try {
                 if (v) await api.publish(wsId, path)
                 else await api.unpublish(wsId, path)
-                load()
+                await load()
+                toast.success(v ? 'Published — link copied below' : 'Unpublished')
               } catch (e) {
                 toast.error(e)
+              } finally {
+                setPublishing(false)
               }
             }}
           />
@@ -418,7 +441,7 @@ export function HistoryModal({ ws: wsId, path }) {
                     }
                   }}
                 >
-                  <RotateCcw /> Restore this version
+                  {busy ? <Spinner size="sm" /> : <RotateCcw />} {busy ? 'Restoring…' : 'Restore this version'}
                 </button>
               </div>
               {showDiff ? <div className="diff" dangerouslySetInnerHTML={{ __html: diffHtml }} /> : <div className="markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(content, { ws: wsId, path }).html }} />}

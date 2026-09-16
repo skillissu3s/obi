@@ -15,6 +15,7 @@ const KIND_ICON = { note: FileText, graph: Network, tasks: ListChecks, home: Hom
 
 export function Pane({ pane, isActive, multi }) {
   const panes = useLayout((s) => s.panes)
+  const pending = useApp((s) => s.pending)
   const dragIdx = useRef(null)
   const activeTab = pane.tabs.find((t) => t.id === pane.active)
 
@@ -34,6 +35,7 @@ export function Pane({ pane, isActive, multi }) {
       <div className="tabbar">
         {pane.tabs.map((tab, idx) => {
           const Icon = KIND_ICON[tab.kind] || FileText
+          const busy = tab.kind === 'note' ? pending[`${tab.ws}:${tab.path}`] : null
           const title = tab.kind === 'note' ? stripExt(basename(tab.path)) : tab.kind === 'graph' ? 'Graph' : tab.kind === 'tasks' ? 'Tasks' : 'Home'
           return (
             <div
@@ -57,7 +59,7 @@ export function Pane({ pane, isActive, multi }) {
               }}
               onContextMenu={(e) => tabMenu(e, tab, idx)}
             >
-              <Icon className="tab-icon" />
+              {busy ? <span className="spinner sm tab-icon" style={{ borderWidth: 1.5 }} /> : <Icon className="tab-icon" />}
               <span className="tab-title">{title}</span>
               {tab.pinned ? (
                 <Pin size={11} style={{ opacity: 0.6 }} />

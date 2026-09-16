@@ -15,19 +15,22 @@ import { Board } from './Board.jsx'
 import { AvatarStack, menuFromElement } from './ui.jsx'
 import { isBoardContent } from '../lib/kanban.js'
 import { basename, dirname, stripExt, joinPath, isNote } from '@shared/paths.js'
-import { renameEntry, deleteEntry, duplicateNote, toggleBookmark, isBookmarked, copyNoteLink, openPath, uploadFiles, moveEntry } from '../lib/actions.js'
+import { renameEntry, deleteEntry, duplicateNote, toggleBookmark, isBookmarked, copyNoteLink, openPath, uploadFiles, moveEntry, moveTo } from '../lib/actions.js'
 import { api } from '../lib/api.js'
 import { setActiveEditorView } from '../lib/commands.js'
 import { slugify } from '@shared/markdown.js'
 
-export function useDocHandle(ws, path) {
+export function useDocHandle(ws, path, enabled = true) {
   const [handle, setHandle] = useState(null)
   useEffect(() => {
-    if (!ws || !path) return
+    if (!ws || !path || !enabled) {
+      setHandle(null)
+      return
+    }
     const h = conn.openDoc(ws, path)
     setHandle(h)
     return () => conn.releaseDoc(h)
-  }, [ws, path])
+  }, [ws, path, enabled])
   return handle
 }
 
@@ -43,7 +46,9 @@ function useHandleState(handle) {
 }
 
 export function NoteView({ tab, paneId, active }) {
-  const handle = useDocHandle(tab.ws, tab.path)
+  // a note we just created isn't on the server yet — wait before joining its document
+  const creating = useApp((s) => s.pending[`${tab.ws}:${tab.path}`]) === 'creating'
+  const handle = useDocHandle(tab.ws, tab.path, !creating)
   useHandleState(handle)
   const prefs = usePrefs()
   const layout = useLayout()
@@ -122,6 +127,17 @@ export function NoteView({ tab, paneId, active }) {
   const title = stripExt(basename(tab.path))
 
   const body = () => {
+    if (creating)
+      return (
+        <div className="note-inner">
+          <div className="inline-title" style={{ color: 'var(--text-3)' }}>
+            {stripExt(basename(tab.path))}
+          </div>
+          <div className="note-banner">
+            <span className="spinner sm" /> Creating note…
+          </div>
+        </div>
+      )
     if (!handle) return null
     if (handle.status === 'loading')
       return (
@@ -258,6 +274,7 @@ export function NoteView({ tab, paneId, active }) {
 function InlineTitle({ tab, title, readOnly, view }) {
   const ref = useRef(null)
   const [value, setValue] = useState(title)
+  const renaming = useApp((s) => s.pending[`${tab.ws}:${tab.path}`]) === 'renaming'
   useEffect(() => setValue(title), [title, tab.path])
   useEffect(() => {
     if (tab.focusTitle && ref.current) {
@@ -274,14 +291,8 @@ function InlineTitle({ tab, title, readOnly, view }) {
       return
     }
     const target = joinPath(dirname(tab.path), `${clean.replace(/[\\/:*?"<>|#^[\]]/g, ' ').trim()}.md`)
-    try {
-      await api.move(tab.ws, tab.path, target)
-      useLayout.getState().renamePaths(tab.ws, tab.path, target)
-      useApp.getState().refreshTree()
-    } catch (e) {
-      toast.error(e)
-      setValue(title)
-    }
+    const moved = await moveTo(tab.path, target)
+    if (!moved) setValue(title)
   }
 
   return (
@@ -289,7 +300,8 @@ function InlineTitle({ tab, title, readOnly, view }) {
       ref={ref}
       className="inline-title"
       value={value}
-      readOnly={readOnly}
+      readOnly={readOnly || renaming}
+      style={renaming ? { opacity: 0.6 } : undefined}
       placeholder="Untitled"
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
