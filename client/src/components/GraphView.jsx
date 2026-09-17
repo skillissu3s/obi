@@ -115,7 +115,7 @@ export function GraphView() {
         </div>
         <div className="gc-row faint">
           <span>
-            {count} nodes · {links} links
+            {count} note{count === 1 ? '' : 's'} · {links} link{links === 1 ? '' : 's'}
           </span>
         </div>
         {showSettings && (

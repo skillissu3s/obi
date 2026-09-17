@@ -76,7 +76,7 @@
   max-width: 100%;
 }
 .readable .note-inner {
-  max-width: calc(740px + 112px);
+  max-width: calc(var(--note-width, 700px) + 112px);
 }
 .inline-title {
   display: block;
@@ -1353,4 +1353,20 @@
   outline: none;
   box-shadow: inset 0 0 0 1px var(--border-strong);
   border-radius: var(--radius-sm);
+}
+
+/* opening a note settles in rather than snapping */
+.note-inner {
+  animation: noteIn 220ms var(--ease) both;
+}
+@keyframes noteIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-inner {
+    animation: none;
+  }
 }

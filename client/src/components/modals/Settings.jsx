@@ -333,6 +333,19 @@ function AppearanceSection() {
       <Setting name="Readable line width" desc="Keep lines comfortably short instead of full width.">
         <Switch checked={prefs.readableWidth} onChange={(v) => prefs.set({ readableWidth: v })} />
       </Setting>
+      {prefs.readableWidth && (
+        <Setting name="Line width" desc="How wide a line of text gets before it wraps.">
+          <Segmented
+            value={prefs.lineWidth}
+            onChange={(v) => prefs.set({ lineWidth: v })}
+            options={[
+              { value: 'narrow', label: 'Narrow' },
+              { value: 'normal', label: 'Normal' },
+              { value: 'wide', label: 'Wide' },
+            ]}
+          />
+        </Setting>
+      )}
       <Setting name="Strike through completed tasks">
         <Switch checked={prefs.strikeDone} onChange={(v) => prefs.set({ strikeDone: v })} />
       </Setting>

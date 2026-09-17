@@ -4,6 +4,7 @@ import { ySyncAnnotation } from 'y-codemirror.next'
 import { EditorState } from '@codemirror/state'
 import { baseExtensions, compartments, collabExtensions, modeExtensions, readOnlyExtensions, prefsExtensions } from '../editor/setup.js'
 import { editorCtx, refreshEffect } from '../editor/livePreview.js'
+import { IMAGE_EXT, extname } from '@shared/paths.js'
 import { usePrefs } from '../store/prefs.js'
 import { useApp } from '../store/app.js'
 import { buildEditorCtx, uploadFiles } from '../lib/actions.js'
@@ -62,6 +63,18 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
             return false
           },
           drop(event, view) {
+            const dragged = event.dataTransfer?.getData('text/obi-path')
+            if (dragged) {
+              event.preventDefault()
+              const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head
+              const ctx2 = view.state.facet(editorCtx)
+              const link = ctx2.linkTextFor ? ctx2.linkTextFor(dragged) : dragged
+              const embed = IMAGE_EXT.has(extname(dragged)) ? '!' : ''
+              const text = `${embed}[[${link}]]`
+              view.dispatch({ changes: { from: pos, insert: text }, selection: { anchor: pos + text.length } })
+              view.focus()
+              return true
+            }
             const files = [...(event.dataTransfer?.files || [])]
             if (!files.length) return false
             event.preventDefault()

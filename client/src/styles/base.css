@@ -1247,3 +1247,28 @@ kbd {
     margin: 18mm;
   }
 }
+
+/* buttons give a little under the finger */
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.qa:active,
+.cv-tool:active:not(:disabled),
+.cv-sbtn:active {
+  transform: scale(0.97);
+}
+.btn,
+.icon-btn,
+.qa,
+.cv-tool,
+.cv-sbtn {
+  transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast), transform 90ms var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .qa:active,
+  .cv-tool:active:not(:disabled),
+  .cv-sbtn:active {
+    transform: none;
+  }
+}
