@@ -3,9 +3,21 @@ import { StateField, StateEffect, Facet } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import { renderMarkdown, renderInline, fetchNote, extractSection, loadKatex, renderMermaid } from '../lib/render.js'
 import { IMAGE_EXT, AUDIO_EXT, VIDEO_EXT, extname, basename, stripExt } from '@shared/paths.js'
+import { splitFrontmatter } from '@shared/parse.js'
 
 export const editorCtx = Facet.define({ combine: (v) => v[0] || {} })
 export const refreshEffect = StateEffect.define()
+
+// Block widgets (properties, tables, math, diagrams, whiteboards) only step aside for the
+// cursor while the editor actually has focus, so an unfocused note stays fully rendered.
+export const setEditorFocus = StateEffect.define()
+export const editorFocusField = StateField.define({
+  create: () => false,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setEditorFocus)) return e.value
+    return value
+  },
+})
 
 const hide = Decoration.replace({})
 const lineCache = new Map()
@@ -74,6 +86,36 @@ class TextWidget extends WidgetType {
   }
   ignoreEvent() {
     return false
+  }
+}
+
+class CopyCodeWidget extends WidgetType {
+  constructor(code) {
+    super()
+    this.code = code
+  }
+  eq(o) {
+    return o.code === this.code
+  }
+  toDOM() {
+    const btn = document.createElement('button')
+    btn.className = 'cm-lp-copy'
+    btn.title = 'Copy code'
+    btn.setAttribute('aria-label', 'Copy code')
+    btn.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>'
+    btn.addEventListener('mousedown', (e) => e.preventDefault())
+    btn.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      navigator.clipboard?.writeText(this.code)
+      btn.classList.add('done')
+      setTimeout(() => btn.classList.remove('done'), 1200)
+    })
+    return btn
+  }
+  ignoreEvent() {
+    return true
   }
 }
 
@@ -258,6 +300,77 @@ class BoardEmbedWidget extends WidgetType {
   }
   ignoreEvent() {
     return true
+  }
+}
+
+// Front matter shown as tidy properties; click anywhere on it to edit the YAML.
+class PropertiesWidget extends WidgetType {
+  constructor(text) {
+    super()
+    this.text = text
+  }
+  eq(o) {
+    return o.text === this.text
+  }
+  toDOM(view) {
+    const wrap = document.createElement('div')
+    wrap.className = 'properties cm-lp-props'
+    let data = null
+    try {
+      data = splitFrontmatter(`${this.text}\n`).frontmatter
+    } catch {}
+    const entries = data && typeof data === 'object' ? Object.entries(data).filter(([k]) => k !== 'position') : []
+    if (!entries.length) {
+      wrap.classList.add('is-empty')
+      wrap.textContent = data ? 'Empty properties' : 'Could not read properties'
+    }
+    for (const [key, value] of entries) {
+      const row = document.createElement('div')
+      row.className = 'prop'
+      const k = document.createElement('div')
+      k.className = 'prop-key'
+      k.textContent = key
+      const v = document.createElement('div')
+      v.className = 'prop-val'
+      const list = Array.isArray(value) ? value : /^tags?$/i.test(key) && typeof value === 'string' ? value.split(/[,\s]+/).filter(Boolean) : null
+      if (list) {
+        for (const item of list) {
+          const chip = document.createElement('span')
+          chip.className = /^tags?$/i.test(key) ? 'prop-tag' : 'prop-chip'
+          chip.textContent = /^tags?$/i.test(key) ? `#${String(item).replace(/^#/, '')}` : String(item)
+          if (chip.className === 'prop-tag') {
+            chip.addEventListener('mousedown', (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              view.state.facet(editorCtx).openTag?.(String(item).replace(/^#/, ''))
+            })
+          }
+          v.append(chip)
+        }
+      } else if (value === true || value === false) {
+        const chip = document.createElement('span')
+        chip.className = 'prop-chip'
+        chip.textContent = value ? 'yes' : 'no'
+        v.append(chip)
+      } else {
+        v.textContent = value instanceof Date ? value.toISOString().slice(0, 10) : value == null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)
+      }
+      row.append(k, v)
+      wrap.append(row)
+    }
+    wrap.title = 'Click to edit properties'
+    wrap.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return
+      e.preventDefault()
+      const pos = view.posAtDOM(wrap)
+      const line = view.state.doc.lineAt(Math.min(pos + 1, view.state.doc.length))
+      view.dispatch({ selection: { anchor: Math.min(line.to, view.state.doc.length) }, scrollIntoView: true })
+      view.focus()
+    })
+    return wrap
+  }
+  ignoreEvent(e) {
+    return e.type === 'mousedown'
   }
 }
 
@@ -597,6 +710,10 @@ function buildDecorations(view) {
           }
           case 'ListMark': {
             const item = node.node.parent
+            if (item?.parent?.name === 'OrderedList') {
+              add(Decoration.mark({ class: 'cm-lp-number' }), node.from, node.to)
+              return
+            }
             if (item?.parent?.name !== 'BulletList') return
             if (item.getChild('Task')) return
             if (!touches(node.from, node.to + 1)) add(Decoration.replace({ widget: new TextWidget('•', 'cm-lp-bullet') }), node.from, node.to)
@@ -642,14 +759,27 @@ function buildDecorations(view) {
             const last = doc.lineAt(Math.min(node.to, doc.length))
             const start = Math.max(first.number, doc.lineAt(Math.max(from - 1, 0)).number)
             const end = Math.min(last.number, doc.lineAt(Math.min(to, doc.length)).number)
+            // while the cursor is away the fence lines are hidden (see blockWidgets), so the
+            // rounded ends belong to the first and last line of the code itself
+            const closed = /^\s*(```|~~~)\s*$/.test(last.text) && last.number > first.number
+            const bare = !touches(node.from, node.to) && closed
+            const firstBody = bare ? first.number + 1 : first.number
+            const lastBody = bare ? last.number - 1 : last.number
             for (let l = start; l <= end; l++) {
               let cls = 'cm-lp-codeblock'
-              if (l === first.number) cls += ' cm-lp-codeblock-begin'
-              if (l === last.number) cls += ' cm-lp-codeblock-end'
+              if (l === firstBody) cls += ' cm-lp-codeblock-begin'
+              if (l === lastBody) cls += ' cm-lp-codeblock-end'
               addLine(doc.line(l).from, cls)
             }
-            for (const cm of node.node.getChildren('CodeMark')) add(Decoration.mark({ class: 'cm-lp-fence' }), cm.from, cm.to)
             const info = node.node.getChild('CodeInfo')
+            const lang = info ? doc.sliceString(info.from, info.to).trim().split(/\s+/)[0] : ''
+            if (bare && firstBody <= lastBody) {
+              const head = doc.line(firstBody)
+              const text = doc.sliceString(doc.line(firstBody).from, doc.line(lastBody).to)
+              decos.push(Decoration.line({ class: 'cm-lp-code-head', attributes: lang ? { 'data-lang': lang } : undefined }).range(head.from))
+              add(Decoration.widget({ widget: new CopyCodeWidget(text), side: -1 }), head.from, head.from)
+            }
+            for (const cm of node.node.getChildren('CodeMark')) add(Decoration.mark({ class: 'cm-lp-fence' }), cm.from, cm.to)
             if (info) add(Decoration.mark({ class: 'cm-lp-fence' }), info.from, info.to)
             return
           }
@@ -737,7 +867,8 @@ function buildBlocks(state) {
   const ctx = state.facet(editorCtx)
   const doc = state.doc
   const ranges = state.selection.ranges
-  const touches = (from, to) => ranges.some((r) => r.from <= to && r.to >= from)
+  const focused = state.field(editorFocusField, false)
+  const touches = (from, to) => focused && ranges.some((r) => r.from <= to && r.to >= from)
   const decos = []
   syntaxTree(state).iterate({
     enter(node) {
@@ -752,12 +883,29 @@ function buildBlocks(state) {
       if (node.name === 'FencedCode') {
         const info = node.node.getChild('CodeInfo')
         const lang = info ? doc.sliceString(info.from, info.to).trim().toLowerCase() : ''
+        if (lang !== 'mermaid' && !touches(node.from, node.to)) {
+          const first = doc.lineAt(node.from)
+          const last = doc.lineAt(Math.min(node.to, doc.length))
+          if (last.number > first.number && /^\s*(```|~~~)\s*$/.test(last.text)) {
+            if (first.to > first.from) decos.push(Decoration.replace({ block: true }).range(first.from, first.to))
+            if (last.to > last.from) decos.push(Decoration.replace({ block: true }).range(last.from, last.to))
+          }
+          return false
+        }
         if (lang === 'mermaid' && !touches(node.from, node.to)) {
           const text = node.node.getChild('CodeText')
           const code = text ? doc.sliceString(text.from, text.to) : ''
           const f = doc.lineAt(node.from).from
           const t = doc.lineAt(Math.min(node.to, doc.length)).to
           if (code.trim()) decos.push(Decoration.replace({ widget: new MermaidWidget(code), block: true }).range(f, t))
+        }
+        return false
+      }
+      if (node.name === 'Frontmatter') {
+        const f = doc.lineAt(node.from).from
+        const t = doc.lineAt(Math.min(node.to, doc.length)).to
+        if (!touches(node.from, node.to) && node.from === 0) {
+          decos.push(Decoration.replace({ widget: new PropertiesWidget(doc.sliceString(node.from, node.to)), block: true }).range(f, t))
         }
         return false
       }
@@ -799,7 +947,13 @@ export const blockWidgets = StateField.define({
     return buildBlocks(state)
   },
   update(value, tr) {
-    if (tr.docChanged || tr.selection || tr.effects.some((e) => e.is(refreshEffect)) || syntaxTree(tr.startState) !== syntaxTree(tr.state)) return buildBlocks(tr.state)
+    if (
+      tr.docChanged ||
+      tr.selection ||
+      tr.effects.some((e) => e.is(refreshEffect) || e.is(setEditorFocus)) ||
+      syntaxTree(tr.startState) !== syntaxTree(tr.state)
+    )
+      return buildBlocks(tr.state)
     return value.map(tr.changes)
   },
   provide: (f) => EditorView.decorations.from(f),

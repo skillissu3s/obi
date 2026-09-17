@@ -13,8 +13,14 @@
   align-items: center;
   gap: 3px;
   padding: 0 10px 0 6px;
-  opacity: 0.72;
+  opacity: 0.78;
   transition: opacity var(--t);
+}
+/* controls people aim for stay readable even when the header is resting */
+.note-header .segmented,
+.note-header > .icon-btn:last-child,
+.note-header .badge {
+  opacity: 1;
 }
 .note-header:hover,
 .note-header:focus-within {
@@ -403,8 +409,56 @@
   padding-bottom: 6px !important;
 }
 .cm-lp-fence {
-  color: var(--text-3);
+  color: var(--text-faint);
   font-size: 0.85em;
+}
+.cm-lp-code-head {
+  position: relative;
+}
+.cm-lp-code-head[data-lang]::after {
+  content: attr(data-lang);
+  position: absolute;
+  right: 12px;
+  top: 5px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.cm-lp-copy {
+  position: absolute;
+  right: 6px;
+  top: 2px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.cm-lp-codeblock:hover .cm-lp-copy,
+.cm-lp-copy:focus-visible {
+  opacity: 1;
+}
+.cm-lp-copy:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.cm-lp-copy.done {
+  opacity: 1;
+  color: var(--success);
+}
+.cm-lp-code-head[data-lang]:hover::after {
+  opacity: 0;
 }
 .cm-lp-quote {
   border-left: 2px solid var(--border-strong);
@@ -583,10 +637,32 @@
 .cm-lp-embed .embed-note-title:hover {
   color: var(--accent-text);
 }
+/* widgets render real HTML: CodeMirror's white-space would turn the markup's
+   newlines into blank lines, and .markdown's bottom padding into dead space */
+.obi-editor .cm-content .markdown,
+.obi-editor .cm-content .cm-lp-table,
+.obi-editor .cm-content .cm-lp-embed,
+.obi-editor .cm-content .cm-board-embed {
+  white-space: normal;
+  tab-size: 4;
+}
+.obi-editor .cm-content .markdown {
+  padding-bottom: 0;
+}
 .cm-lp-table {
-  margin: 6px 0;
+  margin: 12px 0;
   overflow-x: auto;
   cursor: text;
+}
+.cm-lp-table table {
+  margin: 0 !important;
+}
+/* ordered-list numbers keep the text column aligned however long they get */
+.cm-lp-number {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+  min-width: 1.6em;
 }
 .cm-lp-math,
 .cm-lp-mermaid {
@@ -838,14 +914,24 @@
 .markdown td,
 .cm-lp-table th,
 .cm-lp-table td {
-  border: 1px solid var(--border-strong);
-  padding: 6px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 7px 14px 7px 0;
   text-align: left;
+  vertical-align: top;
 }
 .markdown th,
 .cm-lp-table th {
-  background: var(--bg-hover);
   font-weight: 600;
+  color: var(--text-2);
+  font-size: 0.92em;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 5px;
+}
+.markdown tr:last-child td,
+.cm-lp-table tr:last-child td {
+  border-bottom: none;
 }
 .cm-lp-table table {
   border-collapse: collapse;
@@ -902,27 +988,66 @@
   color: var(--text-3);
   font-style: italic;
 }
+/* front matter, shown as properties in both the editor and reading view */
 .properties {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px 0;
-  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+  padding: 2px 0 14px;
+  margin: 0 0 22px;
+  font-family: var(--font-ui);
   font-size: 13px;
+  line-height: 1.5;
 }
 .properties .prop {
   display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 12px;
-  padding: 4px 12px;
+  grid-template-columns: minmax(90px, 148px) 1fr;
+  gap: 14px;
+  padding: 3px 6px;
+  border-radius: 6px;
 }
 .properties .prop-key {
   color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 12.5px;
 }
 .properties .prop-val {
-  color: var(--text);
+  color: var(--text-2);
   word-break: break-word;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.prop-tag,
+.prop-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 99px;
+  padding: 0.5px 8px;
+  font-size: 12px;
+  background: var(--bg-active);
+  color: var(--text-2);
+}
+.prop-tag {
+  background: var(--accent-softer);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.prop-tag:hover {
+  background: var(--accent-soft);
+}
+.cm-lp-props {
+  cursor: text;
+  transition: background var(--t-fast);
+  border-radius: 8px;
+}
+.cm-lp-props:hover .prop {
+  background: var(--bg-hover);
+}
+.cm-lp-props.is-empty {
+  color: var(--text-faint);
+  font-size: 12.5px;
+  padding-bottom: 10px;
 }
 
 /* callouts (shared by reader & public) */

@@ -10,7 +10,7 @@ import { tags as t } from '@lezer/highlight'
 import { classHighlighter } from '@lezer/highlight'
 import { yCollab } from 'y-codemirror.next'
 import { obiMarkdownExtensions, obiTags } from './markdownExt.js'
-import { livePreview, blockWidgets, linkHandlers, editorCtx } from './livePreview.js'
+import { livePreview, blockWidgets, linkHandlers, editorCtx, editorFocusField, setEditorFocus } from './livePreview.js'
 import { wikiCompletion, tagCompletion, slashCompletion } from './completions.js'
 import { markdownKeymapFor } from './commands.js'
 import { annotationField } from './annotations.js'
@@ -29,7 +29,6 @@ const obiHighlight = HighlightStyle.define([
   { tag: t.link, class: 'cm-link-text' },
   { tag: t.url, class: 'cm-url' },
   { tag: t.quote, class: 'cm-quote' },
-  { tag: t.list, class: 'cm-list-mark' },
   { tag: t.processingInstruction, class: 'cm-md-mark' },
   { tag: t.contentSeparator, class: 'cm-md-mark' },
   { tag: obiTags.wikiLink, class: 'cm-wikilink' },
@@ -79,8 +78,12 @@ export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFo
     keymap.of([...closeBracketsKeymap, ...completionKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
     keymap.of(standardKeymap),
     keymap.of(defaultKeymap),
+    editorFocusField,
     EditorView.updateListener.of((u) => {
-      if (u.focusChanged) onFocus?.(u.view.hasFocus)
+      if (u.focusChanged) {
+        onFocus?.(u.view.hasFocus)
+        u.view.dispatch({ effects: setEditorFocus.of(u.view.hasFocus) })
+      }
       if (u.docChanged || u.selectionSet) onUpdate?.(u)
     }),
     comps.mode.of(mode === 'source' ? [] : [livePreview, blockWidgets]),

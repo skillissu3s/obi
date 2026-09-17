@@ -2,6 +2,8 @@ node_modules/
 dist/
 data/
 data-test/
+data-ui/
+data-*/
 *.log
 .env
 .env.local
