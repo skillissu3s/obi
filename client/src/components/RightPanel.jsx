@@ -8,7 +8,7 @@ import * as A from '../lib/actions.js'
 import { LocalGraph } from './GraphView.jsx'
 import { AvatarStack } from './ui.jsx'
 import { basename, dirname, stripExt, isNote } from '@shared/paths.js'
-import { formatDate, timeAgo, readingTime, formatBytes } from '../lib/util.js'
+import { formatDate, timeAgo, readingTime, formatBytes, plainSnippet } from '../lib/util.js'
 
 export function RightPanel({ tab }) {
   const rightTab = useLayout((s) => s.rightTab)
@@ -146,7 +146,7 @@ function BacklinkGroup({ note, ws }) {
       {open &&
         note.hits.map((h, i) => (
           <div key={i} className="bl-hit" onClick={() => useLayout.getState().openNote(ws, note.path, { line: h.line })}>
-            {h.text}
+            {plainSnippet(h.text, 220)}
           </div>
         ))}
     </div>

@@ -1192,3 +1192,58 @@ kbd {
     transform: scale(0.82);
   }
 }
+
+/* ---------- Print: just the note ---------- */
+@media print {
+  .ribbon,
+  .sidebar,
+  .tabbar,
+  .statusbar,
+  .note-header,
+  .mobile-header,
+  .mobile-toolbar,
+  .cv-dock,
+  .nc-bubble,
+  .edge-toggles,
+  .note-mentions,
+  .toasts,
+  .nc-recenter {
+    display: none !important;
+  }
+  html,
+  body,
+  .app,
+  .app-body,
+  .main,
+  .pane,
+  .pane-content,
+  .note-view,
+  .note-scroll {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .note-inner {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .obi-editor .cm-scroller,
+  .obi-editor .cm-content {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  a {
+    color: #000 !important;
+    text-decoration: underline;
+  }
+  .cm-lp-codeblock,
+  .markdown pre,
+  .properties {
+    background: #f4f4f4 !important;
+    color: #000 !important;
+  }
+  @page {
+    margin: 18mm;
+  }
+}

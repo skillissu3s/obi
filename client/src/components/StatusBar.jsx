@@ -19,6 +19,7 @@ export function StatusBar() {
     const pane = s.panes.find((p) => p.id === s.activePane)
     return pane?.tabs.find((t) => t.id === pane.active)
   })
+  const treeMap = useApp((s) => s.treeMap)
   const [stats, setStats] = useState(null)
   const [saveState, setSaveState] = useState('idle')
   const [, tick] = useState(0)
@@ -104,6 +105,11 @@ export function StatusBar() {
         </span>
       )}
       <span className="status-spacer" />
+      {tab?.kind === 'note' && tab.ws === wsId && treeMap.get(tab.path)?.mtime > 0 && (
+        <span className="status-item desktop-only" title={new Date(treeMap.get(tab.path).mtime).toLocaleString()}>
+          Edited {timeAgo(treeMap.get(tab.path).mtime)}
+        </span>
+      )}
       {stats && (
         <>
           {stats.selWords > 0 && <span className="status-item desktop-only">{stats.selWords} selected</span>}

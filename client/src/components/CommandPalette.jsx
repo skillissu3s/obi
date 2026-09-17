@@ -122,8 +122,8 @@ export function CommandPalette() {
       }
       return out
     }
-    // files
-    const notes = app.tree.filter((e) => e.type === 'file' && (isNote(e.path) || isBoardPath(e.path)))
+    // files — recently edited first, so an empty query is already useful
+    const notes = app.tree.filter((e) => e.type === 'file' && (isNote(e.path) || isBoardPath(e.path))).sort((a, b) => b.mtime - a.mtime)
     const scored = fuzzyFilter(notes, query, (e) => stripExt(e.path), 50).map(({ item, indices }) => {
       const name = stripExt(basename(item.path))
       const folder = dirname(item.path)

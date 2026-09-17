@@ -806,7 +806,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           </button>
         </div>
       )}
-      <div className="cv-dock" style={mode === 'source' ? undefined : undefined}>
+      <div className={`cv-dock ${open ? '' : 'is-tucked'}`}>
         {(open || state.selection.length > 0) && <StyleBar ctl={ctl} mode="note" />}
         {open ? (
           <Toolbar

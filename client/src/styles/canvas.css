@@ -977,3 +977,16 @@ h3.shortcut-group {
     display: none;
   }
 }
+
+/* the collapsed canvas pill sits out of the way of the text column */
+.note-view .cv-dock.is-tucked {
+  left: auto;
+  right: 18px;
+  transform: none;
+  align-items: flex-end;
+}
+@media (max-width: 768px) {
+  .note-view .cv-dock.is-tucked {
+    right: 12px;
+  }
+}
