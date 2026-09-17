@@ -25,7 +25,7 @@
 .ribbon .icon-btn {
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   color: var(--text-3);
 }
 .ribbon .icon-btn:hover {
@@ -42,7 +42,7 @@
 .ws-avatar {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,7 +138,7 @@
 .ws-icon {
   width: 26px;
   height: 26px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,7 +199,7 @@
   gap: 5px;
   height: 27px;
   padding-right: 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-2);
   user-select: none;
@@ -238,12 +238,12 @@
 .tree-skeleton-icon {
   width: 14px;
   height: 14px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
 .tree-skeleton-name {
   height: 9px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .tree-row .spinner.file-icon {
   width: 12px;
@@ -304,7 +304,7 @@
   flex: 1;
   height: 22px;
   padding: 0 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--accent);
   background: var(--bg);
   outline: none;
@@ -315,7 +315,12 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--border);
+  background: var(--border-strong);
+  pointer-events: none;
+}
+.tree-row:hover .tree-guide,
+.tree-row.active .tree-guide {
+  background: color-mix(in srgb, var(--text-3) 45%, transparent);
 }
 .presence-dots {
   display: flex;
@@ -373,7 +378,7 @@
   min-width: 70px;
   max-width: 200px;
   padding: 0 4px 0 9px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   color: var(--text-3);
   cursor: pointer;
   user-select: none;
@@ -468,7 +473,7 @@
   gap: 5px;
   padding: 0 7px;
   height: 20px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   border: none;
   background: none;
   color: inherit;
@@ -534,7 +539,7 @@ button.status-item:hover {
 }
 .search-result {
   padding: 7px 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   margin-bottom: 2px;
 }
@@ -565,7 +570,7 @@ button.status-item:hover {
   color: var(--text-2);
   padding: 3px 6px 3px 19px;
   line-height: 1.5;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   word-break: break-word;
 }
 .search-match:hover {
@@ -594,7 +599,7 @@ button.status-item:hover {
   gap: 6px;
   height: 27px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-2);
 }
@@ -665,7 +670,7 @@ button.status-item:hover {
 }
 .bl-note {
   margin-bottom: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--bg-hover);
   overflow: hidden;
 }
@@ -806,7 +811,7 @@ button.status-item:hover {
   }
   .modal {
     max-height: 90vh;
-    border-radius: 16px;
+    border-radius: var(--radius-xl);
   }
   .overlay {
     padding-top: 6vh;
@@ -883,7 +888,7 @@ button.status-item:hover {
   padding: 0 6px 0 3px;
   margin-right: 2px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-2);
   font-size: 12.5px;

@@ -56,6 +56,8 @@ export const DEFAULT_PREFS = {
   confirmDelete: true,
   sortBy: 'name',
   canvasBar: false,
+  typewriter: false,
+  focusParagraph: false,
   graph: { showTags: false, showOrphans: true, showUnresolved: false, showAttachments: false, colorFolders: true, repel: 140, linkDistance: 70, nodeSize: 1, labels: 1 },
   bookmarks: {},
 }

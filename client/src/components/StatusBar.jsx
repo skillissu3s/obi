@@ -4,6 +4,7 @@ import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
 import { syncNow } from '../lib/actions.js'
+import { conn } from '../lib/socket.js'
 import { timeAgo, readingTime } from '../lib/util.js'
 import { AvatarStack } from './ui.jsx'
 
@@ -19,8 +20,26 @@ export function StatusBar() {
     return pane?.tabs.find((t) => t.id === pane.active)
   })
   const [stats, setStats] = useState(null)
+  const [saveState, setSaveState] = useState('idle')
   const [, tick] = useState(0)
   const ws = workspaces.find((w) => w.id === wsId)
+
+  // "Saving… / Saved" for the note in front (GitHub workspaces show sync state instead)
+  useEffect(() => {
+    setSaveState('idle')
+    if (!tab || tab.kind !== 'note') return
+    const onDirty = (e) => {
+      if (e.detail.path === tab.path && e.detail.ws === tab.ws) setSaveState('saving')
+    }
+    window.addEventListener('obi:doc-dirty', onDirty)
+    const off = conn.on('index', (m) => {
+      if (m.ws === tab.ws && m.path === tab.path) setSaveState('saved')
+    })
+    return () => {
+      window.removeEventListener('obi:doc-dirty', onDirty)
+      off()
+    }
+  }, [tab?.ws, tab?.path, tab?.kind])
 
   useEffect(() => {
     const onStats = (e) => setStats(e.detail)
@@ -64,11 +83,17 @@ export function StatusBar() {
           {syncLabel()}
         </button>
       )}
-      {ws?.type === 'online' && (
-        <span className="status-item desktop-only" title="Notes are stored on this server">
-          <Cloud /> Online workspace
-        </span>
-      )}
+      {ws?.type === 'online' &&
+        (saveState === 'idle' ? (
+          <span className="status-item desktop-only" title="Notes are stored on this server">
+            <Cloud /> Online workspace
+          </span>
+        ) : (
+          <span className="status-item" title={saveState === 'saving' ? 'Your changes are on their way to the server' : 'Every change is saved'}>
+            {saveState === 'saving' ? <Loader2 className="spin" /> : <Check />}
+            {saveState === 'saving' ? 'Saving…' : 'Saved'}
+          </span>
+        ))}
       <span className="status-item" title={connection === 'online' ? 'Connected — changes save instantly' : 'Reconnecting…'}>
         <span className={`status-dot ${connection === 'online' ? '' : connection === 'offline' ? 'offline' : 'connecting'}`} />
         {connection === 'online' ? 'Live' : connection === 'reconnecting' ? 'Reconnecting…' : connection === 'offline' ? 'Offline' : 'Connecting…'}

@@ -11,9 +11,10 @@ import { classHighlighter } from '@lezer/highlight'
 import { yCollab } from 'y-codemirror.next'
 import { obiMarkdownExtensions, obiTags } from './markdownExt.js'
 import { livePreview, blockWidgets, linkHandlers, editorCtx, editorFocusField, setEditorFocus } from './livePreview.js'
-import { wikiCompletion, tagCompletion, slashCompletion } from './completions.js'
+import { wikiCompletion, tagCompletion, slashCompletion, emojiCompletion } from './completions.js'
 import { markdownKeymapFor } from './commands.js'
 import { annotationField } from './annotations.js'
+import { writingExtensions } from './writing.js'
 
 const obiHighlight = HighlightStyle.define([
   { tag: t.heading1, class: 'cm-hd cm-hd1' },
@@ -63,7 +64,7 @@ export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFo
     highlightSelectionMatches({ minSelectionLength: 3 }),
     search({ top: true }),
     autocompletion({
-      override: [wikiCompletion, tagCompletion, slashCompletion],
+      override: [wikiCompletion, tagCompletion, slashCompletion, emojiCompletion],
       closeOnBlur: true,
       icons: true,
       activateOnTyping: true,
@@ -99,7 +100,7 @@ export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFo
 }
 
 export function prefsExtensions(prefs) {
-  const exts = []
+  const exts = [...writingExtensions(prefs)]
   if (prefs.lineNumbers) exts.push(lineNumbers())
   if (prefs.spellcheck) exts.push(EditorView.contentAttributes.of({ spellcheck: 'true', autocorrect: 'on', autocapitalize: 'sentences' }))
   else exts.push(EditorView.contentAttributes.of({ spellcheck: 'false' }))

@@ -7,7 +7,7 @@
   --accent: var(--accent-user, var(--accent-default));
   --font-ui: 'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --font-serif: 'Iowan Old Style', 'Charter', 'Georgia', 'Cambria', serif;
+  --font-serif: 'Literata Variable', Literata, 'Iowan Old Style', Charter, Georgia, serif;
   --font-editor: var(--font-ui);
   --editor-font-size: 16px;
   --editor-line-height: 1.75;
@@ -534,7 +534,7 @@ a {
 }
 ::-webkit-scrollbar-thumb {
   background: transparent;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 3px solid transparent;
   background-clip: padding-box;
 }
@@ -739,7 +739,7 @@ a {
   font-size: 0.92em;
   background: var(--bg-code);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .error-text {
   color: var(--danger);
@@ -750,7 +750,7 @@ a {
   position: relative;
   width: 34px;
   height: 20px;
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   background: var(--border-strong);
   border: none;
   cursor: pointer;
@@ -792,7 +792,7 @@ a {
   border: none;
   background: transparent;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-2);
   font-size: 12.5px;
@@ -853,7 +853,7 @@ kbd {
   min-width: 18px;
   height: 19px;
   padding: 0 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--bg-active);
   color: var(--text-3);
   justify-content: center;
@@ -933,7 +933,7 @@ kbd {
 }
 /* fixed attachment: one soft highlight sweeps across every bar together */
 .skeleton {
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background-color: var(--bg-hover);
   background-image: linear-gradient(90deg, transparent 0%, var(--bg-hover) 35%, var(--bg-active) 50%, var(--bg-hover) 65%, transparent 100%);
   background-size: 60vw 100%;
@@ -1036,7 +1036,7 @@ kbd {
   min-width: 200px;
   max-width: 300px;
   background: var(--bg-elev);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
   padding: 5px;
   animation: popIn 140ms var(--ease);
@@ -1049,7 +1049,7 @@ kbd {
   gap: 9px;
   width: 100%;
   padding: 6px 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: none;
   background: none;
   cursor: pointer;
@@ -1104,7 +1104,7 @@ kbd {
   gap: 10px;
   max-width: 380px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-elev);
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
   animation: slideUp 260ms var(--ease-spring);
@@ -1161,4 +1161,34 @@ kbd {
 }
 .mono {
   font-family: var(--font-mono);
+}
+
+/* ---------- Splash ---------- */
+.splash {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--bg);
+  animation: fadeIn 300ms var(--ease);
+}
+.splash img {
+  border-radius: var(--radius-lg);
+  animation: splashIn 700ms var(--ease-spring) both;
+}
+.splash-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  animation: pulse 2.2s ease-in-out infinite;
+}
+@keyframes splashIn {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
 }

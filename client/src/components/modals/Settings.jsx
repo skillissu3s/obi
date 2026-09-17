@@ -360,6 +360,12 @@ function EditorSection() {
       <Setting name="Show note title at top" desc="Edit the file name inline, like a document title.">
         <Switch checked={prefs.inlineTitle} onChange={(v) => prefs.set({ inlineTitle: v })} />
       </Setting>
+      <Setting name="Typewriter scrolling" desc="Keep the line you are writing in the middle of the screen.">
+        <Switch checked={prefs.typewriter} onChange={(v) => prefs.set({ typewriter: v })} />
+      </Setting>
+      <Setting name="Dim other paragraphs" desc="Fade everything except the block you are writing in.">
+        <Switch checked={prefs.focusParagraph} onChange={(v) => prefs.set({ focusParagraph: v })} />
+      </Setting>
       <Setting name="Spell check">
         <Switch checked={prefs.spellcheck} onChange={(v) => prefs.set({ spellcheck: v })} />
       </Setting>

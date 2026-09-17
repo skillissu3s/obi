@@ -192,29 +192,67 @@ export async function deleteEntry(path) {
   const entry = app().treeMap.get(path)
   const isFolder = entry?.type === 'folder'
   const ws = app().workspaces.find((w) => w.id === app().wsId)
+  const online = ws?.type === 'online'
   if (usePrefs.getState().confirmDelete) {
     const ok = await confirmDialog({
       title: `Delete “${basename(path)}”?`,
       message: isFolder
         ? 'This deletes the folder and everything inside it.'
-        : ws?.type === 'github'
-          ? 'The file is deleted and the change is pushed to GitHub (it stays in the repository history).'
-          : 'You can restore it from Trash in workspace settings.',
+        : online
+          ? 'You can undo this, or restore it later from Trash in workspace settings.'
+          : 'The file is deleted and the change is pushed to GitHub (it stays in the repository history).',
       danger: true,
       confirmText: 'Delete',
     })
     if (!ok) return
   }
   const wsId = app().wsId
+  // keep a copy so the undo button can put a file back in a GitHub workspace
+  let snapshot = null
+  if (!isFolder && !online && (isNote(path) || isBoardPath(path))) {
+    try {
+      snapshot = (await api.readNote(wsId, path)).content
+    } catch {}
+  }
   app().setPending(wsId, path, 'deleting')
   try {
     await api.remove(wsId, path)
     app().clearPending(wsId, path)
     layout().closePaths(wsId, path)
     app().refreshTree()
-    toast.success(`Deleted ${basename(path)}`)
+    const undoable = online || snapshot != null
+    toast.success(`Deleted ${basename(path)}`, {
+      timeout: undoable ? 9000 : 3500,
+      action: undoable ? { label: 'Undo', run: () => undoDelete(wsId, path, snapshot, online) } : undefined,
+    })
   } catch (e) {
     app().clearPending(wsId, path)
+    toast.error(e)
+  }
+}
+
+// Online workspaces restore from trash (canvas layer and all); GitHub workspaces
+// get the file written back from the copy taken just before the delete.
+async function undoDelete(wsId, path, snapshot, online) {
+  try {
+    if (online) {
+      const { items } = await api.trash(wsId)
+      const item = items.filter((i) => i.path === path).sort((a, b) => b.deletedAt - a.deletedAt)[0]
+      if (!item) throw new Error('It is no longer in the trash')
+      const r = await api.restoreTrash(wsId, item.id)
+      app().refreshTree()
+      app().refreshIndex()
+      if (r?.path && (isNote(r.path) || isBoardPath(r.path))) layout().openNote(wsId, r.path)
+      toast.success(`Restored ${basename(r?.path || path)}`)
+      return
+    }
+    if (snapshot == null) return
+    await api.writeNote(wsId, path, snapshot, { mustNotExist: true })
+    app().refreshTree()
+    app().refreshIndex()
+    layout().openNote(wsId, path)
+    toast.success(`Restored ${basename(path)}`)
+  } catch (e) {
     toast.error(e)
   }
 }

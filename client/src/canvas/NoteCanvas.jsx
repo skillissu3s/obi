@@ -2,7 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom'
 import { EditorView } from '@codemirror/view'
 import { ySyncAnnotation } from 'y-codemirror.next'
-import { PencilRuler, Highlighter, StickyNote, Link2, MoveUpRight, X, LocateFixed, Copy, Trash2, BringToFront, SendToBack, Lock, ClipboardPaste } from 'lucide-react'
+import {
+  PencilRuler, Highlighter, StickyNote, Link2, MoveUpRight, X, LocateFixed, Copy, Trash2, BringToFront, SendToBack, Lock,
+  ClipboardPaste, Bold, Italic, Strikethrough, Code, Link as LinkIcon,
+} from 'lucide-react'
+import { toggleWrap, insertLink } from '../editor/commands.js'
 import { HIGHLIGHT_COLORS, highlightCss } from '@shared/boardsvg.js'
 import { IMAGE_EXT, extname, isNote } from '@shared/paths.js'
 import { isBoardPath } from '@shared/board.js'
@@ -603,6 +607,14 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
   }, [ctl])
 
   // ----- selection bubble actions -----
+  // markdown formatting straight from the selection bubble
+  const format = (cmd) => {
+    if (!view) return
+    view.focus()
+    cmd(view)
+    requestAnimationFrame(updateBubble)
+  }
+
   const refRange = (range) => {
     syncText()
     return makeAnchor(trackerRef.current.text, range.from, range.to)
@@ -750,11 +762,33 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       )}
       {bubble && (
         <div className={`nc-bubble ${bubble.below ? 'below' : ''}`} style={{ left: bubble.x, top: bubble.y }} onMouseDown={(e) => e.preventDefault()}>
-          {HIGHLIGHT_COLORS.map((c) => (
-            <button key={c} className="cv-sbtn" title={`Highlight ${c}`} onClick={() => highlight(c)}>
-              <span className="hl-dot" style={{ background: highlightCss(c) }} />
-            </button>
-          ))}
+          {!bubble.anno && (
+            <>
+              <button className="cv-sbtn" title="Bold (Ctrl/⌘ B)" onClick={() => format(toggleWrap('**'))}>
+                <Bold />
+              </button>
+              <button className="cv-sbtn" title="Italic (Ctrl/⌘ I)" onClick={() => format(toggleWrap('*'))}>
+                <Italic />
+              </button>
+              <button className="cv-sbtn" title="Strikethrough (Ctrl/⌘ ⇧ X)" onClick={() => format(toggleWrap('~~'))}>
+                <Strikethrough />
+              </button>
+              <button className="cv-sbtn" title="Code (Ctrl/⌘ E)" onClick={() => format(toggleWrap('`'))}>
+                <Code />
+              </button>
+              <button className="cv-sbtn" title="Link (Ctrl/⌘ K)" onClick={() => format(insertLink)}>
+                <LinkIcon />
+              </button>
+              <div className="cv-sep" />
+            </>
+          )}
+          <div className="nc-swatches">
+            {HIGHLIGHT_COLORS.map((c) => (
+              <button key={c} className="cv-sbtn" title={`Highlight ${c} — kept on the canvas, the markdown stays as it is`} onClick={() => highlight(c)}>
+                <span className="hl-dot" style={{ background: highlightCss(c) }} />
+              </button>
+            ))}
+          </div>
           {bubble.anno && (
             <button className="cv-sbtn" title="Remove highlight" onClick={removeHighlight}>
               <X />
@@ -762,10 +796,10 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           )}
           <div className="cv-sep" />
           <button className="cv-sbtn" title="Add a sticky note about this, linked with an arrow" onClick={() => annotate('sticky')}>
-            <StickyNote /> Note
+            <StickyNote />
           </button>
           <button className="cv-sbtn" title="Link a page beside this text" onClick={() => annotate('link')}>
-            <Link2 /> Link
+            <Link2 />
           </button>
           <button className="cv-sbtn" title="Draw an arrow from this text — drag its end onto anything" onClick={connect}>
             <MoveUpRight />

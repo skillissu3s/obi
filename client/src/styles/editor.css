@@ -39,7 +39,7 @@
 }
 .crumbs span.crumb {
   padding: 2px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -111,7 +111,7 @@
   font-size: 12px;
   color: var(--text-2);
   background: var(--bg-hover);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 3px 8px;
 }
 .note-prop b {
@@ -132,7 +132,7 @@
 .note-skeleton-line .skeleton {
   display: block;
   height: 0.62em;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
 }
 .note-skeleton-gap {
   height: calc(0.6em * var(--editor-line-height));
@@ -143,7 +143,7 @@
   gap: 10px;
   padding: 8px 12px;
   margin: 10px 0 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 12.5px;
   background: var(--accent-softer);
   color: var(--text-2);
@@ -216,7 +216,7 @@
   border: none;
   color: var(--text-2);
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .obi-editor .cm-panels {
   background: var(--bg-elev);
@@ -235,7 +235,7 @@
 .obi-editor .cm-panel.cm-search input,
 .obi-editor .cm-panel.cm-search button {
   font: inherit;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   background: var(--bg-input);
   padding: 3px 8px;
@@ -324,7 +324,7 @@
   font-family: var(--font-mono);
   font-size: 0.86em;
   background: var(--bg-code);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.12em 0.3em;
 }
 .cm-link-text,
@@ -399,13 +399,13 @@
   line-height: 1.6;
 }
 .cm-lp-codeblock-begin {
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
+  border-top-left-radius: var(--radius-sm);
+  border-top-right-radius: var(--radius-sm);
   padding-top: 6px !important;
 }
 .cm-lp-codeblock-end {
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
+  border-bottom-left-radius: var(--radius-sm);
+  border-bottom-right-radius: var(--radius-sm);
   padding-bottom: 6px !important;
 }
 .cm-lp-fence {
@@ -478,11 +478,11 @@
   font-weight: 650;
   color: var(--callout);
   padding-top: 6px !important;
-  border-top-right-radius: 8px;
+  border-top-right-radius: var(--radius-sm);
 }
 .cm-lp-callout-last {
   padding-bottom: 6px !important;
-  border-bottom-right-radius: 8px;
+  border-bottom-right-radius: var(--radius-sm);
 }
 .cm-lp-callout-title.cm-lp-callout-last {
   padding-bottom: 6px !important;
@@ -603,7 +603,7 @@
 .cm-lp-image {
   display: block;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin: 6px 0;
   cursor: text;
 }
@@ -612,7 +612,7 @@
   align-items: center;
   gap: 6px;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-hover);
   color: var(--text-3);
   font-size: 0.85em;
@@ -680,7 +680,7 @@
 .cm-tooltip {
   background: var(--bg-elev) !important;
   border: none !important;
-  border-radius: 10px;
+  border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   color: var(--text);
   overflow: hidden;
@@ -695,7 +695,7 @@
 }
 .cm-tooltip.cm-tooltip-autocomplete > ul > li {
   padding: 5px 9px !important;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -732,11 +732,32 @@
   display: flex;
   justify-content: center;
 }
-.cm-completionIcon-note::after { content: '📄'; font-size: 12px; }
-.cm-completionIcon-file::after { content: '📎'; font-size: 12px; }
+/* lucide glyphs as masks, so the popup matches the rest of the icon set */
+.cm-completionIcon-note::after,
+.cm-completionIcon-file::after,
+.cm-completionIcon-tag::after,
+.cm-completionIcon-block::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: var(--cmp-icon) center / contain no-repeat;
+  mask: var(--cmp-icon) center / contain no-repeat;
+}
+.cm-completionIcon-note::after {
+  --cmp-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h4M9 13h6M9 17h3'/%3E%3C/svg%3E");
+}
+.cm-completionIcon-file::after {
+  --cmp-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13.2 2.8a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5'/%3E%3C/svg%3E");
+}
+.cm-completionIcon-tag::after {
+  --cmp-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9h16M4 15h16M10 3 8 21M16 3l-2 18'/%3E%3C/svg%3E");
+}
+.cm-completionIcon-block::after {
+  --cmp-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'/%3E%3Cpath d='M3 9h18M9 21V9'/%3E%3C/svg%3E");
+}
 .cm-completionIcon-heading::after { content: '#'; font-weight: 700; }
-.cm-completionIcon-tag::after { content: '🏷'; font-size: 11px; }
-.cm-completionIcon-block::after { content: '⧉'; }
+.cm-completionIcon-emoji::after { content: '☺'; font-size: 12px; }
 .cm-completionIcon-create::after { content: '+'; font-weight: 700; color: var(--accent); }
 .cm-completionInfo {
   padding: 8px 10px !important;
@@ -820,13 +841,13 @@
   font-size: 0.86em;
   background: var(--bg-code);
   padding: 0.12em 0.35em;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 .markdown pre {
   position: relative;
   background: var(--bg-code);
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   overflow-x: auto;
   line-height: 1.55;
 }
@@ -894,13 +915,13 @@
 .markdown img,
 .markdown video {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .markdown iframe.embed-pdf {
   width: 100%;
   height: 70vh;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .markdown table {
   border-collapse: collapse;
@@ -1002,7 +1023,7 @@
   grid-template-columns: minmax(90px, 148px) 1fr;
   gap: 14px;
   padding: 3px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .properties .prop-key {
   color: var(--text-3);
@@ -1039,7 +1060,7 @@
 .cm-lp-props {
   cursor: text;
   transition: background var(--t-fast);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .cm-lp-props:hover .prop {
   background: var(--bg-hover);
@@ -1128,7 +1149,7 @@
   max-height: 340px;
   overflow: auto;
   background: var(--bg-elev);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: 14px 18px;
   animation: popIn 160ms var(--ease);
@@ -1178,4 +1199,13 @@
     width: 19px;
     height: 19px;
   }
+}
+
+/* paragraph focus: everything but the block you are writing in steps back */
+.cm-focus-paragraph .cm-line.cm-dimmed {
+  opacity: 0.32;
+  transition: opacity 260ms var(--ease);
+}
+.cm-focus-paragraph .cm-line {
+  transition: opacity 260ms var(--ease);
 }

@@ -206,6 +206,8 @@ export function FileTree() {
             onContextMenu={(e) => contextMenu(e, node)}
             title={node.path}
           >
+            {depth > 0 &&
+              Array.from({ length: depth }, (_, i) => <span key={i} className="tree-guide" style={{ left: 11 + i * 13 }} aria-hidden="true" />)}
             {node.type === 'folder' ? (
               <span className={`chev ${expanded.has(node.path) ? 'open' : ''}`}>
                 <ChevronRight />

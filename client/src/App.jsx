@@ -13,8 +13,9 @@ bindConnectionEvents()
 
 function Splash() {
   return (
-    <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <img src="/favicon.svg" alt="" width="42" height="42" style={{ animation: 'pulse 1.4s infinite', borderRadius: 12 }} />
+    <div className="splash">
+      <img src="/favicon.svg" alt="" width="46" height="46" />
+      <span className="splash-name">Obi</span>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { EditorView } from '@codemirror/view'
+import { ySyncAnnotation } from 'y-codemirror.next'
 import { EditorState } from '@codemirror/state'
 import { baseExtensions, compartments, collabExtensions, modeExtensions, readOnlyExtensions, prefsExtensions } from '../editor/setup.js'
 import { editorCtx, refreshEffect } from '../editor/livePreview.js'
@@ -36,6 +37,10 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
           placeholderText: 'Start writing… type / for blocks, [[ to link',
           onUpdate: (u) => {
             if (onStats) onStats(statsFor(u.state))
+            // local edits mark the note as saving until the server confirms the write
+            if (u.docChanged && !u.transactions.some((tr) => tr.annotation(ySyncAnnotation))) {
+              window.dispatchEvent(new CustomEvent('obi:doc-dirty', { detail: { ws: handle.ws, path: handle.path } }))
+            }
           },
         }),
         EditorView.domEventHandlers({
@@ -116,7 +121,7 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
     const comps = compsRef.current
     if (!view || !comps) return
     view.dispatch({ effects: comps.prefs.reconfigure(prefsExtensions(prefs)) })
-  }, [prefs.lineNumbers, prefs.spellcheck])
+  }, [prefs.lineNumbers, prefs.spellcheck, prefs.typewriter, prefs.focusParagraph])
 
   // workspace index changed → re-resolve links
   useEffect(() => {

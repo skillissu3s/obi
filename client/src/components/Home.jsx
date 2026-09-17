@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { FilePlus, CalendarDays, Search, Network, FileText, Clock, Star, ListChecks, Sparkles, Upload, FolderGit2, Cloud, LayoutGrid } from 'lucide-react'
+import { FilePlus, CalendarDays, Search, Network, FileText, Clock, Star, ListChecks, Sparkles, Upload, FolderGit2, Cloud, LayoutGrid, Shapes, PencilRuler } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
@@ -69,12 +69,35 @@ export function Home() {
           ))}
         </div>
 
+        {stats.notes === 0 && (
+          <div className="home-start">
+            <h3>
+              <Sparkles /> Start here
+            </h3>
+            <p>
+              Notes are plain markdown files{ws?.type === 'github' ? ' in your repository' : ''}. Write with <kbd>[[</kbd> to link notes,
+              <kbd>/</kbd> for blocks and <kbd>#</kbd> for tags.
+            </p>
+            <div className="home-start-actions">
+              <button className="btn btn-primary btn-sm" onClick={() => runCommand('new-note')}>
+                <FilePlus /> Write your first note
+              </button>
+              <button className="btn btn-sm" onClick={() => A.createWhiteboard({ folder: '' })}>
+                <Shapes /> New whiteboard
+              </button>
+              <button className="btn btn-sm" onClick={() => useUI.getState().openModal('import')}>
+                <Upload /> Import a vault
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="home-cols">
           <div className="home-section">
             <h3>
               <Clock /> Recently edited
             </h3>
-            {!recent.length && <div className="faint">No notes yet — create your first one.</div>}
+            {!recent.length && <div className="faint">Nothing yet. Notes you open show up here.</div>}
             {recent.map((e) => (
               <div key={e.path} className="recent-item" onClick={(ev) => useLayout.getState().openNote(wsId, e.path, { newTab: ev.metaKey || ev.ctrlKey })}>
                 <FileText />
@@ -117,7 +140,7 @@ export function Home() {
           </div>
         </div>
 
-        <div className="home-stats">
+        <div className="home-stats" style={stats.notes === 0 ? { display: 'none' } : undefined}>
           <span>
             <b>{stats.notes}</b> notes
           </span>

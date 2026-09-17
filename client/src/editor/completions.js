@@ -2,6 +2,7 @@ import { snippetCompletion } from '@codemirror/autocomplete'
 import { editorCtx } from './livePreview.js'
 import { basename, stripExt, dirname, isNote, extname } from '@shared/paths.js'
 import { formatDate } from '../lib/util.js'
+import { EMOJI } from './emoji.js'
 
 // ---------- [[wiki links]] ----------
 export function wikiCompletion(context) {
@@ -85,6 +86,26 @@ export function tagCompletion(context) {
     options: tags.map((t) => ({ label: t.tag, detail: String(t.count), type: 'tag' })),
     validFor: /^[\p{L}\p{N}_\-/]*$/u,
   }
+}
+
+// ---------- :emoji: ----------
+export function emojiCompletion(context) {
+  const line = context.state.doc.lineAt(context.pos)
+  const before = line.text.slice(0, context.pos - line.from)
+  const m = /(?:^|[\s(>])(:([a-z0-9_+-]{2,}))$/i.exec(before)
+  if (!m) return null
+  const query = m[2].toLowerCase()
+  const options = EMOJI.filter(([name]) => name.includes(query))
+    .slice(0, 40)
+    .map(([name, char]) => ({
+      label: `:${name}:`,
+      displayLabel: name,
+      detail: char,
+      type: 'emoji',
+      apply: char,
+    }))
+  if (!options.length) return null
+  return { from: context.pos - m[1].length, options, validFor: /^:[a-z0-9_+-]*$/i }
 }
 
 // ---------- /slash commands ----------
