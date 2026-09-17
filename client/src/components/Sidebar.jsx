@@ -95,6 +95,59 @@ export function FileTree() {
     if (top < el.scrollTop || top + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = Math.max(0, top - el.clientHeight / 2)
   }, [activePath, rows.length])
 
+  // arrow-key navigation over the visible rows
+  const onTreeKeyDown = (e) => {
+    if (e.target !== e.currentTarget || !rows.length) return
+    const idx = rows.findIndex((r) => r.node.path === selected)
+    const go = (i) => {
+      const next = rows[Math.max(0, Math.min(rows.length - 1, i))]
+      if (!next) return
+      useApp.setState({ selectedPath: next.node.path })
+      scrollRef.current?.querySelector(`[data-path="${CSS.escape(next.node.path)}"]`)?.scrollIntoView({ block: 'nearest' })
+    }
+    const node = rows[idx]?.node
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        go(idx < 0 ? 0 : idx + 1)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        go(idx < 0 ? rows.length - 1 : idx - 1)
+        break
+      case 'ArrowRight':
+        if (!node) return
+        e.preventDefault()
+        if (node.type === 'folder' && !expanded.has(node.path)) useApp.getState().setExpanded(node.path, true)
+        else go(idx + 1)
+        break
+      case 'ArrowLeft': {
+        if (!node) return
+        e.preventDefault()
+        if (node.type === 'folder' && expanded.has(node.path)) return useApp.getState().setExpanded(node.path, false)
+        const parent = dirname(node.path)
+        if (parent) {
+          useApp.setState({ selectedPath: parent })
+          scrollRef.current?.querySelector(`[data-path="${CSS.escape(parent)}"]`)?.scrollIntoView({ block: 'nearest' })
+        }
+        break
+      }
+      case 'Enter':
+        if (!node) return
+        e.preventDefault()
+        onRowClick(node, e)
+        break
+      case 'F2':
+        if (node) {
+          e.preventDefault()
+          setRenaming(node.path)
+        }
+        break
+      default:
+        break
+    }
+  }
+
   const onRowClick = (node, e) => {
     useApp.setState({ selectedPath: node.path })
     if (node.type === 'folder') {
@@ -149,6 +202,10 @@ export function FileTree() {
     <div
       className="sidebar-scroll"
       ref={scrollRef}
+      tabIndex={0}
+      role="tree"
+      aria-label="Files"
+      onKeyDown={onTreeKeyDown}
       onDragOver={(e) => {
         e.preventDefault()
         setDropTarget('')
@@ -205,6 +262,10 @@ export function FileTree() {
             }}
             onContextMenu={(e) => contextMenu(e, node)}
             title={node.path}
+            data-path={node.path}
+            role="treeitem"
+            aria-selected={selected === node.path}
+            aria-expanded={node.type === 'folder' ? expanded.has(node.path) : undefined}
           >
             {depth > 0 &&
               Array.from({ length: depth }, (_, i) => <span key={i} className="tree-guide" style={{ left: 11 + i * 13 }} aria-hidden="true" />)}

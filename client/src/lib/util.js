@@ -175,6 +175,22 @@ export function downloadUrl(url) {
   a.remove()
 }
 
+// Markdown line -> readable one-liner (search hits, mention snippets, previews).
+export function plainSnippet(text, max = 160) {
+  return String(text || '')
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX/-]\]\s*)?/, '')
+    .replace(/^\s*>+\s*/, '')
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/!?\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+    .replace(/!?\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_~`]+/g, '')
+    .replace(/==([^=]+)==/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max)
+}
+
 export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

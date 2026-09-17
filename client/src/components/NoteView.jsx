@@ -3,6 +3,7 @@ import {
   ChevronLeft, ChevronRight, MoreHorizontal, Eye, Pencil, Code2, LayoutGrid, Share2, History, Star, Trash2, Copy, Link2,
   FolderInput, SplitSquareHorizontal, Info, Globe, AlertTriangle, FileWarning, Wifi, WifiOff, Bold, Italic, List, ListChecks,
   Heading1, Heading2, Quote, Link as LinkIcon, Image as ImageIcon, Undo2, Redo2, IndentIncrease, IndentDecrease, Hash, FileText,
+  ChevronDown,
 } from 'lucide-react'
 import { conn } from '../lib/socket.js'
 import { useApp } from '../store/app.js'
@@ -20,6 +21,7 @@ import { renameEntry, deleteEntry, duplicateNote, toggleBookmark, isBookmarked, 
 import { api } from '../lib/api.js'
 import { setActiveEditorView } from '../lib/commands.js'
 import { slugify } from '@shared/markdown.js'
+import { plainSnippet } from '../lib/util.js'
 
 export function useDocHandle(ws, path, enabled = true) {
   const [handle, setHandle] = useState(null)
@@ -200,6 +202,7 @@ export function NoteView({ tab, paneId, active }) {
             key={`${handle.key}:${handle.generation}`}
           />
         )}
+        <LinkedMentions tab={tab} />
       </div>
     )
   }
@@ -279,6 +282,70 @@ export function NoteView({ tab, paneId, active }) {
         <NoteCanvas key={`${handle.key}:${handle.generation}`} tab={tab} view={view} scrollEl={scrollEl} innerEl={innerEl} originEl={originEl} stageEl={stageEl} mode={mode} />
       )}
       {view && !readOnly && mode !== 'read' && mode !== 'board' && <MobileToolbar view={view} handle={handle} />}
+    </div>
+  )
+}
+
+// Notes that point here, tucked under the note itself (collapsed until you want them).
+function LinkedMentions({ tab }) {
+  const version = useApp((s) => s.version)
+  const wsId = useApp((s) => s.wsId)
+  const [data, setData] = useState(null)
+  const [open, setOpen] = useState(() => localStorage.getItem('obi:mentionsOpen') === '1')
+  useEffect(() => {
+    if (tab.ws !== wsId) return
+    let alive = true
+    const t = setTimeout(() => {
+      api
+        .backlinks(tab.ws, tab.path)
+        .then((r) => alive && setData(r))
+        .catch(() => {})
+    }, 400)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+  }, [tab.ws, tab.path, wsId, version])
+
+  const linked = data?.linked || []
+  if (!linked.length) return null
+  const total = linked.reduce((n, l) => n + l.hits.length, 0)
+  return (
+    <div className={`note-mentions ${open ? 'open' : ''}`}>
+      <button
+        className="nm-head"
+        onClick={() => {
+          setOpen(!open)
+          localStorage.setItem('obi:mentionsOpen', open ? '0' : '1')
+        }}
+      >
+        <ChevronDown className="nm-chev" />
+        <Link2 />
+        <span>
+          {total} linked mention{total === 1 ? '' : 's'}
+        </span>
+        <span className="nm-count">
+          in {linked.length} note{linked.length === 1 ? '' : 's'}
+        </span>
+      </button>
+      {open && (
+        <div className="nm-list">
+          {linked.map((l) => (
+            <div key={l.path} className="nm-note">
+              <button className="nm-title" onClick={(e) => useLayout.getState().openNote(tab.ws, l.path, { newTab: e.metaKey || e.ctrlKey })}>
+                <FileText />
+                <span className="truncate">{stripExt(basename(l.path))}</span>
+                {dirname(l.path) && <span className="nm-folder truncate">{dirname(l.path)}</span>}
+              </button>
+              {l.hits.slice(0, 3).map((h, i) => (
+                <button key={i} className="nm-hit" onClick={() => useLayout.getState().openNote(tab.ws, l.path, { line: h.line })}>
+                  {plainSnippet(h.text)}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

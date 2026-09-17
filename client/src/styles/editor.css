@@ -1209,3 +1209,116 @@
 .cm-focus-paragraph .cm-line {
   transition: opacity 260ms var(--ease);
 }
+
+/* ---------- linked mentions ---------- */
+.note-mentions {
+  margin: 40px 0 0;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  font-family: var(--font-ui);
+}
+.nm-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 4px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-3);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  text-align: left;
+}
+.nm-head:hover {
+  color: var(--text-2);
+  background: var(--bg-hover);
+}
+.nm-head svg {
+  width: 14px;
+  height: 14px;
+}
+.nm-chev {
+  transition: transform var(--t) var(--ease);
+  transform: rotate(-90deg);
+  opacity: 0.8;
+}
+.note-mentions.open .nm-chev {
+  transform: none;
+}
+.nm-count {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+.nm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 8px;
+  animation: fadeIn var(--t) var(--ease);
+}
+.nm-note {
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+}
+.nm-note:hover {
+  background: var(--bg-hover);
+}
+.nm-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+.nm-title:hover {
+  color: var(--accent-text);
+}
+.nm-title svg {
+  width: 13px;
+  height: 13px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.nm-folder {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-faint);
+  max-width: 40%;
+}
+.nm-hit {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 3px 0 3px 20px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nm-hit:hover {
+  color: var(--text);
+  background: var(--bg-active);
+}
+.sidebar-scroll:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  border-radius: var(--radius-sm);
+}
