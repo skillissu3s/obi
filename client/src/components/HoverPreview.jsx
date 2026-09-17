@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom'
 import { useApp } from '../store/app.js'
 import { renderMarkdown, fetchNote, enhanceRendered } from '../lib/render.js'
 import { stripExt, basename } from '@shared/paths.js'
+import { isBoardPath, parseBoard } from '@shared/board.js'
+import { boardToSvg } from '@shared/boardsvg.js'
+import { api } from '../lib/api.js'
 
 export function HoverPreview() {
   const [state, setState] = useState(null)
@@ -58,7 +61,15 @@ export function HoverPreview() {
   }, [state])
 
   if (!state) return null
-  const { html } = renderMarkdown(state.content.slice(0, 4000), { ws: wsId, path: state.path })
+  let html
+  if (isBoardPath(state.path)) {
+    // whiteboards preview as a drawing
+    let svg = ''
+    try {
+      svg = boardToSvg(parseBoard(state.content), { fileUrl: (p) => api.fileUrl(wsId, p), maxHeight: 260 }).svg
+    } catch {}
+    html = svg ? `<div class="hp-board">${svg}</div>` : '<p class="muted">Empty whiteboard</p>'
+  } else html = renderMarkdown(state.content.slice(0, 4000), { ws: wsId, path: state.path }).html
   const width = 420
   const left = Math.min(Math.max(8, state.rect.left), window.innerWidth - width - 12)
   const above = state.rect.top > window.innerHeight / 2

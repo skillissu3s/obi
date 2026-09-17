@@ -810,9 +810,20 @@
 }
 
 /* ---------- Settings ---------- */
+/* fixed-height shell: the nav column always fills the dialog, only the content scrolls */
+.modal.settings-modal {
+  height: min(760px, 86vh);
+  max-height: 86vh;
+}
+.settings-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .settings {
   display: flex;
-  height: 100%;
+  flex: 1;
   min-height: 0;
 }
 .settings-nav {
@@ -1526,4 +1537,17 @@
 }
 .stat-danger .stat-value {
   color: var(--danger);
+}
+
+.settings-body h3.palette-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.palette-group-title svg {
+  width: 13px;
+  height: 13px;
+}
+.palette-hint {
+  margin: 10px 0 4px;
 }

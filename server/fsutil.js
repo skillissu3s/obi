@@ -113,7 +113,7 @@ const MIME = {
   bmp: 'image/bmp', avif: 'image/avif', ico: 'image/x-icon', pdf: 'application/pdf', mp3: 'audio/mpeg', wav: 'audio/wav',
   ogg: 'audio/ogg', m4a: 'audio/mp4', flac: 'audio/flac', webm: 'video/webm', mp4: 'video/mp4', mov: 'video/quicktime',
   ogv: 'video/ogg', md: 'text/markdown; charset=utf-8', txt: 'text/plain; charset=utf-8', json: 'application/json',
-  csv: 'text/csv; charset=utf-8', canvas: 'application/json',
+  csv: 'text/csv; charset=utf-8', canvas: 'application/json', board: 'application/json',
 }
 export const mimeFor = (ext) => MIME[ext] || 'application/octet-stream'
 export const INLINE_SAFE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'ico', 'pdf', 'mp3', 'wav', 'ogg', 'm4a', 'flac', 'webm', 'mp4', 'mov', 'ogv', 'txt', 'md'])

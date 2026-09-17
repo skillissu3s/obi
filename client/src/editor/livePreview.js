@@ -204,6 +204,63 @@ class EmbedNoteWidget extends WidgetType {
   }
 }
 
+// A whiteboard embedded with ![[name.board]] — live preview, editable in place.
+class BoardEmbedWidget extends WidgetType {
+  constructor(ws, path, label, height, missing) {
+    super()
+    this.ws = ws
+    this.path = path
+    this.label = label
+    this.height = height
+    this.missing = missing
+  }
+  eq(o) {
+    return o.ws === this.ws && o.path === this.path && o.label === this.label && o.height === this.height && o.missing === this.missing
+  }
+  get estimatedHeight() {
+    return Math.min(this.height, 360)
+  }
+  toDOM(view) {
+    const dom = document.createElement('div')
+    dom.className = 'cm-board-embed'
+    if (this.missing) {
+      dom.className += ' cm-lp-image-missing'
+      dom.textContent = `🖊 ${this.label} (whiteboard not found)`
+      return dom
+    }
+    let cancelled = false
+    import('../canvas/BoardEmbed.jsx').then(({ mountBoardEmbed }) => {
+      if (cancelled) return
+      dom._unmount = mountBoardEmbed(dom, {
+        ws: this.ws,
+        path: this.path,
+        label: this.label,
+        height: this.height,
+        onExit: () => view.focus(),
+      })
+      requestAnimationFrame(() => view.requestMeasure())
+    })
+    dom._cancel = () => {
+      cancelled = true
+    }
+    // resizes (preview ↔ editor) change the line height
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => view.requestMeasure())
+      ro.observe(dom)
+      dom._ro = ro
+    }
+    return dom
+  }
+  destroy(dom) {
+    dom._cancel?.()
+    dom._unmount?.()
+    dom._ro?.disconnect()
+  }
+  ignoreEvent() {
+    return true
+  }
+}
+
 class TableWidget extends WidgetType {
   constructor(text, ws, path) {
     super()
@@ -327,6 +384,16 @@ function embedSize(alias) {
   if (!alias) return {}
   const m = /^(\d+)(?:x(\d+))?$/.exec(alias.trim())
   return m ? { width: Number(m[1]), height: m[2] ? Number(m[2]) : undefined } : {}
+}
+
+export function boardEmbedFor(ctx, raw) {
+  const { target } = splitTarget(raw.split('|')[0])
+  if (extname(target) !== 'board') return null
+  const alias = raw.includes('|') ? raw.slice(raw.indexOf('|') + 1).trim() : ''
+  const resolved = ctx.resolve?.(target) || null
+  const height = /^\d+$/.test(alias) ? Math.max(200, Math.min(1400, Number(alias))) : 440
+  const label = alias && !/^\d+$/.test(alias) ? alias : stripExt(basename(target))
+  return new BoardEmbedWidget(ctx.ws, resolved, label, height, !resolved)
 }
 
 function embedWidget(ctx, raw) {
@@ -509,6 +576,8 @@ function buildDecorations(view) {
               return false
             }
             const raw = doc.sliceString(target.from, n.getChild('WikiAlias') ? n.getChild('WikiAlias').to : target.to)
+            // whiteboards on their own line are drawn as blocks by `blockWidgets`
+            if (extname(splitTarget(raw.split('|')[0]).target) === 'board' && soloEmbedLine(doc, n.from, n.to)) return false
             add(Decoration.replace({ widget: embedWidget(ctx, raw) }), n.from, n.to)
             return false
           }
@@ -657,7 +726,12 @@ export const livePreview = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 )
 
-// ---------------- block widgets (tables, math, mermaid) ----------------
+// ---------------- block widgets (tables, math, mermaid, whiteboards) ----------------
+
+function soloEmbedLine(doc, from, to) {
+  const line = doc.lineAt(from)
+  return to <= line.to && !line.text.slice(0, from - line.from).trim() && !line.text.slice(to - line.from).trim()
+}
 
 function buildBlocks(state) {
   const ctx = state.facet(editorCtx)
@@ -687,6 +761,19 @@ function buildBlocks(state) {
         }
         return false
       }
+      if (node.name === 'WikiEmbed') {
+        const n = node.node
+        const target = n.getChild('WikiTarget')
+        if (target && soloEmbedLine(doc, n.from, n.to) && !touches(n.from, n.to)) {
+          const raw = doc.sliceString(target.from, n.getChild('WikiAlias') ? n.getChild('WikiAlias').to : target.to)
+          const widget = boardEmbedFor(ctx, raw)
+          if (widget) {
+            const line = doc.lineAt(n.from)
+            decos.push(Decoration.replace({ widget, block: true }).range(line.from, line.to))
+          }
+        }
+        return false
+      }
       if (node.name === 'Paragraph') {
         if (doc.sliceString(node.from, node.from + 2) === '$$') {
           const text = doc.sliceString(node.from, node.to)
@@ -696,8 +783,10 @@ function buildBlocks(state) {
             const t = doc.lineAt(Math.min(node.to, doc.length)).to
             decos.push(Decoration.replace({ widget: new MathWidget(m[1].trim()), block: true }).range(f, t))
           }
+          return false
         }
-        return false
+        // only paragraphs holding an embed need a look inside (for whiteboards)
+        return doc.sliceString(node.from, node.to).includes('.board') ? undefined : false
       }
       if (node.name === 'Frontmatter' || node.name === 'HTMLBlock') return false
     },

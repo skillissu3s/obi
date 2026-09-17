@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { ALLOW_FILE_REMOTES } from './config.js'
+import { isBoardPath, isLayerPath, mergeBoards } from '../shared/board.js'
 
 export class GitError extends Error {
   constructor(message, details) {
@@ -225,6 +226,15 @@ export async function syncRepo(dir, { url, branch, token, username, authorName, 
               const theirs = await showStage(dir, 3, f)
               const abs = path.join(dir, f)
               await fs.mkdir(path.dirname(abs), { recursive: true })
+              if (ours && theirs && (isBoardPath(f) || isLayerPath(f))) {
+                const base = await showStage(dir, 1, f)
+                const merged = mergeBoards(base ? base.toString('utf8') : '', ours.toString('utf8'), theirs.toString('utf8'))
+                if (merged != null) {
+                  await fs.writeFile(abs, merged)
+                  await must(dir, ['add', '--', f])
+                  continue
+                }
+              }
               if (ours && theirs) {
                 const copy = conflictName(f)
                 await fs.writeFile(abs, theirs)

@@ -13,7 +13,9 @@ Obi is your calm, fast home for notes — in the cloud, shared with others, or s
 - [[Shortcuts]] — every keyboard shortcut in one place
 - [[Markdown cheatsheet]] — callouts, tasks, math, diagrams & more
 - [[Project board]] — a Kanban board that is just a markdown file
-- Open the **graph view** from the left ribbon to see how notes connect
+- Press **Canvas** at the bottom of any note to draw, add sticky notes and images around it — select text to highlight it or attach a note
+- Type \`/whiteboard\` to sketch a diagram right inside a note
+- Open the **graph view** from the sidebar to see how notes connect
 
 ## Quick wins
 - [ ] Create your first note with **Ctrl/⌘ + N**
@@ -40,6 +42,9 @@ Obi is your calm, fast home for notes — in the cloud, shared with others, or s
 | Bold / Italic / Link | Ctrl/⌘ B / I / L |
 | Toggle checkbox | Ctrl/⌘ Enter |
 | Close tab | Ctrl/⌘ W (Alt W in browsers that reserve it) |
+| New whiteboard | Alt B |
+| Canvas tools on a note | Alt C |
+| Pan a canvas | Space + drag, middle mouse, or H |
 
 Back to [[Welcome]]. #getting-started
 `,

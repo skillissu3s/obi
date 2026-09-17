@@ -73,6 +73,21 @@ export function Reader({ handle, onStats, readOnly }) {
         body.textContent = 'Could not load note'
       }
     })
+    // live whiteboard embeds
+    const unmounts = []
+    let alive = true
+    const boards = [...el.querySelectorAll('.embed-board[data-path]:not([data-mounted])')]
+    if (boards.length) {
+      import('../canvas/BoardEmbed.jsx').then(({ mountBoardEmbed }) => {
+        if (!alive) return
+        for (const node of boards) {
+          node.dataset.mounted = '1'
+          const path = node.dataset.path
+          const height = Number(node.dataset.height) || 440
+          unmounts.push(mountBoardEmbed(node, { ws: handle.ws, path, height, label: path.split('/').pop().replace(/\.board$/i, '') }))
+        }
+      })
+    }
     // code copy buttons
     el.querySelectorAll('pre:not([data-copy])').forEach((pre) => {
       pre.dataset.copy = '1'
@@ -86,7 +101,11 @@ export function Reader({ handle, onStats, readOnly }) {
       }
       pre.appendChild(btn)
     })
-    return () => window.removeEventListener('obi:theme', onTheme)
+    return () => {
+      alive = false
+      unmounts.forEach((u) => u())
+      window.removeEventListener('obi:theme', onTheme)
+    }
   }, [html, handle])
 
   const onClick = (e) => {

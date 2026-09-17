@@ -30,6 +30,7 @@ const CALLOUT_RE = /^\[!([\w-]+)\]([+-]?)[ \t]*(.*)$/m
  *  html: allow raw html (must be sanitised by caller)
  *  resolve(target, kind, env) -> { href, exists, path }
  *  fileUrl(path, env) -> string
+ *  boardEmbed(resolved, env, meta) -> html string | null   (for ![[x.board]])
  */
 export function createMarkdown(opts = {}) {
   const md = new MarkdownIt({ html: opts.html ?? false, linkify: true, breaks: true, typographer: false })
@@ -82,6 +83,13 @@ export function createMarkdown(opts = {}) {
     if (AUDIO_EXT.has(ext) && src) return `<audio class="embed-audio" controls src="${escapeHtml(src)}"></audio>`
     if (VIDEO_EXT.has(ext) && src) return `<video class="embed-video" controls src="${escapeHtml(src)}"${size}></video>`
     if (ext === 'pdf' && src) return `<iframe class="embed-pdf" src="${escapeHtml(src)}"></iframe>`
+    if (ext === 'board') {
+      const custom = opts.boardEmbed?.(r, env, { target, display })
+      if (custom != null) return custom
+      if (!r.exists || !r.path) return `<span class="embed-missing">${escapeHtml(stripExt(basename(target)))}</span>`
+      const height = display && /^\d+$/.test(display) ? ` data-height="${escapeHtml(display)}"` : ''
+      return `<div class="embed-board" data-path="${escapeHtml(r.path)}"${height}><div class="embed-board-body">…</div></div>`
+    }
     if (opts.noteEmbeds === false || !r.exists) {
       return `<a class="internal-link${r.exists ? '' : ' is-unresolved'}" data-href="${escapeHtml(target + subpath)}" href="${escapeHtml(r.href || '#')}">${escapeHtml(display || stripExt(basename(target)))}</a>`
     }

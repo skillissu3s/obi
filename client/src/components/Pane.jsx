@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
-import { X, Plus, FileText, Network, ListChecks, Home as HomeIcon, SplitSquareHorizontal, Pin, PinOff, Copy, MoreHorizontal } from 'lucide-react'
+import { X, Plus, FileText, Network, ListChecks, Home as HomeIcon, SplitSquareHorizontal, Pin, PinOff, Copy, MoreHorizontal, Shapes } from 'lucide-react'
 import { useLayout } from '../store/layout.js'
 import { useApp } from '../store/app.js'
 import { useUI } from '../store/ui.js'
 import { NoteView } from './NoteView.jsx'
+import { BoardView } from './BoardView.jsx'
+import { isBoardPath } from '@shared/board.js'
 import { Home } from './Home.jsx'
 import { GraphView } from './GraphView.jsx'
 import { TasksView } from './TasksView.jsx'
@@ -34,7 +36,7 @@ export function Pane({ pane, isActive, multi }) {
     <div className={`pane ${isActive ? '' : 'inactive'}`} onMouseDown={() => useLayout.getState().focusPane(pane.id)}>
       <div className="tabbar">
         {pane.tabs.map((tab, idx) => {
-          const Icon = KIND_ICON[tab.kind] || FileText
+          const Icon = tab.kind === 'note' && isBoardPath(tab.path) ? Shapes : KIND_ICON[tab.kind] || FileText
           const busy = tab.kind === 'note' ? pending[`${tab.ws}:${tab.path}`] : null
           const title = tab.kind === 'note' ? stripExt(basename(tab.path)) : tab.kind === 'graph' ? 'Graph' : tab.kind === 'tasks' ? 'Tasks' : 'Home'
           return (
@@ -107,6 +109,7 @@ export function Pane({ pane, isActive, multi }) {
 }
 
 function TabContent({ tab, paneId, active }) {
+  if (tab.kind === 'note' && isBoardPath(tab.path)) return <BoardView tab={tab} paneId={paneId} active={active} />
   if (tab.kind === 'note') return <NoteView tab={tab} paneId={paneId} active={active} />
   if (tab.kind === 'graph') return <GraphView />
   if (tab.kind === 'tasks') return <TasksView />

@@ -12,6 +12,9 @@ import { notifyUser } from './hub.js'
 import * as git from './git.js'
 import { MAX_UPLOAD_MB } from './config.js'
 import { extname, isNote, basename, dirname, safeName, joinPath } from '../shared/paths.js'
+import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
+import { scanDir } from './fsutil.js'
+import path from 'node:path'
 
 export const wsRouter = express.Router()
 export const miscRouter = express.Router()
@@ -64,6 +67,18 @@ function notePathAccess(req, min, p) {
   if (!hasRank(role, min)) throw new HttpError(404, 'Note not found')
   req.ws = w
   req.role = role
+}
+
+async function boardAccess(req, p) {
+  const w = one('SELECT * FROM workspaces WHERE id = ?', req.params.id)
+  if (!w) throw new HttpError(404, 'Workspace not found')
+  const role = workspaceRole(req.user.id, w.id)
+  req.ws = w
+  req.role = role
+  if (role) return
+  const rt = await getRuntime(w.id)
+  if (!(await canReadFile(req.user.id, rt, p))) throw new HttpError(404, 'Whiteboard not found')
+  req.role = 'viewer'
 }
 
 const settingsKeys = new Set([
@@ -197,7 +212,8 @@ wsRouter.get('/:id/index', access('viewer'), async (req, res) => {
 
 wsRouter.get('/:id/note', async (req, res) => {
   const p = safePath(req.query.path)
-  notePathAccess(req, 'viewer', p)
+  if (isBoardPath(p)) await boardAccess(req, p)
+  else notePathAccess(req, 'viewer', p)
   const rt = await getRuntime(req.ws.id)
   const content = await rt.readNote(p)
   if (content == null) throw new HttpError(404, 'Note not found')
@@ -207,8 +223,16 @@ wsRouter.get('/:id/note', async (req, res) => {
 wsRouter.put('/:id/note', async (req, res) => {
   const { path: rawPath, content, ifMissing, mustNotExist } = req.body || {}
   const p = safePath(rawPath)
-  if (!isNote(p)) throw new HttpError(400, 'Notes must end with .md')
+  const board = isBoardPath(p)
+  if (!isNote(p) && !board) throw new HttpError(400, 'Notes must end with .md')
   notePathAccess(req, 'editor', p)
+  if (board) {
+    try {
+      parseBoard(content)
+    } catch (e) {
+      throw new HttpError(400, e instanceof BoardParseError ? e.message : 'Invalid whiteboard')
+    }
+  }
   if (!workspaceRole(req.user.id, req.ws.id)) {
     // share-only editors may only modify existing notes
     const rt0 = await getRuntime(req.ws.id)
@@ -233,6 +257,7 @@ wsRouter.post('/:id/move', access('editor'), async (req, res) => {
   const rt = await getRuntime(req.ws.id)
   const entry = rt.tree.get(from)
   if (entry?.type === 'file' && isNote(from) && !isNote(to)) throw new HttpError(400, 'Notes must end with .md')
+  if (entry?.type === 'file' && isBoardPath(from) && !isBoardPath(to)) throw new HttpError(400, 'Whiteboards must end with .board')
   const r = await rt.move(from, to, { updateLinks: req.body?.updateLinks !== false, userId: req.user.id })
   res.json(r)
 })
@@ -264,7 +289,7 @@ wsRouter.get('/:id/file', async (req, res) => {
   const w = one('SELECT * FROM workspaces WHERE id = ?', req.params.id)
   if (!w) throw new HttpError(404, 'Not found')
   const rt = await getRuntime(w.id)
-  if (!canReadFile(req.user.id, rt, p) || !rt.hasFile(p)) throw new HttpError(404, 'Not found')
+  if (!rt.hasFile(p) || !(await canReadFile(req.user.id, rt, p))) throw new HttpError(404, 'Not found')
   const ext = extname(p)
   res.setHeader('Content-Type', mimeFor(ext))
   res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox")
@@ -517,6 +542,9 @@ wsRouter.get('/:id/export', access('viewer'), async (req, res) => {
   const rt = await getRuntime(req.ws.id)
   await rt.lock.run(() => rt.flushDocs())
   const files = rt.getTree().filter((e) => e.type === 'file')
+  // canvas layers live in .obi/ — include them so an export round-trips
+  const layerFiles = (await scanDir(path.join(rt.dir, '.obi'))).filter((e) => e.type === 'file').map((e) => ({ ...e, path: `.obi/${e.path}` }))
+  files.push(...layerFiles.filter((e) => isLayerPath(e.path)))
   const name = (req.ws.name || 'workspace').replace(/[^\w.-]+/g, '-')
   res.setHeader('Content-Type', 'application/zip')
   res.setHeader('Content-Disposition', `attachment; filename="${name}.zip"`)
@@ -532,7 +560,7 @@ wsRouter.get('/:id/export', access('viewer'), async (req, res) => {
     } catch {
       continue
     }
-    const text = ['md', 'txt', 'json', 'csv', 'canvas', 'svg'].includes(extname(f.path))
+    const text = ['md', 'txt', 'json', 'csv', 'canvas', 'svg', 'board'].includes(extname(f.path))
     const entry = text ? new ZipDeflate(f.path, { level: 6 }) : new ZipPassThrough(f.path)
     entry.mtime = new Date(f.mtime)
     zip.add(entry)
@@ -550,7 +578,9 @@ wsRouter.post('/:id/import', access('editor'), express.raw({ type: () => true, l
   } catch {
     throw new HttpError(400, 'That does not look like a valid .zip file')
   }
-  let names = Object.keys(entries).filter((n) => !n.endsWith('/') && !n.startsWith('__MACOSX') && !n.split('/').some((s) => s.startsWith('.')))
+  const allNames = Object.keys(entries).filter((n) => !n.endsWith('/') && !n.startsWith('__MACOSX'))
+  let names = allNames.filter((n) => !n.split('/').some((s) => s.startsWith('.')))
+  const layerNames = allNames.filter((n) => isLayerPath(n) || isLayerPath(n.slice(n.indexOf('/') + 1)))
   // strip a single shared top-level folder
   const tops = new Set(names.map((n) => n.split('/')[0]))
   const strip = tops.size === 1 && names.every((n) => n.includes('/'))
@@ -567,6 +597,25 @@ wsRouter.post('/:id/import', access('editor'), express.raw({ type: () => true, l
     if (rt.tree.has(p)) p = rt.uniquePath(p)
     await rt.writeFile(p, Buffer.from(entries[n]))
     count++
+  }
+  // canvas layers for notes that came in with the import
+  for (const n of layerNames) {
+    const rel = isLayerPath(n) ? n : n.slice(n.indexOf('/') + 1)
+    const note = notePathForLayer(rel)
+    let target
+    try {
+      target = safePath(joinPath(folder, note))
+    } catch {
+      continue
+    }
+    if (!rt.hasFile(target)) continue
+    const text = Buffer.from(entries[n]).toString('utf8')
+    try {
+      parseBoard(text)
+    } catch {
+      continue
+    }
+    await rt.importLayer(target, text)
   }
   res.json({ imported: count })
 })

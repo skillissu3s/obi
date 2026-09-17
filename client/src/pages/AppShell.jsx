@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Menu, Search, Network, ListChecks, Settings, Plus, PanelRight, ShieldCheck, LogOut, CalendarDays, Star, X, Loader2,
-  AlertTriangle, RefreshCw, FolderGit2, FileText, Maximize2, Layers, CheckCircle2, KeyRound,
+  AlertTriangle, RefreshCw, FolderGit2, FileText, Maximize2, Layers, CheckCircle2, KeyRound, PanelLeftOpen, Shapes,
 } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
@@ -23,6 +23,8 @@ import { NewWorkspaceModal, ShareModal, HistoryModal, MoveModal, ImportModal, Sh
 import { Modal, WsIcon, Avatar, Spinner, menuFromElement } from '../components/ui.jsx'
 import { PasswordInput } from './Auth.jsx'
 import { StorageWarning } from '../components/StorageWarning.jsx'
+import { EdgeToggles } from '../components/EdgeToggles.jsx'
+import { userMenu } from '../lib/userMenu.js'
 import { basename, stripExt } from '@shared/paths.js'
 
 export default function AppShell() {
@@ -140,8 +142,9 @@ export default function AppShell() {
       {user?.isAdmin && <StorageWarning compact />}
       <MobileHeader ws={ws} activeTab={activeTab} />
       <div className="app-body">
-        <Ribbon user={user} />
-        {layout.left && <Sidebar />}
+        {/* one or the other: the full sidebar when open, the compact ribbon when closed */}
+        {!(layout.left && !mobile) && <Ribbon user={user} />}
+        {layout.left && <Sidebar user={user} />}
         {layout.left && mobile && <div className="scrim" onClick={() => layout.toggleLeft(false)} />}
         <div className="main">
           {loadingWs ? (
@@ -190,6 +193,7 @@ export default function AppShell() {
         </div>
         {layout.right && !layout.focus && <RightPanel tab={activeTab} />}
         {layout.right && mobile && <div className="scrim" onClick={() => layout.toggleRight(false)} />}
+        {!mobile && !layout.focus && <EdgeToggles />}
       </div>
       <StatusBar />
       {layout.focus && (
@@ -235,30 +239,13 @@ function Ribbon({ user }) {
   const layout = useLayout()
   const ws = workspaces.find((w) => w.id === wsId)
 
-  const userMenu = (e) => {
-    useUI.getState().showContextMenu(menuFromElement(e.currentTarget), [
-      { label: user.displayName, section: `@${user.username}` },
-      { label: 'Settings', icon: Settings, hint: '⌘,', run: () => useUI.getState().openModal('settings') },
-      { label: 'Keyboard shortcuts', icon: ListChecks, run: () => useUI.getState().openModal('shortcuts') },
-      user.isAdmin && { label: 'Admin console', icon: ShieldCheck, run: () => navigate('/admin') },
-      'divider',
-      {
-        label: 'Sign out',
-        icon: LogOut,
-        run: async () => {
-          await api.logout()
-          conn.stop()
-          useApp.setState({ user: null })
-          navigate('/login')
-        },
-      },
-    ])
-  }
-
   return (
     <div className="ribbon">
       <button className="ws-avatar" onClick={() => useUI.getState().openPalette('workspaces')} title={`${ws?.name || 'Workspace'} — switch (⌘⇧O)`}>
         <WsIcon ws={ws} size={32} />
+      </button>
+      <button className="icon-btn" title="Open sidebar (Ctrl/⌘ \)" onClick={() => layout.toggleLeft(true)}>
+        <PanelLeftOpen />
       </button>
       <button className="icon-btn" title="Search (⌘⇧F)" onClick={() => layout.setLeftTab('search')}>
         <Search />
@@ -275,6 +262,9 @@ function Ribbon({ user }) {
       <button className="icon-btn" title="New note (⌘N)" onClick={() => runCommand('new-note')}>
         <Plus />
       </button>
+      <button className="icon-btn" title="New whiteboard (Alt B)" onClick={() => runCommand('new-whiteboard')}>
+        <Shapes />
+      </button>
       <div className="ribbon-spacer" />
       <button className={`icon-btn ${useLayout.getState().right ? 'active' : ''}`} title="Toggle right panel" onClick={() => layout.toggleRight()}>
         <PanelRight />
@@ -282,7 +272,7 @@ function Ribbon({ user }) {
       <button className="icon-btn" title="Settings" onClick={() => useUI.getState().openModal('settings')}>
         <Settings />
       </button>
-      <button className="icon-btn" onClick={userMenu} title={user?.displayName} style={{ marginTop: 4 }}>
+      <button className="icon-btn" onClick={(e) => userMenu(e, user)} title={user?.displayName} style={{ marginTop: 4 }}>
         <Avatar name={user?.displayName || '?'} color={user?.color} size={26} />
       </button>
     </div>

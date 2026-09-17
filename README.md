@@ -13,7 +13,7 @@ Obi gives you two kinds of workspace:
 | Share the whole workspace | — (private to you) | ✅ members with roles |
 | History | full git history | automatic snapshots + trash |
 
-Both kinds are plain markdown, folders and attachments — never a proprietary format.
+Both kinds are plain markdown, folders and attachments — never a proprietary format. Both get exactly the same editor, whiteboards and note canvas.
 
 ---
 
@@ -31,6 +31,15 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 - Automatic link rewriting when you rename or move notes
 - Kanban **board view** for notes with `kanban-plugin: basic` front matter (compatible with the Obsidian Kanban plugin)
 - Daily notes with templates, template insertion, inline title editing
+
+**Whiteboards & the note canvas** (every workspace, GitHub or online)
+- **Whiteboards** (`.board` files): rectangles, ellipses, diamonds, arrows that stay attached to shapes, lines with bends and curves, freehand pen, highlighter, text, sticky notes, images, frames, links to notes or web pages, eraser and a laser pointer. Hand-drawn or clean style, fills and hatching, dashes, arrowheads, grouping, locking, alignment, snapping and a grid, copy/paste, undo, zoom and pan, export to PNG/SVG
+- **Embed a whiteboard in a note** with `![[Sketch.board]]` (or `/whiteboard` in the slash menu) — it shows as a live drawing and you can edit it right there
+- **Every note has a canvas around it.** Open *Canvas* at the bottom of a note to draw over or beside the text, drop sticky notes, images and page links into the margins. Drawings are pinned to the paragraph they sit next to, so they move with the text as you write
+- **Select text** for a small toolbar: highlight it, attach a sticky note (joined by a dashed arrow), link a page beside it, or start an arrow from it and drop the end on anything — shapes or other text
+- Pan with the scroll wheel (sideways on notes), **Space + drag**, the **middle mouse button** or the hand tool; `Ctrl/⌘` + wheel zooms whiteboards
+- Live cursors and selections when several people are on the same whiteboard or note canvas
+- The markdown never changes: a note's canvas is saved beside it in `.obi/layers/<note path>.json` and follows the note when it's renamed, moved, deleted or restored. Whiteboards and layers are plain JSON with one element per line, and simultaneous edits from different machines are merged element by element during git sync
 
 **Finding things**
 - Command palette (`Ctrl/⌘ K`), quick switcher (`Ctrl/⌘ O`)
@@ -56,9 +65,9 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 - `/admin` console: create users, reset passwords, promote admins, disable/delete accounts, one-time invite links, see every workspace and its sync state
 
 **Everything else**
-- **8 colour themes**, each with a dark and a light variant — Sumi (warm ink & paper), Graphite, Midnight, Nordic, Forest, Ember, Mocha, Nebula. Switch from *Settings → Appearance* or the command palette (“Colour theme: …”). Themes restyle the whole app: surfaces, text, borders, syntax highlighting and accent.
+- **13 colour themes**, each with a light and a dark version. Light-first: Paper (crisp white & ink blue), Sand, Sakura, Mint, Sky. Dark-first: Sumi (warm ink & paper), Graphite, Midnight, Nordic, Forest, Ember, Mocha, Nebula. Switch from *Settings → Appearance* or the command palette (“Colour theme: …”). Themes restyle the whole app, including drawings: surfaces, text, borders, syntax highlighting and accent.
 - Optional accent override on top of any theme, three editor fonts, adjustable size/line-height, readable line width, focus mode
-- Minimal chrome by design: no panel borders, flat tabs, a header that fades until you reach for it
+- Minimal chrome by design: no panel borders, flat tabs, a header that fades until you reach for it. The left side shows either the full sidebar or a slim icon ribbon, and hidden toggles appear when the pointer nears a panel edge
 - Split panes, tabs, per-workspace layout persistence
 - Mobile layout with a formatting toolbar, installable as a PWA
 - Import/export a workspace as `.zip` (drop in an Obsidian vault)
@@ -197,5 +206,6 @@ shared/   markdown parser/renderer, link resolution, path helpers, diff/merge �
 
 - Every open note is a **Yjs document** on the server; browsers sync over one multiplexed WebSocket, so several devices/people can edit the same note without conflicts. The server debounces writes to disk (~1 s) and, for GitHub workspaces, commits and pushes on a timer.
 - Notes are files. The server keeps an in-memory index (links, tags, headings, tasks, front matter) for instant search, backlinks and the graph, and updates it incrementally on every save.
+- Whiteboards and note canvases are Yjs maps of elements (last write wins per element), saved as JSON. Canvas elements on a note carry a text anchor (a quote of the line plus some context) instead of a fixed position, so they follow edits made anywhere — other devices, git pulls, other apps.
 - Metadata that isn't part of your markdown — users, sessions, members, shares, publish links, version snapshots, trash — lives in SQLite at `/data/obi.db`.
 - Sessions are httpOnly cookies; passwords are scrypt-hashed; mutating API calls require a custom header (CSRF protection); uploaded files are served with a sandboxing CSP.

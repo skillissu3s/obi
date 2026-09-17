@@ -4,6 +4,7 @@ import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
 import { toast, confirmDialog, promptDialog, useUI } from '../store/ui.js'
 import { basename, dirname, stripExt, joinPath, isNote, safeName, extname } from '@shared/paths.js'
+import { isBoardPath, emptyBoard } from '@shared/board.js'
 import { formatDate, isoDate, downloadUrl, copyText } from './util.js'
 import { fetchNote } from './render.js'
 import { conn } from './socket.js'
@@ -110,6 +111,28 @@ export async function createNote({ folder = '', title, content, open = true, new
   }
 }
 
+// A new whiteboard file, created optimistically like notes.
+export async function createWhiteboard({ folder = '', title, open = true, newTab = false } = {}) {
+  const s = app()
+  const ws = s.wsId
+  const base = title ? safeName(title) : `Whiteboard ${formatDate(new Date(), 'YYYY-MM-DD HHmm')}`
+  const path = uniquePath(joinPath(folder, `${base}.board`))
+  s.addEntry(path)
+  s.setPending(ws, path, 'creating')
+  if (open) layout().openNote(ws, path, { newTab })
+  try {
+    await api.writeNote(ws, path, emptyBoard(), { mustNotExist: true })
+    app().clearPending(ws, path)
+    return path
+  } catch (e) {
+    app().clearPending(ws, path)
+    app().removeEntry(path)
+    layout().closePaths(ws, path)
+    toast.error(e)
+    return null
+  }
+}
+
 export async function createFolder(parent = '') {
   const name = await promptDialog({ title: 'New folder', placeholder: 'Folder name', confirmText: 'Create' })
   if (!name) return
@@ -133,11 +156,14 @@ export async function renameEntry(path) {
   const entry = app().treeMap.get(path)
   const isFile = entry?.type === 'file'
   const current = basename(path)
-  const name = await promptDialog({ title: `Rename ${isFile ? 'note' : 'folder'}`, value: isFile && isNote(path) ? stripExt(current) : current, selectBase: true, confirmText: 'Rename' })
+  const board = isFile && isBoardPath(path)
+  const kind = !isFile ? 'folder' : board ? 'whiteboard' : isNote(path) ? 'note' : 'file'
+  const name = await promptDialog({ title: `Rename ${kind}`, value: isFile && (isNote(path) || board) ? stripExt(current) : current, selectBase: true, confirmText: 'Rename' })
   if (!name) return
   const clean = safeName(name)
   if (!clean) return
-  const target = joinPath(dirname(path), isFile && isNote(path) && !clean.endsWith('.md') ? `${clean}.md` : clean)
+  const ext = board ? '.board' : isFile && isNote(path) ? '.md' : ''
+  const target = joinPath(dirname(path), ext && !clean.toLowerCase().endsWith(ext) ? `${clean}${ext}` : clean)
   return moveTo(path, target)
 }
 
@@ -207,6 +233,26 @@ export async function duplicateNote(path) {
     app().clearPending(ws, target)
     app().removeEntry(target)
     layout().closePaths(ws, target)
+    toast.error(e)
+  }
+}
+
+// Duplicate a note or a whiteboard.
+export async function duplicateFile(path) {
+  if (isNote(path)) return duplicateNote(path)
+  const ws = app().wsId
+  const ext = extname(path)
+  const target = uniquePath(`${stripExt(path)} copy.${ext}`)
+  app().addEntry(target)
+  app().setPending(ws, target, 'creating')
+  try {
+    const { content } = await api.readNote(ws, path)
+    await api.writeNote(ws, target, content, { mustNotExist: true })
+    app().clearPending(ws, target)
+    layout().openNote(ws, target)
+  } catch (e) {
+    app().clearPending(ws, target)
+    app().removeEntry(target)
     toast.error(e)
   }
 }
@@ -401,6 +447,18 @@ export function buildEditorCtx(ws, path) {
     },
     openTag: (tag) => openTagSearch(tag),
     upload: (files) => uploadFiles(files),
+    // create a whiteboard next to the note and embed it where the cursor is
+    insertWhiteboard: async (view, from, to = from) => {
+      if (from !== to) view.dispatch({ changes: { from, to, insert: '' } })
+      const board = await createWhiteboard({ folder: dirname(path), title: `${stripExt(basename(path))} sketch`, open: false })
+      if (!board) return
+      const link = app().resolver.linkTextFor(board)
+      const pos = Math.min(from, view.state.doc.length)
+      const line = view.state.doc.lineAt(pos)
+      const text = `${line.text.slice(0, pos - line.from).trim() ? '\n' : ''}![[${link}]]\n`
+      view.dispatch({ changes: { from: pos, insert: text }, selection: { anchor: pos + text.length } })
+      view.focus()
+    },
   }
 }
 
@@ -454,6 +512,21 @@ export function workspaceStats() {
     tasks,
     done,
   }
+}
+
+// Pick a note/whiteboard or a web address. Resolves { path } | { url } | { remove } | null.
+export function pickLink(opts = {}) {
+  return new Promise((resolve) => {
+    let done = false
+    useUI.getState().openPalette('link', {
+      ...opts,
+      resolve: (v) => {
+        if (done) return
+        done = true
+        resolve(v)
+      },
+    })
+  })
 }
 
 export { isoDate, conn, useUI }

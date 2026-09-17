@@ -8,12 +8,16 @@ import { atomicWrite, absPath, scanDir, mapLimit, Mutex, HttpError, exists } fro
 import * as git from './git.js'
 import { parseNote, LinkResolver, relativePath, parseQuery } from '../shared/parse.js'
 import { basename, dirname, extname, isNote, noteTitle, stripExt, joinPath } from '../shared/paths.js'
+import { isBoardPath, layerPathFor, notePathForLayer, BoardParseError, LAYER_DIR } from '../shared/board.js'
 
 const MAX_INDEX_BYTES = 2 * 1024 * 1024
 const VERSION_INTERVAL = 10 * 60 * 1000
 const runtimes = new Map()
 
 export const workspaceDir = (id) => path.join(WORKSPACES_DIR, id)
+
+// canvas layers of trashed notes travel with them
+export const trashCompanions = (trashName) => [`${trashName}.layer.json`, `${trashName}.layers`]
 
 export async function getRuntime(id) {
   let rt = runtimes.get(id)
@@ -69,6 +73,7 @@ class WorkspaceRuntime {
     this.meta = new Map()
     this.resolver = new LinkResolver()
     this.docs = new Map()
+    this.layers = new Map() // note path -> LiveDoc holding that note's canvas layer
     this.subscribers = new Set()
     this.lock = new Mutex()
     this.lastUsed = Date.now()
@@ -237,26 +242,88 @@ class WorkspaceRuntime {
   }
 
   // ---------- live docs ----------
-  async openDoc(p) {
-    let doc = this.docs.get(p)
+  // kind: 'text' (a note or, for .board paths, a whiteboard) or 'layer' (the canvas layer of note `p`)
+  async openDoc(p, kind = 'text') {
+    const layer = kind === 'layer'
+    const registry = layer ? this.layers : this.docs
+    let doc = registry.get(p)
     if (doc && !doc.destroyed) return doc
     if (!this._opening) this._opening = new Map()
-    if (this._opening.has(p)) return this._opening.get(p)
+    const openKey = `${kind}:${p}`
+    if (this._opening.has(openKey)) return this._opening.get(openKey)
     const promise = (async () => {
-      const text = await this.readNote(p)
-      if (text == null) throw new HttpError(404, 'Note not found')
-      let d = this.docs.get(p)
+      let text
+      if (layer) {
+        if (!isNote(p) || !this.hasFile(p)) throw new HttpError(404, 'Note not found')
+        text = await this.readLayer(p)
+      } else {
+        text = await this.readNote(p)
+        if (text == null) throw new HttpError(404, isBoardPath(p) ? 'Whiteboard not found' : 'Note not found')
+      }
+      let d = registry.get(p)
       if (d && !d.destroyed) return d
-      d = new LiveDoc(this, p, text)
-      this.docs.set(p, d)
+      try {
+        d = new LiveDoc(this, p, text, {
+          kind: layer || isBoardPath(p) ? 'board' : 'text',
+          layer,
+          registry,
+          key: layer ? layerDocKey(this.id, p) : undefined,
+        })
+      } catch (e) {
+        if (e instanceof BoardParseError) throw new HttpError(422, layer ? `The canvas layer of this note is damaged (${e.message})` : e.message)
+        throw e
+      }
+      registry.set(p, d)
       return d
     })()
-    this._opening.set(p, promise)
+    this._opening.set(openKey, promise)
     try {
       return await promise
     } finally {
-      this._opening.delete(p)
+      this._opening.delete(openKey)
     }
+  }
+
+  async readLayer(notePath) {
+    const doc = this.layers.get(notePath)
+    if (doc && !doc.destroyed) return doc.text
+    try {
+      return await fs.readFile(absPath(this.dir, layerPathFor(notePath)), 'utf8')
+    } catch {
+      return ''
+    }
+  }
+
+  async _writeLayer(notePath, text) {
+    const rel = layerPathFor(notePath)
+    const abs = absPath(this.dir, rel)
+    if (text == null) {
+      if (!(await exists(abs))) return
+      await fs.rm(abs, { force: true })
+    } else {
+      await atomicWrite(abs, text)
+    }
+    this.markDirty(rel)
+  }
+
+  // bring a note's layer file along when the note moves
+  async _moveLayer(from, to) {
+    const src = absPath(this.dir, layerPathFor(from))
+    if (!(await exists(src))) return
+    const dst = absPath(this.dir, layerPathFor(to))
+    await fs.mkdir(path.dirname(dst), { recursive: true })
+    await fs.rename(src, dst)
+    this.markDirty(layerPathFor(from))
+    this.markDirty(layerPathFor(to))
+  }
+
+  // write a layer file coming from an import
+  importLayer(notePath, text) {
+    return this.lock.run(async () => {
+      const doc = this.layers.get(notePath)
+      if (doc) doc.applyExternal(text)
+      await this._writeLayer(notePath, text)
+    })
   }
 
   saveFromDoc(doc) {
@@ -264,14 +331,21 @@ class WorkspaceRuntime {
   }
 
   async _saveDoc(doc) {
-    if (doc.destroyed && this.docs.get(doc.path) !== doc) return
+    if (doc.destroyed && doc.registry.get(doc.path) !== doc) return
     const text = doc.takePending()
     if (text == null) return
+    if (doc.layer) {
+      // an empty layer leaves no file behind
+      if (!this.hasFile(doc.path)) return
+      await this._writeLayer(doc.path, doc.isEmpty ? null : text)
+      return
+    }
     await this._writeNote(doc.path, text, { userId: doc.lastEditor, fromDoc: true })
   }
 
   async flushDocs() {
     for (const doc of this.docs.values()) await this._saveDoc(doc)
+    for (const doc of this.layers.values()) await this._saveDoc(doc)
   }
 
   // ---------- write ----------
@@ -407,10 +481,12 @@ class WorkspaceRuntime {
       moves.push({ from, to, type: entry.type })
       const fileMoves = new Map(moves.filter((m) => m.type === 'file').map((m) => [m.from, m.to]))
 
-      // flush live docs that will move
+      // flush live docs (and canvas layers) that will move
       for (const m of fileMoves.keys()) {
         const doc = this.docs.get(m)
         if (doc) await this._saveDoc(doc)
+        const layer = this.layers.get(m)
+        if (layer) await this._saveDoc(layer)
       }
 
       // pre-compute link resolutions with the old layout
@@ -452,6 +528,10 @@ class WorkspaceRuntime {
           }
           const doc = this.docs.get(m.from)
           if (doc) doc.evict('moved', { from: m.from, to: m.to })
+          if (isNote(m.from)) {
+            this.layers.get(m.from)?.evict('moved', { from: m.from, to: m.to })
+            if (isNote(m.to)) await this._moveLayer(m.from, m.to).catch((e) => console.error('[layer move]', e.message))
+          }
         }
       }
       await this._ensureParents(to)
@@ -504,16 +584,33 @@ class WorkspaceRuntime {
           await this._saveDoc(doc)
           doc.evict('deleted')
         }
+        const layer = this.layers.get(e.path)
+        if (layer) {
+          await this._saveDoc(layer)
+          layer.evict('deleted')
+        }
       }
       const abs = absPath(this.dir, p)
+      // the note's canvas layer: a file for a note, a directory for a folder
+      const layerRel = entry.type === 'folder' ? `${LAYER_DIR}/${p}` : isNote(p) ? layerPathFor(p) : null
+      const layerAbs = layerRel ? absPath(this.dir, layerRel) : null
+      const hasLayer = layerAbs ? await exists(layerAbs) : false
       if (this.type === 'online') {
         const trashDir = path.join(this.dir, '.trash')
         await fs.mkdir(trashDir, { recursive: true })
         const id = newId(16)
         await fs.rename(abs, path.join(trashDir, id))
+        if (hasLayer) {
+          const [fileName, dirName] = trashCompanions(id)
+          await fs.rename(layerAbs, path.join(trashDir, entry.type === 'folder' ? dirName : fileName)).catch(() => {})
+        }
         run('INSERT INTO trash (id, workspace_id, original_path, trash_name, kind, deleted_by, deleted_at) VALUES (?,?,?,?,?,?,?)', id, this.id, p, id, entry.type, userId, now())
       } else {
         await fs.rm(abs, { recursive: true, force: true })
+        if (hasLayer) {
+          await fs.rm(layerAbs, { recursive: true, force: true })
+          this.markDirty(layerRel)
+        }
       }
       for (const e of affected) {
         this.tree.delete(e.path)
@@ -541,6 +638,13 @@ class WorkspaceRuntime {
       const abs = absPath(this.dir, target)
       await fs.mkdir(path.dirname(abs), { recursive: true })
       await fs.rename(path.join(this.dir, '.trash', row.trash_name), abs)
+      const [layerFile, layerDir] = trashCompanions(row.trash_name).map((n) => path.join(this.dir, '.trash', n))
+      const layerSrc = row.kind === 'folder' ? layerDir : layerFile
+      if (await exists(layerSrc)) {
+        const dst = absPath(this.dir, row.kind === 'folder' ? `${LAYER_DIR}/${target}` : layerPathFor(target))
+        await fs.mkdir(path.dirname(dst), { recursive: true })
+        await fs.rename(layerSrc, dst).catch(() => {})
+      }
       run('DELETE FROM trash WHERE id = ?', trashId)
       // re-scan restored subtree
       const added = row.kind === 'folder' ? (await scanDir(abs)).map((e) => ({ ...e, path: `${target}/${e.path}` })) : []
@@ -565,7 +669,7 @@ class WorkspaceRuntime {
   async purgeTrash(trashId) {
     const rows = trashId ? all('SELECT * FROM trash WHERE id = ? AND workspace_id = ?', trashId, this.id) : all('SELECT * FROM trash WHERE workspace_id = ?', this.id)
     for (const row of rows) {
-      await fs.rm(path.join(this.dir, '.trash', row.trash_name), { recursive: true, force: true })
+      for (const n of [row.trash_name, ...trashCompanions(row.trash_name)]) await fs.rm(path.join(this.dir, '.trash', n), { recursive: true, force: true })
       run('DELETE FROM trash WHERE id = ?', row.id)
     }
   }
@@ -773,7 +877,7 @@ class WorkspaceRuntime {
       const opts = this.gitOpts()
       const files = [...this.dirtyPaths]
       const message = files.length
-        ? `${files.length === 1 ? 'Update' : `Update ${files.length} files:`} ${files.slice(0, 3).map((f) => basename(f)).join(', ')}${files.length > 3 ? ` +${files.length - 3} more` : ''}`
+        ? `${files.length === 1 ? 'Update' : `Update ${files.length} files:`} ${files.slice(0, 3).map(commitLabel).join(', ')}${files.length > 3 ? ` +${files.length - 3} more` : ''}`
         : 'Update notes'
       const dirtyBefore = new Set(this.dirtyPaths)
       let result = await git.syncRepo(this.dir, { ...opts, message })
@@ -804,8 +908,11 @@ class WorkspaceRuntime {
     if (changed === null) {
       await this.scan()
       for (const doc of this.docs.values()) {
-        const t = this.contents.get(doc.path)
+        const t = doc.kind === 'board' ? await fs.readFile(absPath(this.dir, doc.path), 'utf8').catch(() => null) : this.contents.get(doc.path)
         if (t != null && t !== doc.text) doc.applyExternal(t)
+      }
+      for (const doc of this.layers.values()) {
+        doc.applyExternal(await fs.readFile(absPath(this.dir, layerPathFor(doc.path)), 'utf8').catch(() => ''))
       }
       this.emit({ t: 'reindex', ws: this.id })
       this.emitTree()
@@ -815,6 +922,12 @@ class WorkspaceRuntime {
     for (const rel of changed) {
       const abs = absPath(this.dir, rel)
       const st = await fs.stat(abs).catch(() => null)
+      const layerOf = notePathForLayer(rel)
+      if (layerOf != null) {
+        const doc = this.layers.get(layerOf)
+        if (doc) doc.applyExternal(st ? await fs.readFile(abs, 'utf8') : '')
+        continue
+      }
       if (rel.split('/').some((s) => s.startsWith('.'))) continue
       if (!st) {
         if (this.tree.has(rel)) {
@@ -848,6 +961,9 @@ class WorkspaceRuntime {
         const doc = this.docs.get(rel)
         if (doc && doc.text !== text) doc.applyExternal(text)
         this.emitIndex(rel)
+      } else if (isBoardPath(rel)) {
+        const doc = this.docs.get(rel)
+        if (doc) doc.applyExternal(await fs.readFile(abs, 'utf8'))
       }
     }
     if (treeChanged) this.emitTree()
@@ -865,7 +981,15 @@ class WorkspaceRuntime {
     }
     this.closed = true
     for (const doc of [...this.docs.values()]) doc.evict('closed')
+    for (const doc of [...this.layers.values()]) doc.evict('closed')
   }
+}
+
+export const layerDocKey = (wsId, notePath) => `${wsId}:${notePath}\u0000layer`
+
+function commitLabel(p) {
+  const note = notePathForLayer(p)
+  return note != null ? `${basename(note)} (canvas)` : basename(p)
 }
 
 // ---------- link rewriting ----------

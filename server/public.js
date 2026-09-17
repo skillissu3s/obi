@@ -4,6 +4,8 @@ import { getRuntime } from './runtime.js'
 import { createMarkdown, escapeHtml } from '../shared/markdown.js'
 import { absPath, mimeFor, safePath, INLINE_SAFE } from './fsutil.js'
 import { noteTitle, extname, IMAGE_EXT, AUDIO_EXT, VIDEO_EXT } from '../shared/paths.js'
+import { isBoardPath, parseBoard } from '../shared/board.js'
+import { boardToSvg } from '../shared/boardsvg.js'
 import { APP_NAME } from './config.js'
 
 export const publicRouter = express.Router()
@@ -14,10 +16,21 @@ async function loadPublished(slug) {
   const rt = await getRuntime(row.workspace_id)
   const content = await rt.readNote(row.path)
   if (content == null) return null
-  return { row, rt, content }
+  // whiteboards embedded with ![[x.board]] are rendered to static SVG
+  const boards = new Map()
+  for (const m of content.matchAll(/!\[\[([^\]|#]+\.board)/gi)) {
+    const p = rt.resolver.resolve(m[1].trim(), row.path, 'wiki')
+    if (!p || boards.has(p) || !isBoardPath(p)) continue
+    try {
+      boards.set(p, parseBoard(await rt.readNote(p)))
+    } catch {
+      boards.set(p, null)
+    }
+  }
+  return { row, rt, content, boards }
 }
 
-function renderFor({ row, rt, content }) {
+function renderFor({ row, rt, content, boards }) {
   const published = new Map(all('SELECT slug, path FROM published WHERE workspace_id = ?', row.workspace_id).map((r) => [r.path, r.slug]))
   const { render } = createMarkdown({
     html: false,
@@ -29,6 +42,14 @@ function renderFor({ row, rt, content }) {
       return { href: slug ? `/p/${slug}` : null, exists: !!slug, path: p }
     },
     fileUrl: (p) => `/p/${row.slug}/file?path=${encodeURIComponent(p)}`,
+    boardEmbed: (r, env, { target, display }) => {
+      const p = rt.resolver.resolve(target, env.path, 'wiki')
+      const elements = p ? boards?.get(p) : null
+      if (!elements) return `<p class="board-missing">${escapeHtml(noteTitle(target))}</p>`
+      const maxHeight = display && /^\d+$/.test(display) ? Number(display) : 520
+      const { svg, empty } = boardToSvg(elements, { maxHeight, title: noteTitle(p), fileUrl: (src) => `/p/${row.slug}/file?path=${encodeURIComponent(src)}` })
+      return empty ? '' : `<figure class="board">${svg}</figure>`
+    },
   })
   return render(content, { path: row.path })
 }
@@ -55,6 +76,15 @@ ul.contains-task-list{list-style:none;padding-left:1.2em}.task-list-item input{m
 hr{border:none;border-top:1px solid var(--border);margin:2em 0}
 footer{margin-top:64px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
 .math,.mermaid-block{font-family:ui-monospace,monospace;white-space:pre-wrap;background:var(--code);padding:.2em .4em;border-radius:6px}
+figure.board{margin:1.4em 0;padding:8px;border:1px solid var(--border);border-radius:12px;overflow:auto;text-align:center}
+figure.board svg{display:inline-block}
+:root{--cv-bg:var(--bg);--cv-ink:#1e1c18;--cv-gray:#8a857b;--cv-red:#d6453d;--cv-orange:#e07b2c;--cv-yellow:#d9a514;--cv-green:#2f9e58;--cv-teal:#1f9a94;--cv-blue:#2f6fdb;--cv-violet:#7c4ddb;--cv-pink:#d6448f;
+--cv-gray-fill:#ecebe6;--cv-red-fill:#fbd9d6;--cv-orange-fill:#fde2c8;--cv-yellow-fill:#fbefb8;--cv-green-fill:#d3f0dc;--cv-teal-fill:#cdeeec;--cv-blue-fill:#d7e5fb;--cv-violet-fill:#e5dbfa;--cv-pink-fill:#f9d7ea;--cv-ink-fill:#e4e2dc;
+--cv-sticky-yellow:#fde68a;--cv-sticky-orange:#fdc79a;--cv-sticky-pink:#f9b8d4;--cv-sticky-violet:#d4c2fb;--cv-sticky-blue:#b9d5fb;--cv-sticky-teal:#a6e3dd;--cv-sticky-green:#bfe8b5;--cv-sticky-gray:#e2e0da;
+--cv-card:#fff;--cv-card-border:#e3dfd4;--cv-frame:rgba(0,0,0,.02)}
+@media (prefers-color-scheme:dark){:root{--cv-ink:#ebe7df;--cv-gray:#9c968b;--cv-red:#f07068;--cv-orange:#f39a55;--cv-yellow:#f0c648;--cv-green:#5cc983;--cv-teal:#4cc7c0;--cv-blue:#6ea0f5;--cv-violet:#a88af5;--cv-pink:#f27ab6;
+--cv-gray-fill:#2c2a26;--cv-red-fill:#4a2522;--cv-orange-fill:#4a311e;--cv-yellow-fill:#473b16;--cv-green-fill:#1f3d2a;--cv-teal-fill:#1b3c3a;--cv-blue-fill:#1f3050;--cv-violet-fill:#33284f;--cv-pink-fill:#48233a;--cv-ink-fill:#34322d;
+--cv-card:#1b1a18;--cv-card-border:#34322d;--cv-frame:rgba(255,255,255,.02)}}
 </style></head><body><main><article id="content">${body}</article>
 <footer>Published with ${escapeHtml(APP_NAME)} · updates live</footer></main>
 <script>
@@ -91,7 +121,8 @@ publicRouter.get('/:slug/file', async (req, res) => {
   const p = safePath(req.query.path)
   const ext = extname(p)
   const meta = data.rt.meta.get(data.row.path)
-  const allowed = meta?.links.some((l) => data.rt.resolver.resolve(l.target, data.row.path, l.kind) === p)
+  const inBoard = [...data.boards.values()].some((els) => els?.some((e) => e.type === 'image' && e.src === p))
+  const allowed = inBoard || meta?.links.some((l) => data.rt.resolver.resolve(l.target, data.row.path, l.kind) === p)
   if (!allowed || !(IMAGE_EXT.has(ext) || AUDIO_EXT.has(ext) || VIDEO_EXT.has(ext) || ext === 'pdf') || !data.rt.hasFile(p)) return res.status(404).end()
   res.setHeader('Content-Type', mimeFor(ext))
   res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox")

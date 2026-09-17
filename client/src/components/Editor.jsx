@@ -68,6 +68,7 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
       ],
     })
     const view = new EditorView({ state, parent: host })
+    view.obiComps = comps // lets the canvas layer plug its listeners in
     viewRef.current = view
     view.dispatch({
       effects: [

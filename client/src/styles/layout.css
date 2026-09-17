@@ -850,3 +850,97 @@ button.status-item:hover {
 .focus-exit:hover {
   opacity: 1;
 }
+
+/* ---------- Sidebar footer & edge toggles ---------- */
+.sidebar-collapse {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 8px 8px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-footer .icon-btn {
+  width: 28px;
+  height: 28px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.sidebar-footer .icon-btn:hover,
+.sidebar-footer .icon-btn.active {
+  color: var(--text);
+}
+.sidebar-user {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 3px;
+  margin-right: 2px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-user:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.edge-toggles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+.edge-toggle {
+  position: absolute;
+  width: 18px;
+  height: 42px;
+  margin-top: -21px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-elev);
+  color: var(--text-2);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-strong);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 140ms var(--ease), transform 180ms var(--ease-spring), top 80ms linear, background var(--t-fast), color var(--t-fast);
+  pointer-events: none;
+  cursor: pointer;
+}
+.edge-toggle.right {
+  margin-left: -18px;
+}
+.edge-toggle.show {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+.edge-toggle:hover {
+  color: var(--accent-fg);
+  background: var(--accent);
+  box-shadow: var(--shadow);
+}
+.edge-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+.focus-mode .edge-toggles {
+  display: none;
+}
+.rp-tabs .icon-btn.rp-close {
+  flex: 0 0 30px;
+  color: var(--text-3);
+}

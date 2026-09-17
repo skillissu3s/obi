@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, Command, FileText, FilePlus, Layers, Cloud, FolderGit2, CornerDownLeft, ArrowUp, ArrowDown, Copy } from 'lucide-react'
+import { Search, Command, FileText, FilePlus, Layers, Cloud, FolderGit2, CornerDownLeft, ArrowUp, ArrowDown, Copy, Globe, X, Shapes, Link2 } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
@@ -9,6 +9,7 @@ import { fuzzyFilter, hotkeyLabel, timeAgo } from '../lib/util.js'
 import * as A from '../lib/actions.js'
 import { WsIcon } from './ui.jsx'
 import { basename, stripExt, dirname, isNote } from '@shared/paths.js'
+import { isBoardPath } from '@shared/board.js'
 import { getActiveEditorView } from '../lib/commands.js'
 
 function Highlight({ text, indices }) {
@@ -25,6 +26,11 @@ export function CommandPalette() {
   const listRef = useRef(null)
   const app = useApp()
   const mode = palette?.mode || 'commands'
+  // palettes opened with a `resolve` callback (pickers) report a dismissal as null
+  const dismiss = () => {
+    palette?.resolve?.(null)
+    close()
+  }
 
   useEffect(() => {
     setQuery(palette?.query || '')
@@ -81,15 +87,50 @@ export function CommandPalette() {
         },
       }))
     }
+    if (mode === 'link') {
+      const q = query.trim()
+      const out = []
+      if (/^(https?:\/\/|www\.)\S+$/i.test(q)) {
+        const url = q.startsWith('www.') ? `https://${q}` : q
+        out.push({ key: '__url', icon: Globe, title: `Link to ${url}`, sub: 'Web page', run: () => palette.resolve({ url }) })
+      }
+      if (palette.allowRemove) out.push({ key: '__remove', icon: X, title: 'Remove link', sub: 'Unlink this element', run: () => palette.resolve({ remove: true }) })
+      const files = app.tree.filter((e) => e.type === 'file' && (isNote(e.path) || isBoardPath(e.path)))
+      for (const { item, indices } of fuzzyFilter(files, q, (e) => stripExt(e.path), 50)) {
+        const name = stripExt(basename(item.path))
+        const prefixLen = stripExt(item.path).length - name.length
+        out.push({
+          key: item.path,
+          icon: isBoardPath(item.path) ? Shapes : FileText,
+          title: name,
+          titleIndices: q ? indices.filter((i) => i >= prefixLen).map((i) => i - prefixLen) : [],
+          sub: dirname(item.path),
+          run: () => palette.resolve({ path: item.path }),
+        })
+      }
+      if (q && !out.some((o) => o.key === '__url') && !files.some((n) => stripExt(basename(n.path)).toLowerCase() === q.toLowerCase())) {
+        out.push({
+          key: '__create',
+          icon: FilePlus,
+          title: `Create note “${q}”`,
+          sub: 'New note, linked here',
+          run: async () => {
+            const path = await A.createNote({ title: q, open: false })
+            palette.resolve(path ? { path } : null)
+          },
+        })
+      }
+      return out
+    }
     // files
-    const notes = app.tree.filter((e) => e.type === 'file' && isNote(e.path))
+    const notes = app.tree.filter((e) => e.type === 'file' && (isNote(e.path) || isBoardPath(e.path)))
     const scored = fuzzyFilter(notes, query, (e) => stripExt(e.path), 50).map(({ item, indices }) => {
       const name = stripExt(basename(item.path))
       const folder = dirname(item.path)
       const prefixLen = stripExt(item.path).length - name.length
       return {
         key: item.path,
-        icon: FileText,
+        icon: isBoardPath(item.path) ? Shapes : FileText,
         title: name,
         titleIndices: query ? indices.filter((i) => i >= prefixLen).map((i) => i - prefixLen) : [],
         sub: folder,
@@ -113,6 +154,7 @@ export function CommandPalette() {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
+        palette?.resolve?.(null)
         close()
       }
     }
@@ -123,7 +165,15 @@ export function CommandPalette() {
   if (!palette) return null
 
   const placeholder =
-    mode === 'commands' ? 'Type a command…' : mode === 'workspaces' ? 'Switch workspace…' : mode === 'templates' ? 'Insert template…' : 'Search notes by name…'
+    mode === 'commands'
+      ? 'Type a command…'
+      : mode === 'workspaces'
+        ? 'Switch workspace…'
+        : mode === 'templates'
+          ? 'Insert template…'
+          : mode === 'link'
+            ? palette.placeholder || 'Link a note, or paste a web address…'
+            : 'Search notes by name…'
 
   const onKeyDown = (e) => {
     if (e.key === 'ArrowDown' || (e.key === 'n' && e.ctrlKey)) {
@@ -141,7 +191,7 @@ export function CommandPalette() {
       }
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      close()
+      dismiss()
     }
   }
 
@@ -149,14 +199,14 @@ export function CommandPalette() {
     <div
       className="overlay"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) close()
+        if (e.target === e.currentTarget) dismiss()
       }}
     >
       <div className="palette">
         <div className="palette-input">
-          {mode === 'commands' ? <Command /> : <Search />}
+          {mode === 'commands' ? <Command /> : mode === 'link' ? <Link2 /> : <Search />}
           <input autoFocus value={query} placeholder={placeholder} onChange={(e) => { setQuery(e.target.value); setHl(0) }} onKeyDown={onKeyDown} />
-          {mode !== 'commands' && <span className="badge">{mode}</span>}
+          {mode !== 'commands' && <span className="badge">{mode === 'link' ? 'link' : mode}</span>}
         </div>
         <div className="palette-list" ref={listRef}>
           {!items.length && <div className="empty">Nothing found</div>}

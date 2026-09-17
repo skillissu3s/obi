@@ -4,15 +4,21 @@ import { debounce } from '../lib/util.js'
 
 // Full colour themes. `dark`/`light` are only used to draw the preview swatches —
 // the real colours live in base.css under [data-palette='…'].
+// `home` is the mode a theme was designed for; every theme still has both versions.
 export const PALETTES = [
-  { id: 'sumi', name: 'Sumi', note: 'Warm ink & paper', dark: ['#121211', '#ebe7df', '#2f9e78'], light: ['#f6f4ed', '#201d18', '#2f9e78'] },
-  { id: 'graphite', name: 'Graphite', note: 'Neutral monochrome', dark: ['#131314', '#e8e8ea', '#8ea2c0'], light: ['#f3f3f5', '#1b1b1e', '#4a648c'] },
-  { id: 'midnight', name: 'Midnight', note: 'Deep blue & azure', dark: ['#0d1117', '#e3e8ef', '#4c9aff'], light: ['#edf1f7', '#17202b', '#2f6fd0'] },
-  { id: 'nordic', name: 'Nordic', note: 'Cool slate & frost', dark: ['#1a1f26', '#e6ebf2', '#74b6c7'], light: ['#eaeef4', '#1f2733', '#3d8a9e'] },
-  { id: 'forest', name: 'Forest', note: 'Pine & amber', dark: ['#0f1411', '#e4ebe4', '#d79a3f'], light: ['#ecf1e9', '#1a201a', '#97671f'] },
-  { id: 'ember', name: 'Ember', note: 'Plum & rose', dark: ['#170f12', '#f0e6e6', '#e0607e'], light: ['#f7edef', '#231a1c', '#c04466'] },
-  { id: 'mocha', name: 'Mocha', note: 'Coffee & caramel', dark: ['#171310', '#ece2d6', '#c98a4b'], light: ['#f2ebe0', '#221c14', '#9a6528'] },
-  { id: 'nebula', name: 'Nebula', note: 'Violet & lilac', dark: ['#131019', '#e9e6f2', '#a78bfa'], light: ['#f2effa', '#1d1926', '#7c5cd6'] },
+  { id: 'paper', home: 'light', name: 'Paper', note: 'Crisp white & ink blue', dark: ['#15171c', '#e6e8ee', '#7b9cff'], light: ['#ffffff', '#1c1f26', '#3056d3'] },
+  { id: 'sand', home: 'light', name: 'Sand', note: 'Dune & terracotta', dark: ['#1a1612', '#ede5d9', '#e08a57'], light: ['#fbf7ef', '#2a231a', '#c0602b'] },
+  { id: 'sakura', home: 'light', name: 'Sakura', note: 'Blush & cherry', dark: ['#1a1316', '#f1e6ea', '#f07fa0'], light: ['#fffafb', '#2b2024', '#d6456d'] },
+  { id: 'mint', home: 'light', name: 'Mint', note: 'Fresh mint & emerald', dark: ['#0f1714', '#e2efe8', '#34d399'], light: ['#f7fcf9', '#18251f', '#0c936a'] },
+  { id: 'sky', home: 'light', name: 'Sky', note: 'Airy blue & azure', dark: ['#0e1520', '#e2eaf5', '#38bdf8'], light: ['#f7fbff', '#152033', '#0277b8'] },
+  { id: 'sumi', home: 'dark', name: 'Sumi', note: 'Warm ink & paper', dark: ['#121211', '#ebe7df', '#2f9e78'], light: ['#f6f4ed', '#201d18', '#2f9e78'] },
+  { id: 'graphite', home: 'dark', name: 'Graphite', note: 'Neutral monochrome', dark: ['#131314', '#e8e8ea', '#8ea2c0'], light: ['#f3f3f5', '#1b1b1e', '#4a648c'] },
+  { id: 'midnight', home: 'dark', name: 'Midnight', note: 'Deep blue & azure', dark: ['#0d1117', '#e3e8ef', '#4c9aff'], light: ['#edf1f7', '#17202b', '#2f6fd0'] },
+  { id: 'nordic', home: 'dark', name: 'Nordic', note: 'Cool slate & frost', dark: ['#1a1f26', '#e6ebf2', '#74b6c7'], light: ['#eaeef4', '#1f2733', '#3d8a9e'] },
+  { id: 'forest', home: 'dark', name: 'Forest', note: 'Pine & amber', dark: ['#0f1411', '#e4ebe4', '#d79a3f'], light: ['#ecf1e9', '#1a201a', '#97671f'] },
+  { id: 'ember', home: 'dark', name: 'Ember', note: 'Plum & rose', dark: ['#170f12', '#f0e6e6', '#e0607e'], light: ['#f7edef', '#231a1c', '#c04466'] },
+  { id: 'mocha', home: 'dark', name: 'Mocha', note: 'Coffee & caramel', dark: ['#171310', '#ece2d6', '#c98a4b'], light: ['#f2ebe0', '#221c14', '#9a6528'] },
+  { id: 'nebula', home: 'dark', name: 'Nebula', note: 'Violet & lilac', dark: ['#131019', '#e9e6f2', '#a78bfa'], light: ['#f2effa', '#1d1926', '#7c5cd6'] },
 ]
 
 export const ACCENTS = [
@@ -49,6 +55,7 @@ export const DEFAULT_PREFS = {
   vimMode: false,
   confirmDelete: true,
   sortBy: 'name',
+  canvasBar: false,
   graph: { showTags: false, showOrphans: true, showUnresolved: false, showAttachments: false, colorFolders: true, repel: 140, linkDistance: 70, nodeSize: 1, labels: 1 },
   bookmarks: {},
 }

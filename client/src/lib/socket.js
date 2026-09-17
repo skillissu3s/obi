@@ -4,6 +4,7 @@ import * as awarenessProtocol from 'y-protocols/awareness'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { merge3, applyToYText } from '@shared/textdiff.js'
+import { isBoardPath, serializeBoard, mergeBoards, parseBoard, diffElements } from '@shared/board.js'
 
 const MSG_SYNC = 0
 const MSG_AWARENESS = 1
@@ -30,13 +31,19 @@ class Emitter {
   }
 }
 
+export const docKey = (ws, path, kind = 'text') => (kind === 'layer' ? `${ws}:${path}\u0000layer` : `${ws}:${path}`)
+
+// kind 'text' = note (or whiteboard file, by extension); kind 'layer' = the canvas layer of a note
 export class DocHandle extends Emitter {
-  constructor(conn, ws, path) {
+  constructor(conn, ws, path, kind = 'text') {
     super()
     this.conn = conn
     this.ws = ws
     this.path = path
-    this.key = `${ws}:${path}`
+    this.kind = kind
+    this.isBoard = kind === 'layer' || isBoardPath(path)
+    this.key = docKey(ws, path, kind)
+    this.localOrigin = { local: true }
     this.refs = 0
     this.epoch = null
     this.role = null
@@ -53,9 +60,16 @@ export class DocHandle extends Emitter {
 
   _createDoc() {
     this.ydoc = new Y.Doc()
-    this.ytext = this.ydoc.getText('content')
+    if (this.isBoard) {
+      this.ymap = this.ydoc.getMap('elements')
+      this.undoManager = new Y.UndoManager(this.ymap, { trackedOrigins: new Set([this.localOrigin]), captureTimeout: 400 })
+      this.ymap.observe((ev) => this.emit('change', ev))
+    } else {
+      this.ytext = this.ydoc.getText('content')
+      this.undoManager = new Y.UndoManager(this.ytext)
+      this.ytext.observe(() => this.emit('change'))
+    }
     this.awareness = new awarenessProtocol.Awareness(this.ydoc)
-    this.undoManager = new Y.UndoManager(this.ytext)
     const u = this.conn.user
     if (u) this.awareness.setLocalStateField('user', { name: u.displayName, color: u.color, colorLight: lighten(u.color), id: u.id })
     this.ydoc.on('update', (update, origin) => {
@@ -71,7 +85,6 @@ export class DocHandle extends Emitter {
       encoding.writeVarUint8Array(enc, awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed))
       this.conn.sendBinary(encoding.toUint8Array(enc))
     })
-    this.ytext.observe(() => this.emit('change'))
   }
 
   _header(type) {
@@ -82,7 +95,11 @@ export class DocHandle extends Emitter {
   }
 
   get text() {
-    return this.ytext.toString()
+    return this.isBoard ? serializeBoard([...this.ymap.values()]) : this.ytext.toString()
+  }
+
+  get elements() {
+    return this.isBoard ? [...this.ymap.values()] : []
   }
 
   get readOnly() {
@@ -95,7 +112,7 @@ export class DocHandle extends Emitter {
   }
 
   join() {
-    if (this.conn.connected) this.conn.sendJSON({ t: 'join', ws: this.ws, path: this.path })
+    if (this.conn.connected) this.conn.sendJSON({ t: 'join', ws: this.ws, path: this.path, kind: this.kind })
   }
 
   onJoined(msg) {
@@ -137,7 +154,10 @@ export class DocHandle extends Emitter {
         if (this.pendingMerge) {
           const { base: b, local } = this.pendingMerge
           this.pendingMerge = null
-          if (this.role !== 'viewer') applyToYText(this.ytext, merge3(b, local, this.text), 'merge')
+          if (this.role !== 'viewer') {
+            if (this.isBoard) this._mergeBoard(b, local)
+            else applyToYText(this.ytext, merge3(b, local, this.text), 'merge')
+          }
         }
         this.setStatus('ready')
         this.emit('synced')
@@ -145,6 +165,18 @@ export class DocHandle extends Emitter {
     } else if (type === MSG_AWARENESS) {
       awarenessProtocol.applyAwarenessUpdate(this.awareness, decoding.readVarUint8Array(decoder), this)
     }
+  }
+
+  // re-apply offline board edits on top of a rebuilt server document
+  _mergeBoard(base, local) {
+    const merged = mergeBoards(base, local, this.text)
+    if (merged == null) return
+    const { set, del } = diffElements(this.elements, parseBoard(merged))
+    if (!set.length && !del.length) return
+    this.ydoc.transact(() => {
+      for (const id of del) this.ymap.delete(id)
+      for (const el of set) this.ymap.set(el.id, el)
+    }, 'merge')
   }
 
   onDisconnect() {
@@ -323,12 +355,12 @@ class Connection extends Emitter {
     }
   }
 
-  openDoc(ws, path) {
-    const key = `${ws}:${path}`
+  openDoc(ws, path, kind = 'text') {
+    const key = docKey(ws, path, kind)
     let d = this.docs.get(key)
     if (!d || d.status === 'deleted') {
       if (d) this._drop(d)
-      d = new DocHandle(this, ws, path)
+      d = new DocHandle(this, ws, path, kind)
       this.docs.set(key, d)
       d.join()
     } else if (d.status === 'error' || d.status === 'missing') {

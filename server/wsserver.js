@@ -1,8 +1,9 @@
 import { WebSocketServer } from 'ws'
 import * as decoding from 'lib0/decoding'
 import { userFromCookieHeader } from './auth.js'
-import { workspaceRole, noteRole } from './access.js'
-import { getRuntime, peekRuntime } from './runtime.js'
+import { workspaceRole, noteRole, canReadFile } from './access.js'
+import { isBoardPath } from '../shared/board.js'
+import { getRuntime, peekRuntime, layerDocKey } from './runtime.js'
 import { registerSocket, unregisterSocket } from './hub.js'
 import { publicUser } from './users.js'
 import { normalizePath } from '../shared/paths.js'
@@ -125,14 +126,20 @@ async function handleJSON(sock, msg) {
     case 'join': {
       const path = normalizePath(msg.path)
       if (!path) throw new Error('Invalid path')
-      const key = `${msg.ws}:${path}`
-      const role = noteRole(sock.user.id, msg.ws, path)
+      const kind = msg.kind === 'layer' ? 'layer' : 'text'
+      const key = kind === 'layer' ? layerDocKey(msg.ws, path) : `${msg.ws}:${path}`
+      let role = noteRole(sock.user.id, msg.ws, path)
+      // whiteboards embedded in a note shared with this user can be viewed
+      if (!role && kind === 'text' && isBoardPath(path)) {
+        const rt0 = await getRuntime(msg.ws).catch(() => null)
+        if (rt0 && (await canReadFile(sock.user.id, rt0, path))) role = 'viewer'
+      }
       if (!role) return sock.sendJSON({ t: 'error', doc: key, error: 'Note not found or access denied', code: 404 })
       sock.wanted.add(key)
       const rt = await getRuntime(msg.ws)
       let doc
       try {
-        doc = await rt.openDoc(path)
+        doc = await rt.openDoc(path, kind)
       } catch (e) {
         sock.wanted.delete(key)
         return sock.sendJSON({ t: 'error', doc: key, error: e.message, code: e.status || 500 })

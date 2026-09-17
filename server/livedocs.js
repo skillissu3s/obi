@@ -5,6 +5,7 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import { newId } from './security.js'
 import { applyToYText } from '../shared/textdiff.js'
+import { parseBoard, serializeBoard, diffElements } from '../shared/board.js'
 
 export const MSG_SYNC = 0
 export const MSG_AWARENESS = 1
@@ -20,16 +21,30 @@ function header(key, type) {
   return enc
 }
 
+// kind 'text' = a markdown note (Y.Text), kind 'board' = a whiteboard or a note's canvas layer (Y.Map of elements)
 export class LiveDoc {
-  constructor(runtime, path, text) {
+  constructor(runtime, path, text, { kind = 'text', layer = false, registry = runtime.docs, key } = {}) {
     this.runtime = runtime
     this.path = path
-    this.key = `${runtime.id}:${path}`
+    this.kind = kind
+    this.layer = layer
+    this.registry = registry
+    this.key = key || `${runtime.id}:${path}`
     this.epoch = newId(10)
     this.ydoc = new Y.Doc({ gc: true })
-    this.ytext = this.ydoc.getText('content')
-    if (text) this.ytext.insert(0, text)
-    this.savedText = text
+    if (kind === 'board') {
+      // throws BoardParseError for unreadable files — the caller refuses to open (and never overwrites) them
+      const elements = parseBoard(text)
+      this.ymap = this.ydoc.getMap('elements')
+      this.ydoc.transact(() => {
+        for (const el of elements) this.ymap.set(el.id, el)
+      })
+      this.savedText = serializeBoard(elements)
+    } else {
+      this.ytext = this.ydoc.getText('content')
+      if (text) this.ytext.insert(0, text)
+      this.savedText = text
+    }
     this.awareness = new awarenessProtocol.Awareness(this.ydoc)
     this.awareness.setLocalState(null)
     this.conns = new Map() // socket -> { role, clientIds: Set<number> }
@@ -63,7 +78,11 @@ export class LiveDoc {
   }
 
   get text() {
-    return this.ytext.toString()
+    return this.kind === 'board' ? serializeBoard([...this.ymap.values()]) : this.ytext.toString()
+  }
+
+  get isEmpty() {
+    return this.kind === 'board' ? this.ymap.size === 0 : this.ytext.length === 0
   }
 
   addConn(sock, role) {
@@ -136,6 +155,23 @@ export class LiveDoc {
 
   // Replace content coming from outside the doc (git pull, rename link updates, task toggles…)
   applyExternal(text) {
+    if (this.kind === 'board') {
+      let next
+      try {
+        next = parseBoard(text)
+      } catch {
+        return // leave the live board alone if the incoming file is unreadable
+      }
+      const { set, del } = diffElements([...this.ymap.values()], next)
+      if (set.length || del.length) {
+        this.ydoc.transact(() => {
+          for (const id of del) this.ymap.delete(id)
+          for (const el of set) this.ymap.set(el.id, el)
+        }, 'external')
+      }
+      this.savedText = serializeBoard(next)
+      return
+    }
     applyToYText(this.ytext, text, 'external')
     this.savedText = text
   }
@@ -164,7 +200,7 @@ export class LiveDoc {
     this.destroyed = true
     clearTimeout(this.saveTimer)
     clearTimeout(this.destroyTimer)
-    if (this.runtime.docs.get(this.path) === this) this.runtime.docs.delete(this.path)
+    if (this.registry.get(this.path) === this) this.registry.delete(this.path)
     this.awareness.destroy()
     this.ydoc.destroy()
     this.runtime.presenceChanged()

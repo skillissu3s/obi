@@ -2,7 +2,7 @@ import {
   FilePlus, FolderPlus, CalendarDays, Search, Network, ListChecks, Settings, PanelLeft, PanelRight, Eye, Code2, Sun, Moon,
   Maximize2, SplitSquareHorizontal, X, RefreshCw, Share2, Globe, History, Pencil, Trash2, Copy, Link2, Star, Shuffle,
   Download, Upload, LogOut, ShieldCheck, Command, FolderInput, Keyboard, Plus, LayoutGrid, BookOpen, Undo2, Redo2,
-  Bold, Italic, Quote, IndentIncrease, IndentDecrease, Hash, Users, Layers, Palette,
+  Bold, Italic, Quote, IndentIncrease, IndentDecrease, Hash, Users, Layers, Palette, Shapes, PencilRuler, PanelLeftOpen,
 } from 'lucide-react'
 import { indentMore, indentLess, undo, redo } from '@codemirror/commands'
 import { yUndoManagerKeymap } from 'y-codemirror.next'
@@ -16,7 +16,15 @@ import { api } from './api.js'
 import { conn } from './socket.js'
 import * as A from './actions.js'
 import { toggleWrap, insertLink, toggleTask, setHeading, toggleQuote } from '../editor/commands.js'
+import { editorCtx } from '../editor/livePreview.js'
 import { dirname, isNote, stripExt, basename } from '@shared/paths.js'
+
+function insertWhiteboard() {
+  const v = activeView
+  if (!v) return
+  const sel = v.state.selection.main
+  v.state.facet(editorCtx).insertWhiteboard?.(v, sel.from, sel.to)
+}
 
 const yUndoCmd = yUndoManagerKeymap[0]?.run
 const yRedoCmd = yUndoManagerKeymap[1]?.run
@@ -63,6 +71,9 @@ export function buildCommands() {
     { id: 'new-note', name: 'New note', icon: FilePlus, hotkey: 'Mod+N', alt: 'Alt+N', group: 'File', run: () => A.createNote({ folder: currentFolder() }) },
     { id: 'new-note-tab', name: 'New note in new tab', icon: FilePlus, group: 'File', run: () => A.createNote({ folder: currentFolder(), newTab: true }) },
     { id: 'new-folder', name: 'New folder', icon: FolderPlus, group: 'File', run: () => A.createFolder(currentFolder()) },
+    { id: 'new-whiteboard', name: 'New whiteboard', icon: Shapes, hotkey: 'Alt+B', group: 'File', run: () => A.createWhiteboard({ folder: currentFolder() }) },
+    { id: 'insert-whiteboard', name: 'Insert a new whiteboard into this note', icon: Shapes, group: 'Editor', hidden: !activeView, run: () => insertWhiteboard() },
+    { id: 'canvas-tools', name: 'Toggle canvas tools on notes', icon: PencilRuler, hotkey: 'Alt+C', group: 'View', run: () => window.dispatchEvent(new CustomEvent('obi:canvas-bar')) },
     { id: 'new-board', name: 'New board (Kanban)', icon: LayoutGrid, group: 'File', run: async () => {
         const { emptyBoardContent } = await import('./kanban.js')
         A.createNote({ folder: currentFolder(), title: 'Board', content: emptyBoardContent() })

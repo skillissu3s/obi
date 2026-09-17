@@ -116,9 +116,11 @@ export function slashCompletion(context) {
   const m = /(?:^|\s)\/([\w-]*)$/.exec(before)
   if (!m) return null
   const from = context.pos - m[1].length - 1
+  // the typed range starts at the slash, so labels carry one too (displayLabel hides it)
   const options = SLASH.map((s) =>
     snippetCompletion(s.snippet, {
-      label: s.label,
+      label: `/${s.label}`,
+      displayLabel: s.label,
       detail: s.keywords.split(' ')[0],
       type: 'block',
       section: 'Blocks',
@@ -126,19 +128,32 @@ export function slashCompletion(context) {
   )
   const now = new Date()
   options.push(
-    { label: "Today's date", detail: formatDate(now, 'YYYY-MM-DD'), type: 'block', apply: formatDate(now, 'YYYY-MM-DD'), section: 'Insert' },
-    { label: 'Current time', detail: formatDate(now, 'HH:mm'), type: 'block', apply: formatDate(now, 'HH:mm'), section: 'Insert' },
-    { label: 'Date & time', detail: formatDate(now, 'YYYY-MM-DD HH:mm'), type: 'block', apply: formatDate(now, 'YYYY-MM-DD HH:mm'), section: 'Insert' },
+    { label: "/Today's date", displayLabel: "Today's date", detail: formatDate(now, 'YYYY-MM-DD'), type: 'block', apply: formatDate(now, 'YYYY-MM-DD'), section: 'Insert' },
+    { label: '/Current time', displayLabel: 'Current time', detail: formatDate(now, 'HH:mm'), type: 'block', apply: formatDate(now, 'HH:mm'), section: 'Insert' },
+    { label: '/Date & time', displayLabel: 'Date & time', detail: formatDate(now, 'YYYY-MM-DD HH:mm'), type: 'block', apply: formatDate(now, 'YYYY-MM-DD HH:mm'), section: 'Insert' },
   )
   const ctx = context.state.facet(editorCtx)
+  if (ctx.insertWhiteboard) {
+    options.unshift({
+      label: '/Whiteboard',
+      displayLabel: 'Whiteboard',
+      detail: 'draw',
+      info: 'Create a whiteboard and embed it here — edit it right inside the note',
+      type: 'block',
+      section: 'Blocks',
+      boost: 2,
+      apply: (view, c, from2, to) => ctx.insertWhiteboard(view, from2, to),
+    })
+  }
   for (const tpl of ctx.templates?.() || []) {
     options.push({
-      label: stripExt(basename(tpl)),
+      label: `/${stripExt(basename(tpl))}`,
+      displayLabel: stripExt(basename(tpl)),
       detail: 'template',
       type: 'block',
       section: 'Templates',
       apply: (view, c, from2, to) => ctx.insertTemplate?.(view, tpl, from2, to),
     })
   }
-  return { from, options, validFor: /^[\w-]*$/ }
+  return { from, options, validFor: /^\/[\w-]*$/ }
 }

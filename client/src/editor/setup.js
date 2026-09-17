@@ -13,6 +13,7 @@ import { obiMarkdownExtensions, obiTags } from './markdownExt.js'
 import { livePreview, blockWidgets, linkHandlers, editorCtx } from './livePreview.js'
 import { wikiCompletion, tagCompletion, slashCompletion } from './completions.js'
 import { markdownKeymapFor } from './commands.js'
+import { annotationField } from './annotations.js'
 
 const obiHighlight = HighlightStyle.define([
   { tag: t.heading1, class: 'cm-hd cm-hd1' },
@@ -45,6 +46,7 @@ export const compartments = () => ({
   readOnly: new Compartment(),
   collab: new Compartment(),
   prefs: new Compartment(),
+  canvas: new Compartment(),
 })
 
 export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFocus, placeholderText }) {
@@ -85,6 +87,8 @@ export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFo
     comps.readOnly.of([]),
     comps.collab.of([]),
     comps.prefs.of(prefsExtensions(prefs)),
+    annotationField,
+    comps.canvas.of([]),
   ]
   if (placeholderText) exts.push(cmPlaceholder(placeholderText))
   if (!handle) exts.push(history())

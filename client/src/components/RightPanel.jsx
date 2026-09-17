@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { List, Link2, Network, CalendarDays, Info, FileText, ChevronLeft, ChevronRight, Plus, Hash, Clock, Users } from 'lucide-react'
+import { List, Link2, Network, CalendarDays, Info, FileText, ChevronLeft, ChevronRight, Plus, Hash, Clock, Users, PanelRightClose } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
@@ -44,6 +44,9 @@ export function RightPanel({ tab }) {
             <t.icon />
           </button>
         ))}
+        <button className="icon-btn rp-close" title="Close panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight(false)}>
+          <PanelRightClose />
+        </button>
       </div>
       <div className="rp-body">
         {rightTab === 'outline' && <Outline tab={tab} />}

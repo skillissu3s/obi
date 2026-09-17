@@ -11,7 +11,7 @@ import { adminRouter } from './admin.js'
 import { wsRouter, miscRouter } from './workspaces.js'
 import { publicRouter } from './public.js'
 import { attachWebSocket } from './wsserver.js'
-import { shutdownAll, workspaceDir } from './runtime.js'
+import { shutdownAll, workspaceDir, trashCompanions } from './runtime.js'
 import { createUser } from './users.js'
 import { hashPassword } from './security.js'
 import { warnIfEphemeral, dataCreatedAt } from './storage.js'
@@ -98,7 +98,7 @@ function housekeeping() {
   run('DELETE FROM invites WHERE expires_at < ? AND used_by IS NULL', now() - 30 * 86400000)
   const old = all('SELECT * FROM trash WHERE deleted_at < ?', now() - 30 * 86400000)
   for (const row of old) {
-    fs.rmSync(path.join(workspaceDir(row.workspace_id), '.trash', row.trash_name), { recursive: true, force: true })
+    for (const n of [row.trash_name, ...trashCompanions(row.trash_name)]) fs.rmSync(path.join(workspaceDir(row.workspace_id), '.trash', n), { recursive: true, force: true })
     run('DELETE FROM trash WHERE id = ?', row.id)
   }
 }

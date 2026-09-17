@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   ChevronRight, FileText, Folder, FolderOpen, FilePlus, FolderPlus, Search, Hash, Star, Share2, Users, ChevronDown,
   MoreHorizontal, Pencil, Trash2, Copy, FolderInput, SplitSquareHorizontal, Link2, History, ListFilter, X, Image, File,
-  SortAsc, PanelLeftClose, Layers, Plus, Settings2, Cloud, FolderGit2, LogOut, CheckCircle2, Globe,
+  SortAsc, PanelLeftClose, Layers, Plus, Settings2, Cloud, FolderGit2, LogOut, CheckCircle2, Globe, Shapes, ChevronsDownUp,
+  Network, ListChecks, CalendarDays, Settings, PanelRight,
 } from 'lucide-react'
+import { userMenu } from '../lib/userMenu.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
@@ -13,6 +15,7 @@ import * as A from '../lib/actions.js'
 import { WsIcon, menuFromElement, Avatar } from './ui.jsx'
 import { basename, dirname, stripExt, isNote, extname, joinPath, IMAGE_EXT } from '@shared/paths.js'
 import { debounce, timeAgo, fuzzyFilter } from '../lib/util.js'
+import { isBoardPath } from '@shared/board.js'
 
 const ROW_H = 28
 
@@ -52,8 +55,13 @@ function flatten(node, expanded, depth = 0, out = []) {
   return out
 }
 
+// notes and whiteboards open as documents; their extension stays hidden
+const isDoc = (p) => isNote(p) || isBoardPath(p)
+const docName = (name) => (isDoc(name) ? stripExt(name) : name)
+
 function fileIcon(path) {
   if (isNote(path)) return FileText
+  if (isBoardPath(path)) return Shapes
   if (IMAGE_EXT.has(extname(path))) return Image
   return File
 }
@@ -91,7 +99,7 @@ export function FileTree() {
     useApp.setState({ selectedPath: node.path })
     if (node.type === 'folder') {
       useApp.getState().setExpanded(node.path, !expanded.has(node.path))
-    } else if (isNote(node.path)) {
+    } else if (isDoc(node.path)) {
       useLayout.getState().openNote(wsId, node.path, { newTab: e.metaKey || e.ctrlKey })
     } else {
       window.open(api.fileUrl(wsId, node.path), '_blank', 'noopener')
@@ -103,15 +111,16 @@ export function FileTree() {
     const folder = isFolder ? node.path : dirname(node.path)
     useUI.getState().showContextMenu(e, [
       isFolder && { label: 'New note here', icon: FilePlus, run: () => A.createNote({ folder }) },
+      isFolder && { label: 'New whiteboard here', icon: Shapes, run: () => A.createWhiteboard({ folder }) },
       isFolder && { label: 'New folder', icon: FolderPlus, run: () => A.createFolder(folder) },
-      !isFolder && isNote(node.path) && { label: 'Open in new tab', icon: FileText, run: () => useLayout.getState().openNote(wsId, node.path, { newTab: true }) },
-      !isFolder && isNote(node.path) && { label: 'Open to the right', icon: SplitSquareHorizontal, run: () => useLayout.getState().splitRight({ kind: 'note', ws: wsId, path: node.path }) },
+      !isFolder && isDoc(node.path) && { label: 'Open in new tab', icon: isBoardPath(node.path) ? Shapes : FileText, run: () => useLayout.getState().openNote(wsId, node.path, { newTab: true }) },
+      !isFolder && isDoc(node.path) && { label: 'Open to the right', icon: SplitSquareHorizontal, run: () => useLayout.getState().splitRight({ kind: 'note', ws: wsId, path: node.path }) },
       'divider',
       { label: 'Rename…', icon: Pencil, run: () => setRenaming(node.path) },
       { label: 'Move to…', icon: FolderInput, run: () => useUI.getState().openModal('move', { path: node.path }) },
-      !isFolder && isNote(node.path) && { label: 'Duplicate', icon: Copy, run: () => A.duplicateNote(node.path) },
-      !isFolder && isNote(node.path) && { label: 'Copy link', icon: Link2, run: () => A.copyNoteLink(wsId, node.path) },
-      !isFolder && isNote(node.path) && { label: A.isBookmarked(node.path) ? 'Remove bookmark' : 'Bookmark', icon: Star, run: () => A.toggleBookmark(node.path) },
+      !isFolder && isDoc(node.path) && { label: 'Duplicate', icon: Copy, run: () => A.duplicateFile(node.path) },
+      !isFolder && isDoc(node.path) && { label: 'Copy link', icon: Link2, run: () => A.copyNoteLink(wsId, node.path) },
+      !isFolder && isDoc(node.path) && { label: A.isBookmarked(node.path) ? 'Remove bookmark' : 'Bookmark', icon: Star, run: () => A.toggleBookmark(node.path) },
       !isFolder && isNote(node.path) && { label: 'Share & publish…', icon: Share2, run: () => useUI.getState().openModal('share', { ws: wsId, path: node.path }) },
       !isFolder && isNote(node.path) && { label: 'Version history', icon: History, run: () => useUI.getState().openModal('history', { ws: wsId, path: node.path }) },
       'divider',
@@ -189,7 +198,7 @@ export function FileTree() {
             onDrop={(e) => onDrop(e, node)}
             onClick={(e) => onRowClick(node, e)}
             onAuxClick={(e) => {
-              if (e.button === 1 && node.type === 'file' && isNote(node.path)) {
+              if (e.button === 1 && node.type === 'file' && isDoc(node.path)) {
                 e.preventDefault()
                 useLayout.getState().openNote(wsId, node.path, { newTab: true })
               }
@@ -208,14 +217,15 @@ export function FileTree() {
             {renaming === node.path ? (
               <input
                 className="tree-rename"
-                defaultValue={isNote(node.path) ? stripExt(node.name) : node.name}
+                defaultValue={docName(node.name)}
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
                 onBlur={(e) => {
                   const v = e.target.value.trim()
                   setRenaming(null)
-                  const cur = isNote(node.path) ? stripExt(node.name) : node.name
-                  if (v && v !== cur) A.moveTo(node.path, joinPath(dirname(node.path), isNote(node.path) ? `${v}.md` : v))
+                  const cur = docName(node.name)
+                  const ext = isNote(node.path) ? '.md' : isBoardPath(node.path) ? '.board' : ''
+                  if (v && v !== cur) A.moveTo(node.path, joinPath(dirname(node.path), `${v}${ext}`))
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') e.target.blur()
@@ -223,7 +233,7 @@ export function FileTree() {
                 }}
               />
             ) : (
-              <span className="tree-name">{isNote(node.path) ? stripExt(node.name) : node.name}</span>
+              <span className="tree-name">{docName(node.name)}</span>
             )}
             {viewers.length > 0 && (
               <span className="presence-dots">
@@ -232,7 +242,7 @@ export function FileTree() {
                 ))}
               </span>
             )}
-            {node.type === 'file' && !isNote(node.path) && <span className="tree-ext">{extname(node.path)}</span>}
+            {node.type === 'file' && !isDoc(node.path) && <span className="tree-ext">{extname(node.path)}</span>}
             <span className="row-actions">
               {node.type === 'folder' && (
                 <button
@@ -539,9 +549,11 @@ export function BookmarksPanel() {
 
 // ---------------- Sidebar shell ----------------
 
-export function Sidebar() {
+export function Sidebar({ user }) {
   const leftTab = useLayout((s) => s.leftTab)
   const width = useLayout((s) => s.leftWidth)
+  const rightOpen = useLayout((s) => s.right)
+  const rootRef = useRef(null)
   const wsId = useApp((s) => s.wsId)
   const workspaces = useApp((s) => s.workspaces)
   const prefs = usePrefs()
@@ -550,7 +562,8 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!dragging) return
-    const onMove = (e) => useLayout.getState().setWidths({ leftWidth: Math.max(200, Math.min(460, e.clientX - 48)) })
+    const left = rootRef.current?.getBoundingClientRect().left || 0
+    const onMove = (e) => useLayout.getState().setWidths({ leftWidth: Math.max(200, Math.min(460, e.clientX - left)) })
     const onUp = () => setDragging(false)
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -577,7 +590,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="sidebar left" style={{ width }}>
+    <div className="sidebar left" style={{ width }} ref={rootRef}>
       <div className="sidebar-header">
         <button className="ws-switcher" onClick={() => useUI.getState().openPalette('workspaces')} title="Switch workspace">
           <WsIcon ws={ws} />
@@ -597,6 +610,9 @@ export function Sidebar() {
           </div>
           <ChevronDown size={14} style={{ color: 'var(--text-3)' }} />
         </button>
+        <button className="icon-btn sidebar-collapse" title="Close sidebar (Ctrl/⌘ \)" onClick={() => useLayout.getState().toggleLeft(false)}>
+          <PanelLeftClose />
+        </button>
       </div>
       <div className="sidebar-tabs">
         {tabs.map((t) => (
@@ -611,14 +627,17 @@ export function Sidebar() {
           <button className="icon-btn sm" title="New note" onClick={() => A.createNote({ folder: '' })}>
             <FilePlus />
           </button>
+          <button className="icon-btn sm" title="New whiteboard (Alt B)" onClick={() => A.createWhiteboard({ folder: '' })}>
+            <Shapes />
+          </button>
           <button className="icon-btn sm" title="New folder" onClick={() => A.createFolder('')}>
             <FolderPlus />
           </button>
           <button className="icon-btn sm" title="Sort" onClick={sortMenu}>
             <SortAsc />
           </button>
-          <button className="icon-btn sm" title="Collapse all" onClick={() => useApp.getState().collapseAll()}>
-            <PanelLeftClose />
+          <button className="icon-btn sm" title="Collapse all folders" onClick={() => useApp.getState().collapseAll()}>
+            <ChevronsDownUp />
           </button>
         </div>
       )}
@@ -626,6 +645,29 @@ export function Sidebar() {
       {leftTab === 'search' && <SearchPanel />}
       {leftTab === 'tags' && <TagsPanel />}
       {leftTab === 'bookmarks' && <BookmarksPanel />}
+      <div className="sidebar-footer">
+        {user && (
+          <button className="sidebar-user" onClick={(e) => userMenu(e, user)} title="Account">
+            <Avatar name={user.displayName || '?'} color={user.color} size={22} />
+            <span className="truncate">{user.displayName}</span>
+          </button>
+        )}
+        <button className="icon-btn" title="Graph view (Ctrl/⌘ G)" onClick={() => useLayout.getState().openView('graph')}>
+          <Network />
+        </button>
+        <button className="icon-btn" title="Tasks" onClick={() => useLayout.getState().openView('tasks')}>
+          <ListChecks />
+        </button>
+        <button className="icon-btn" title="Daily note (Ctrl/⌘ D)" onClick={() => A.openDailyNote()}>
+          <CalendarDays />
+        </button>
+        <button className={`icon-btn ${rightOpen ? 'active' : ''}`} title="Right panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight()}>
+          <PanelRight />
+        </button>
+        <button className="icon-btn" title="Settings (Ctrl/⌘ ,)" onClick={() => useUI.getState().openModal('settings')}>
+          <Settings />
+        </button>
+      </div>
       <div className={`resizer ${dragging ? 'dragging' : ''}`} onMouseDown={() => setDragging(true)} />
     </div>
   )

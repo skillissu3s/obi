@@ -581,17 +581,48 @@ export function ShortcutsModal() {
     ['Quote', 'Mod ⇧ Q'],
     ['Code block', 'Mod ⇧ C'],
     ['Undo / redo', 'Mod Z / Mod ⇧ Z'],
+    ['New whiteboard', 'Alt B'],
+    ['Canvas tools on a note', 'Alt C'],
   ]
+  // canvas keys work on whiteboards, and on notes once you click the canvas (outside the text)
+  const canvas = [
+    ['Select', 'V'],
+    ['Pan', 'H · Space + drag · middle mouse'],
+    ['Rectangle / ellipse / diamond', 'R / O / D'],
+    ['Arrow / line', 'A / L'],
+    ['Draw / highlighter', 'P / M'],
+    ['Text / sticky note', 'T / N'],
+    ['Image / link a page', 'I / K'],
+    ['Frame (whiteboards)', 'F'],
+    ['Eraser / laser pointer', 'E / X'],
+    ['Keep tool selected', 'Q'],
+    ['Grid & snapping', 'G'],
+    ['Zoom', 'Mod + wheel · Mod + / −'],
+    ['Zoom to fit / 100%', '⇧ 1 / Mod 0'],
+    ['Duplicate', 'Mod D · Alt + drag'],
+    ['Group / ungroup', 'Mod G / Mod ⇧ G'],
+    ['Lock', 'Mod ⇧ L'],
+    ['Bring forward / back', '] / [ (Mod for front / back)'],
+    ['Nudge', 'Arrows (⇧ for 10px)'],
+    ['Straight lines, squares', 'hold ⇧ while drawing'],
+    ['Edit text or label', 'double-click · Enter'],
+  ]
+  const mod = navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'
+  const grid = (list) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr auto', gap: '10px 18px' }}>
+      {list.map(([k, v]) => (
+        <div key={k} style={{ display: 'contents' }}>
+          <span className="muted">{k}</span>
+          <kbd>{v.replaceAll('Mod', mod)}</kbd>
+        </div>
+      ))}
+    </div>
+  )
   return (
     <Modal title="Keyboard shortcuts" center onClose={close} className="wide">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr auto', gap: '10px 18px' }}>
-        {rows.map(([k, v]) => (
-          <div key={k} style={{ display: 'contents' }}>
-            <span className="muted">{k}</span>
-            <kbd>{v.replace('Mod', navigator.platform.includes('Mac') ? '⌘' : 'Ctrl')}</kbd>
-          </div>
-        ))}
-      </div>
+      {grid(rows)}
+      <h3 className="shortcut-group">Whiteboards & note canvas</h3>
+      {grid(canvas)}
     </Modal>
   )
 }

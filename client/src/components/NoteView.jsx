@@ -12,6 +12,7 @@ import { useUI, toast } from '../store/ui.js'
 import { Editor } from './Editor.jsx'
 import { Reader } from './Reader.jsx'
 import { Board } from './Board.jsx'
+import { NoteCanvas } from '../canvas/NoteCanvas.jsx'
 import { AvatarStack, menuFromElement } from './ui.jsx'
 import { isBoardContent } from '../lib/kanban.js'
 import { basename, dirname, stripExt, joinPath, isNote } from '@shared/paths.js'
@@ -61,6 +62,15 @@ export function NoteView({ tab, paneId, active }) {
   const [view, setView] = useState(null)
   const [heading, setHeading] = useState(null)
   const scrollRef = useRef(null)
+  // DOM nodes the canvas layer attaches to
+  const [scrollEl, setScrollEl] = useState(null)
+  const [innerEl, setInnerEl] = useState(null)
+  const [originEl, setOriginEl] = useState(null)
+  const [stageEl, setStageEl] = useState(null)
+  const setScroll = useCallback((el) => {
+    scrollRef.current = el
+    setScrollEl(el)
+  }, [])
   const ws = workspaces.find((w) => w.id === tab.ws)
   const foreign = tab.ws !== wsId
 
@@ -167,7 +177,8 @@ export function NoteView({ tab, paneId, active }) {
       )
     if (mode === 'board') return <Board handle={handle} readOnly={readOnly} />
     return (
-      <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`}>
+      <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`} ref={mode === 'read' ? undefined : setInnerEl}>
+        {mode !== 'read' && <div className="nc-origin" ref={setOriginEl} />}
         {prefs.inlineTitle && <InlineTitle tab={tab} title={title} readOnly={readOnly || foreign} view={view} />}
         {readOnly && (
           <div className="note-banner">
@@ -198,7 +209,7 @@ export function NoteView({ tab, paneId, active }) {
   }, [active, stats])
 
   return (
-    <div className={`note-view ${prefs.readableWidth ? 'readable' : ''} ${prefs.strikeDone ? 'strike-done' : ''}`}>
+    <div className={`note-view ${prefs.readableWidth ? 'readable' : ''} ${prefs.strikeDone ? 'strike-done' : ''}`} ref={setStageEl}>
       <div className="note-header">
         <button className="icon-btn" disabled={!tab.back?.length} onClick={() => useLayout.getState().navigate(tab.id, -1)} title="Back">
           <ChevronLeft />
@@ -261,9 +272,12 @@ export function NoteView({ tab, paneId, active }) {
           <MoreHorizontal />
         </button>
       </div>
-      <div className="note-scroll" ref={scrollRef}>
+      <div className="note-scroll" ref={setScroll} tabIndex={-1}>
         {body()}
       </div>
+      {handle?.status === 'ready' && (mode === 'live' || mode === 'source') && view && originEl && scrollEl && (
+        <NoteCanvas key={`${handle.key}:${handle.generation}`} tab={tab} view={view} scrollEl={scrollEl} innerEl={innerEl} originEl={originEl} stageEl={stageEl} mode={mode} />
+      )}
       {view && !readOnly && mode !== 'read' && mode !== 'board' && <MobileToolbar view={view} handle={handle} />}
     </div>
   )

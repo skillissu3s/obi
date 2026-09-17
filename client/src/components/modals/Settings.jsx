@@ -76,7 +76,7 @@ export function SettingsModal({ section: initial }) {
   ].filter(Boolean)
 
   return (
-    <Modal title={null} onClose={close} className="xwide" bodyClass="">
+    <Modal title={null} onClose={close} className="xwide settings-modal" bodyClass="settings-shell">
       <div className="settings">
         <div className="settings-nav">
           {nav.map((n, i) =>
@@ -251,26 +251,43 @@ function AppearanceSection() {
         />
       </Setting>
 
-      <h3>Colour theme</h3>
-      <div className="palette-grid">
-        {PALETTES.map((p) => {
-          const [bg, fg, accent] = p[mode]
-          return (
-            <button key={p.id} className={`palette-card ${prefs.palette === p.id ? 'active' : ''}`} onClick={() => prefs.set({ palette: p.id })} title={p.note}>
-              <span className="palette-swatch" style={{ background: bg }}>
-                <i style={{ background: fg }} />
-                <i style={{ background: accent }} />
-                <i style={{ background: `color-mix(in srgb, ${fg} 35%, ${bg})` }} />
-              </span>
-              <span className="palette-meta">
-                <b>{p.name}</b>
-                <em>{p.note}</em>
-              </span>
-              {prefs.palette === p.id && <Check className="palette-check" />}
-            </button>
-          )
-        })}
-      </div>
+      {[
+        { home: 'light', title: 'Light themes', icon: Sun },
+        { home: 'dark', title: 'Dark themes', icon: Moon },
+      ].map((group) => (
+        <div key={group.home}>
+          <h3 className="palette-group-title">
+            <group.icon /> {group.title}
+          </h3>
+          <div className="palette-grid">
+            {PALETTES.filter((p) => p.home === group.home).map((p) => {
+              // cards preview the theme in the mode it was designed for
+              const [bg, fg, accent] = p[group.home]
+              const active = prefs.palette === p.id && (prefs.theme === 'system' || mode === group.home)
+              return (
+                <button
+                  key={p.id}
+                  className={`palette-card ${active ? 'active' : ''}`}
+                  onClick={() => prefs.set(prefs.theme === 'system' ? { palette: p.id } : { palette: p.id, theme: group.home })}
+                  title={`${p.note} (also has a ${group.home === 'light' ? 'dark' : 'light'} version)`}
+                >
+                  <span className="palette-swatch" style={{ background: bg }}>
+                    <i style={{ background: fg }} />
+                    <i style={{ background: accent }} />
+                    <i style={{ background: `color-mix(in srgb, ${fg} 35%, ${bg})` }} />
+                  </span>
+                  <span className="palette-meta">
+                    <b>{p.name}</b>
+                    <em>{p.note}</em>
+                  </span>
+                  {active && <Check className="palette-check" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+      <p className="setting-desc palette-hint">Every theme has a light and a dark version. Mode above switches between them, or pick System to follow your device.</p>
 
       <Setting name="Accent colour" desc="Overrides the accent that comes with the theme.">
         <div className="accent-swatches">

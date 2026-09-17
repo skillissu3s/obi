@@ -300,11 +300,155 @@
   --accent-default: #7c5cd6;
 }
 
+/* ---------- light-first palettes ---------- */
+
+/* Paper — crisp white with ink blue */
+[data-palette='paper'][data-theme='light'] {
+  --tint: 22 28 45;
+  --bg: #ffffff;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #f6f7f9;
+  --text: #1c1f26;
+  --text-2: #545b69;
+  --text-3: #8b92a0;
+  --text-faint: #c1c6cf;
+  --mark-bg: rgba(250, 214, 80, 0.45);
+  --graph-node: #6a7180;
+  --accent-default: #3056d3;
+}
+[data-palette='paper'][data-theme='dark'] {
+  --tint: 226 232 255;
+  --bg: #15171c;
+  --bg-elev: #1d2027;
+  --bg-sidebar: #181a20;
+  --text: #e6e8ee;
+  --text-2: #9ca2b0;
+  --text-3: #686e7c;
+  --text-faint: #474c57;
+  --mark-bg: rgba(230, 196, 80, 0.24);
+  --graph-node: #8d93a1;
+  --accent-default: #7b9cff;
+}
+
+/* Sand — dune beige with terracotta */
+[data-palette='sand'][data-theme='light'] {
+  --tint: 64 44 20;
+  --bg: #fbf7ef;
+  --bg-elev: #fffdf8;
+  --bg-sidebar: #f3ecdf;
+  --text: #2a231a;
+  --text-2: #675b4a;
+  --text-3: #9c8e79;
+  --text-faint: #cbbfa9;
+  --mark-bg: rgba(236, 190, 90, 0.42);
+  --graph-node: #736650;
+  --accent-default: #c0602b;
+}
+[data-palette='sand'][data-theme='dark'] {
+  --tint: 255 238 214;
+  --bg: #1a1612;
+  --bg-elev: #231e18;
+  --bg-sidebar: #1d1914;
+  --text: #ede5d9;
+  --text-2: #aa9d8a;
+  --text-3: #76695a;
+  --text-faint: #54493d;
+  --mark-bg: rgba(224, 138, 87, 0.26);
+  --graph-node: #9c8f7d;
+  --accent-default: #e08a57;
+}
+
+/* Sakura — blush with cherry */
+[data-palette='sakura'][data-theme='light'] {
+  --tint: 72 30 44;
+  --bg: #fffafb;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #fbf0f3;
+  --text: #2b2024;
+  --text-2: #6d5960;
+  --text-3: #a08c93;
+  --text-faint: #d3c1c7;
+  --mark-bg: rgba(250, 190, 205, 0.55);
+  --graph-node: #7b6770;
+  --accent-default: #d6456d;
+}
+[data-palette='sakura'][data-theme='dark'] {
+  --tint: 255 230 238;
+  --bg: #1a1316;
+  --bg-elev: #231a1e;
+  --bg-sidebar: #1d1519;
+  --text: #f1e6ea;
+  --text-2: #b39da5;
+  --text-3: #7c6870;
+  --text-faint: #58484e;
+  --mark-bg: rgba(240, 127, 160, 0.24);
+  --graph-node: #a58f98;
+  --accent-default: #f07fa0;
+}
+
+/* Mint — fresh mint with emerald */
+[data-palette='mint'][data-theme='light'] {
+  --tint: 18 52 38;
+  --bg: #f7fcf9;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #ebf5ef;
+  --text: #18251f;
+  --text-2: #4f6258;
+  --text-3: #85998e;
+  --text-faint: #b9cbc1;
+  --mark-bg: rgba(250, 214, 90, 0.45);
+  --graph-node: #607369;
+  --accent-default: #0c936a;
+}
+[data-palette='mint'][data-theme='dark'] {
+  --tint: 222 255 238;
+  --bg: #0f1714;
+  --bg-elev: #16211c;
+  --bg-sidebar: #121b17;
+  --text: #e2efe8;
+  --text-2: #97aba0;
+  --text-3: #63766c;
+  --text-faint: #44524b;
+  --mark-bg: rgba(52, 211, 153, 0.2);
+  --graph-node: #8a9e93;
+  --accent-default: #34d399;
+}
+
+/* Sky — airy blue with azure */
+[data-palette='sky'][data-theme='light'] {
+  --tint: 16 38 72;
+  --bg: #f7fbff;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #ecf3fb;
+  --text: #152033;
+  --text-2: #4e5d73;
+  --text-3: #8594a9;
+  --text-faint: #bac5d4;
+  --mark-bg: rgba(250, 214, 90, 0.45);
+  --graph-node: #5f6e84;
+  --accent-default: #0277b8;
+}
+[data-palette='sky'][data-theme='dark'] {
+  --tint: 214 234 255;
+  --bg: #0e1520;
+  --bg-elev: #151e2b;
+  --bg-sidebar: #111925;
+  --text: #e2eaf5;
+  --text-2: #96a4b8;
+  --text-3: #627084;
+  --text-faint: #435063;
+  --mark-bg: rgba(56, 189, 248, 0.2);
+  --graph-node: #8796ab;
+  --accent-default: #38bdf8;
+}
+
 /* cool palettes get a cooler code palette */
 [data-palette='graphite'][data-theme='dark'],
 [data-palette='midnight'][data-theme='dark'],
 [data-palette='nordic'][data-theme='dark'],
-[data-palette='nebula'][data-theme='dark'] {
+[data-palette='nebula'][data-theme='dark'],
+[data-palette='paper'][data-theme='dark'],
+[data-palette='sky'][data-theme='dark'] {
   --tok-keyword: #b99cf0;
   --tok-string: #8fc9a8;
   --tok-number: #e0a373;
@@ -316,7 +460,9 @@
 [data-palette='graphite'][data-theme='light'],
 [data-palette='midnight'][data-theme='light'],
 [data-palette='nordic'][data-theme='light'],
-[data-palette='nebula'][data-theme='light'] {
+[data-palette='nebula'][data-theme='light'],
+[data-palette='paper'][data-theme='light'],
+[data-palette='sky'][data-theme='light'] {
   --tok-keyword: #6d3fb5;
   --tok-string: #2e7a55;
   --tok-number: #a75f26;
