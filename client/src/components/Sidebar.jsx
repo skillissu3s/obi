@@ -14,7 +14,7 @@ import { api } from '../lib/api.js'
 import * as A from '../lib/actions.js'
 import { WsIcon, menuFromElement, Avatar } from './ui.jsx'
 import { basename, dirname, stripExt, isNote, extname, joinPath, IMAGE_EXT } from '@shared/paths.js'
-import { debounce, timeAgo, fuzzyFilter } from '../lib/util.js'
+import { debounce, timeAgo, fuzzyFilter, plainSnippet } from '../lib/util.js'
 import { isBoardPath } from '@shared/board.js'
 
 const ROW_H = 28
@@ -462,7 +462,7 @@ export function SearchPanel() {
             </div>
             {r.matches.map((m, i) => (
               <div key={i} className="search-match" onClick={() => useLayout.getState().openNote(wsId, r.path, { line: m.line })}>
-                <Highlighted text={m.text} ranges={m.ranges} />
+                <Highlighted {...cleanMatch(m.text, query)} />
               </div>
             ))}
           </div>
@@ -470,6 +470,27 @@ export function SearchPanel() {
       </div>
     </>
   )
+}
+
+// Search hits read as prose, not markdown source: strip the syntax, then find the
+// typed words again in the cleaned line so the highlighting still lines up.
+function cleanMatch(text, query) {
+  const clean = plainSnippet(text, 240)
+  const terms = String(query || '')
+    .toLowerCase()
+    .match(/"[^"]+"|[^\s]+/g) || []
+  const lower = clean.toLowerCase()
+  const ranges = []
+  for (const raw of terms) {
+    const term = raw.replace(/^-/, '').replace(/^\w+:/, '').replace(/"/g, '')
+    if (term.length < 2) continue
+    let i = lower.indexOf(term)
+    while (i >= 0 && ranges.length < 20) {
+      ranges.push([i, i + term.length])
+      i = lower.indexOf(term, i + term.length)
+    }
+  }
+  return { text: clean, ranges }
 }
 
 function Highlighted({ text, ranges }) {
