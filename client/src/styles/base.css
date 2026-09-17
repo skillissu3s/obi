@@ -774,17 +774,26 @@ kbd {
 }
 @keyframes shimmer {
   0% {
-    background-position: -400px 0;
+    background-position: -60vw 0;
   }
   100% {
-    background-position: 400px 0;
+    background-position: 100vw 0;
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+/* fixed attachment: one soft highlight sweeps across every bar together */
 .skeleton {
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--bg-hover) 0%, var(--bg-active) 50%, var(--bg-hover) 100%);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
+  background-color: var(--bg-hover);
+  background-image: linear-gradient(90deg, transparent 0%, var(--bg-hover) 35%, var(--bg-active) 50%, var(--bg-hover) 65%, transparent 100%);
+  background-size: 60vw 100%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  animation: shimmer 1.6s infinite ease-in-out;
 }
 
 .divider {

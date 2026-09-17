@@ -74,6 +74,7 @@ export function FileTree() {
 
   const me = useApp((s) => s.user?.id)
   const pending = useApp((s) => s.pending)
+  const loadingWs = useApp((s) => s.loadingWs)
   const rootNode = useMemo(() => buildTree(tree, prefs.sortBy), [tree, prefs.sortBy])
   const rows = useMemo(() => flatten(rootNode, expanded), [rootNode, expanded])
 
@@ -151,7 +152,8 @@ export function FileTree() {
         if (e.target === e.currentTarget) contextMenu(e, { type: 'folder', path: '' })
       }}
     >
-      {rows.length === 0 && (
+      {rows.length === 0 && loadingWs && <TreeSkeleton />}
+      {rows.length === 0 && !loadingWs && (
         <div className="empty">
           <FileText />
           <div>No notes yet</div>
@@ -259,6 +261,24 @@ export function FileTree() {
         )
       })}
       <div style={{ height: 40 }} />
+    </div>
+  )
+}
+
+const TREE_SKELETON = [
+  [0, 46], [0, 38], [1, 58], [1, 44], [1, 62], [0, 52], [0, 34], [1, 48], [0, 40],
+]
+
+function TreeSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading files">
+      {TREE_SKELETON.map(([depth, w], i) => (
+        <div key={i} className="tree-row tree-skeleton" style={{ paddingLeft: 4 + depth * 13 }}>
+          <span style={{ width: 4 }} />
+          <span className="skeleton tree-skeleton-icon" />
+          <span className="skeleton tree-skeleton-name" style={{ width: `${w}%` }} />
+        </div>
+      ))}
     </div>
   )
 }

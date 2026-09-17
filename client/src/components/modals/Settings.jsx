@@ -15,9 +15,10 @@ import { timeAgo, formatBytes, copyText, modKey } from '../../lib/util.js'
 import { PasswordInput } from '../../pages/Auth.jsx'
 import { basename, stripExt } from '@shared/paths.js'
 
-function Setting({ name, desc, children, status }) {
+// `stacked` puts wide controls (pickers, multi-input rows) under the label instead of beside it
+function Setting({ name, desc, children, status, stacked = false }) {
   return (
-    <div className="setting">
+    <div className={`setting ${stacked ? 'stacked' : ''}`}>
       <div className="setting-text">
         <div className="setting-name">
           {name}
@@ -142,19 +143,20 @@ function AccountSection({ user }) {
     <>
       <h2>Account</h2>
       <p className="section-sub">Your profile and security.</p>
-      <div className="row" style={{ gap: 14, marginBottom: 10 }}>
-        <Avatar name={user.displayName} color={user.color} size={54} />
-        <div>
-          <div style={{ fontWeight: 650, fontSize: 16 }}>{user.displayName}</div>
-          <div className="faint">
-            @{user.username} {user.isAdmin && <span className="badge accent">Admin</span>}
+      <div className="settings-summary">
+        <Avatar name={user.displayName} color={user.color} size={48} />
+        <div className="settings-summary-text">
+          <div className="settings-summary-title truncate">{user.displayName}</div>
+          <div className="settings-summary-meta">
+            <span className="faint">@{user.username}</span>
+            {user.isAdmin && <span className="badge accent">Admin</span>}
           </div>
         </div>
       </div>
       <Setting name="Display name" desc="Shown to collaborators on shared notes." status={status.name}>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} />
       </Setting>
-      <Setting name="Cursor colour" desc="Your colour in shared documents." status={status.color}>
+      <Setting name="Cursor colour" desc="Your colour in shared documents." status={status.color} stacked>
         <div className="accent-swatches">
           {['#2f9e78', '#d1703f', '#b8604f', '#c0913a', '#2a93a3', '#5566cf', '#96549e', '#7f9a44', '#c26a8a', '#7c776d'].map((c) => (
             <button
@@ -171,21 +173,25 @@ function AccountSection({ user }) {
           ))}
         </div>
       </Setting>
-      <h3>Change password</h3>
-      <div className="field">
-        <label>Current password</label>
+      <h3>Password</h3>
+      <Setting name="Current password">
         <PasswordInput value={pw.current} onChange={(v) => setPw({ ...pw, current: v })} />
+      </Setting>
+      <Setting name="New password" desc="At least 8 characters. Other devices are signed out when it changes.">
+        <PasswordInput value={pw.next} onChange={(v) => setPw({ ...pw, next: v })} autoComplete="new-password" placeholder="New password" />
+      </Setting>
+      <div className="setting-actions">
+        <button className="btn btn-primary" disabled={!pw.current || pw.next.length < 8 || pwBusy} onClick={changePw}>
+          {pwBusy ? <Spinner size="sm" /> : <KeyRound />} {pwBusy ? 'Updating…' : 'Update password'}
+        </button>
       </div>
-      <div className="field">
-        <label>New password</label>
-        <PasswordInput value={pw.next} onChange={(v) => setPw({ ...pw, next: v })} autoComplete="new-password" placeholder="At least 8 characters" />
-      </div>
-      <button className="btn btn-primary" disabled={!pw.current || pw.next.length < 8 || pwBusy} onClick={changePw}>
-        {pwBusy ? <Spinner size="sm" /> : <KeyRound />} {pwBusy ? 'Updating…' : 'Update password'}
-      </button>
 
       <h3>Sessions</h3>
-      {!sessions && <Spinner size="sm" />}
+      {!sessions && (
+        <div className="setting-loading">
+          <Spinner size="sm" /> Loading sessions…
+        </div>
+      )}
       {sessions?.map((s) => (
         <div className="setting" key={s.id}>
           <div className="setting-text">
@@ -198,7 +204,7 @@ function AccountSection({ user }) {
           </div>
         </div>
       ))}
-      <div className="row" style={{ marginTop: 12, gap: 8 }}>
+      <div className="setting-actions">
         <button
           className="btn"
           onClick={async () => {
@@ -302,10 +308,10 @@ function AppearanceSection() {
         />
       </Setting>
       <Setting name="Font size" desc={`${prefs.fontSize}px`}>
-        <input type="range" min="13" max="22" value={prefs.fontSize} onChange={(e) => prefs.set({ fontSize: Number(e.target.value) })} style={{ width: 200, accentColor: 'var(--accent)' }} />
+        <input type="range" min="13" max="22" value={prefs.fontSize} onChange={(e) => prefs.set({ fontSize: Number(e.target.value) })} className="range" />
       </Setting>
       <Setting name="Line height" desc={String(prefs.lineHeight)}>
-        <input type="range" min="1.3" max="2.2" step="0.05" value={prefs.lineHeight} onChange={(e) => prefs.set({ lineHeight: Number(e.target.value) })} style={{ width: 200, accentColor: 'var(--accent)' }} />
+        <input type="range" min="1.3" max="2.2" step="0.05" value={prefs.lineHeight} onChange={(e) => prefs.set({ lineHeight: Number(e.target.value) })} className="range" />
       </Setting>
       <Setting name="Readable line width" desc="Keep lines comfortably short instead of full width.">
         <Switch checked={prefs.readableWidth} onChange={(v) => prefs.set({ readableWidth: v })} />
@@ -372,29 +378,29 @@ function WorkspaceSection({ ws, isOwner }) {
       <p className="section-sub">
         {ws.type === 'github' ? 'Notes live in your GitHub repository.' : 'Notes live on this server and can be shared with other people.'}
       </p>
-      <div className="row" style={{ gap: 12, marginBottom: 14 }}>
+      <div className="settings-summary">
         <WsIcon ws={ws} size={48} />
-        <div>
-          <div style={{ fontWeight: 650, fontSize: 16 }}>{ws.name}</div>
-          <div className="faint">
+        <div className="settings-summary-text">
+          <div className="settings-summary-title truncate">{ws.name}</div>
+          <div className="settings-summary-meta">
             {ws.type === 'github' ? (
-              <span className="badge">
-                <FolderGit2 /> {ws.github?.label} · {ws.github?.branch}
+              <span className="badge badge-truncate" title={`${ws.github?.label} · ${ws.github?.branch}`}>
+                <FolderGit2 /> <span className="truncate">{ws.github?.label} · {ws.github?.branch}</span>
               </span>
             ) : (
               <span className="badge accent">
                 <Cloud /> Online
               </span>
-            )}{' '}
-            · owned by {ws.owner?.name}
+            )}
+            <span className="faint">owned by {ws.owner?.name}</span>
           </div>
         </div>
       </div>
       <Setting name="Name" status={status.name}>
         <input className="input" value={name} disabled={!isOwner} onChange={(e) => setName(e.target.value)} onBlur={() => name !== ws.name && save({ name })} />
       </Setting>
-      <Setting name="Icon" status={status.icon}>
-        <div style={{ width: 260 }}>
+      <Setting name="Icon" desc="Shown in the workspace switcher and the ribbon." status={status.icon} stacked>
+        <div className="emoji-field">
           <EmojiPicker
             value={icon}
             onChange={(v) => {
@@ -465,27 +471,36 @@ function GithubSection({ ws, isOwner }) {
       <h2>GitHub sync</h2>
       <p className="section-sub">Obi keeps a working copy on the server, commits your edits and pushes them to GitHub. Changes made in Obsidian are pulled back automatically.</p>
 
-      <div className="card" style={{ marginBottom: 18 }}>
-        <div className="card-head">
-          <FolderGit2 size={16} />
-          <h3>{ws.github?.label}</h3>
-          <span className="badge">{ws.github?.branch}</span>
-          <a className="btn btn-ghost btn-sm" href={ws.github?.repo?.replace(/\.git$/, '')} target="_blank" rel="noreferrer">
-            <ExternalLink /> Open
-          </a>
-        </div>
-        <div style={{ padding: '12px 16px' }}>
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <div>
-              <div className="setting-name">
-                {sync?.state === 'error' ? <span style={{ color: 'var(--danger)' }}>Sync error</span> : sync?.state === 'syncing' ? 'Syncing…' : sync?.pending ? `${sync.pending} change(s) waiting` : 'Everything synced'}
-              </div>
-              <div className="setting-desc">{sync?.error || (sync?.lastSync ? `Last sync ${timeAgo(sync.lastSync)}` : 'Not synced yet')}</div>
-            </div>
-            <button className="btn" onClick={() => A.syncNow()}>
-              <RefreshCw className={sync?.state === 'syncing' ? 'spin' : ''} /> Sync now
-            </button>
+      <div className="settings-summary">
+        <span className="settings-summary-icon">
+          <FolderGit2 />
+        </span>
+        <div className="settings-summary-text">
+          <div className="settings-summary-title truncate" title={ws.github?.repo}>{ws.github?.label}</div>
+          <div className="settings-summary-meta">
+            <span className="badge">{ws.github?.branch}</span>
+            <span className={sync?.state === 'error' ? 'error-text' : 'faint'}>
+              {sync?.state === 'error'
+                ? `Sync error — ${sync.error}`
+                : sync?.state === 'syncing'
+                  ? 'Syncing…'
+                  : sync?.pending
+                    ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting`
+                    : sync?.lastSync
+                      ? `Synced ${timeAgo(sync.lastSync)}`
+                      : 'Not synced yet'}
+            </span>
           </div>
+        </div>
+        <div className="settings-summary-actions">
+          {/^https?:/.test(ws.github?.repo || '') && (
+            <a className="btn btn-ghost btn-sm" href={ws.github.repo.replace(/\.git$/, '')} target="_blank" rel="noreferrer">
+              <ExternalLink /> Open
+            </a>
+          )}
+          <button className="btn btn-sm" disabled={sync?.state === 'syncing'} onClick={() => A.syncNow()}>
+            <RefreshCw className={sync?.state === 'syncing' ? 'spin' : ''} /> {sync?.state === 'syncing' ? 'Syncing…' : 'Sync now'}
+          </button>
         </div>
       </div>
 
@@ -494,39 +509,37 @@ function GithubSection({ ws, isOwner }) {
       </Setting>
       <Setting name="Push after" desc="Seconds of inactivity before committing and pushing." status={status.autoSyncSeconds}>
         <input
-          className="input"
           type="number"
           min="5"
           max="600"
           defaultValue={s.autoSyncSeconds ?? 30}
           onBlur={(e) => Number(e.target.value) !== (s.autoSyncSeconds ?? 30) && save({ settings: { autoSyncSeconds: Number(e.target.value) } })}
-          style={{ width: 110 }}
+          className="input input-num"
         />
       </Setting>
       <Setting name="Pull every" desc="Seconds between checks for changes made elsewhere (e.g. Obsidian)." status={status.pullIntervalSeconds}>
         <input
-          className="input"
           type="number"
           min="30"
           max="3600"
           defaultValue={s.pullIntervalSeconds ?? 120}
           onBlur={(e) => Number(e.target.value) !== (s.pullIntervalSeconds ?? 120) && save({ settings: { pullIntervalSeconds: Number(e.target.value) } })}
-          style={{ width: 110 }}
+          className="input input-num"
         />
       </Setting>
-      <Setting name="Commit author" desc="Name and email used for commits Obi creates." status={status.authorName || status.authorEmail}>
-        <div className="row">
-          <input className="input" placeholder="Name" defaultValue={s.authorName || ''} onBlur={(e) => e.target.value !== (s.authorName || '') && save({ settings: { authorName: e.target.value } })} style={{ width: 130 }} />
-          <input className="input" placeholder="email@example.com" defaultValue={s.authorEmail || ''} onBlur={(e) => e.target.value !== (s.authorEmail || '') && save({ settings: { authorEmail: e.target.value } })} style={{ width: 180 }} />
+      <Setting name="Commit author" desc="Name and email used for commits Obi creates." status={status.authorName || status.authorEmail} stacked>
+        <div className="field-row">
+          <input className="input" placeholder="Name" defaultValue={s.authorName || ''} onBlur={(e) => e.target.value !== (s.authorName || '') && save({ settings: { authorName: e.target.value } })} />
+          <input className="input" type="email" placeholder="email@example.com" defaultValue={s.authorEmail || ''} onBlur={(e) => e.target.value !== (s.authorEmail || '') && save({ settings: { authorEmail: e.target.value } })} />
         </div>
       </Setting>
 
       {isOwner && (
         <>
           <h3>Connection</h3>
-          <Setting name="Access token" desc="Paste a new fine-grained personal access token with Contents: read & write. Stored encrypted.">
-            <div className="row">
-              <input className="input" type="password" placeholder="github_pat_…" value={token} onChange={(e) => setToken(e.target.value)} style={{ width: 200 }} />
+          <Setting name="Access token" desc="Paste a new fine-grained personal access token with Contents: read & write. Stored encrypted." stacked>
+            <div className="field-row">
+              <input className="input" type="password" placeholder="github_pat_…" value={token} onChange={(e) => setToken(e.target.value)} />
               <button
                 className="btn"
                 disabled={!token || saving}
@@ -548,10 +561,10 @@ function GithubSection({ ws, isOwner }) {
               </button>
             </div>
           </Setting>
-          <Setting name="Repository & branch" desc="Changing these re-clones the repository on the server. Make sure everything is synced first.">
-            <div className="row">
-              <input className="input" value={repo} onChange={(e) => setRepo(e.target.value)} style={{ width: 240 }} />
-              <input className="input" value={branch} onChange={(e) => setBranch(e.target.value)} style={{ width: 100 }} />
+          <Setting name="Repository & branch" desc="Changing these re-clones the repository on the server. Make sure everything is synced first." stacked>
+            <div className="field-row">
+              <input className="input" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="https://github.com/you/notes" aria-label="Repository URL" />
+              <input className="input input-branch" value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="main" aria-label="Branch" />
               <button
                 className="btn"
                 disabled={repo === ws.github?.repo && branch === ws.github?.branch}
@@ -637,7 +650,7 @@ function MembersSection({ ws, isOwner }) {
         </div>
       )}
       {!members && (
-        <div className="row faint" style={{ gap: 8 }}>
+        <div className="setting-loading">
           <Spinner size="sm" /> Loading members…
         </div>
       )}
@@ -802,7 +815,7 @@ function TrashSection({ ws }) {
       <h2>Trash</h2>
       <p className="section-sub">Deleted notes are kept for 30 days.</p>
       {!items && (
-        <div className="row faint" style={{ gap: 8 }}>
+        <div className="setting-loading">
           <Spinner size="sm" /> Loading trash…
         </div>
       )}
@@ -868,6 +881,7 @@ function WorkspacesSection() {
     <>
       <h2>Workspaces</h2>
       <p className="section-sub">Each workspace is a separate set of notes — cloud or GitHub.</p>
+      <div className="settings-list">
       {workspaces.map((w) => (
         <button
           key={w.id}
@@ -887,9 +901,12 @@ function WorkspacesSection() {
           {w.id === wsId && <Check size={16} />}
         </button>
       ))}
-      <button className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => useUI.getState().openModal('new-workspace')}>
-        <Plus /> New workspace
-      </button>
+      </div>
+      <div className="setting-actions">
+        <button className="btn btn-primary" onClick={() => useUI.getState().openModal('new-workspace')}>
+          <Plus /> New workspace
+        </button>
+      </div>
     </>
   )
 }
@@ -914,16 +931,16 @@ function AboutSection() {
       <h2>About Obi</h2>
       <p className="section-sub">A calm, fast, self-hosted home for your markdown notes.</p>
       <h3>Keyboard shortcuts</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px 20px', maxWidth: 420 }}>
+      <div className="shortcut-list">
         {shortcuts.map(([k, v]) => (
-          <div key={k} style={{ display: 'contents' }}>
-            <span className="muted">{k}</span>
+          <div key={k} className="shortcut-row">
+            <span>{k}</span>
             <kbd>{v}</kbd>
           </div>
         ))}
       </div>
       <h3>Tips</h3>
-      <ul className="hint" style={{ lineHeight: 1.8, paddingLeft: 18 }}>
+      <ul className="tip-list">
         <li>
           Type <span className="code-inline">[[</span> to link notes, <span className="code-inline">#</span> for tags, <span className="code-inline">/</span> for blocks.
         </li>

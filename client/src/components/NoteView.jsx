@@ -129,23 +129,21 @@ export function NoteView({ tab, paneId, active }) {
   const body = () => {
     if (creating)
       return (
-        <div className="note-inner">
+        <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`}>
           <div className="inline-title" style={{ color: 'var(--text-3)' }}>
-            {stripExt(basename(tab.path))}
+            {title}
           </div>
           <div className="note-banner">
             <span className="spinner sm" /> Creating note…
           </div>
         </div>
       )
-    if (!handle) return null
-    if (handle.status === 'loading')
+    if (!handle || handle.status === 'loading')
+      // same column, title and line rhythm as the real note, so nothing jumps when it arrives
       return (
-        <div className="note-loading">
-          <div className="skeleton" style={{ height: 34, width: '45%' }} />
-          <div className="skeleton" style={{ height: 14, width: '90%' }} />
-          <div className="skeleton" style={{ height: 14, width: '80%' }} />
-          <div className="skeleton" style={{ height: 14, width: '85%' }} />
+        <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`}>
+          {prefs.inlineTitle && <div className="inline-title">{title}</div>}
+          <NoteSkeleton />
         </div>
       )
     if (handle.status === 'missing' || handle.status === 'deleted')
@@ -267,6 +265,16 @@ export function NoteView({ tab, paneId, active }) {
         {body()}
       </div>
       {view && !readOnly && mode !== 'read' && mode !== 'board' && <MobileToolbar view={view} handle={handle} />}
+    </div>
+  )
+}
+
+const SKELETON_LINES = [94, 88, 91, 52, null, 36, 90, 84, 68, null, 80, 74]
+
+export function NoteSkeleton() {
+  return (
+    <div className="note-skeleton" aria-busy="true" aria-label="Loading note">
+      {SKELETON_LINES.map((w, i) => (w == null ? <div key={i} className="note-skeleton-gap" /> : <div key={i} className="note-skeleton-line"><span className="skeleton" style={{ width: `${w}%` }} /></div>))}
     </div>
   )
 }

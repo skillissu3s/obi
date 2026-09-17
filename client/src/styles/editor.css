@@ -112,11 +112,24 @@
   font-weight: 550;
   color: var(--text-3);
 }
-.note-loading {
-  padding: 30px 0;
+/* skeleton lines sit on the editor's own line grid */
+.note-skeleton {
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+}
+.note-skeleton-line {
+  height: calc(1em * var(--editor-line-height));
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  padding: 0 2px;
+}
+.note-skeleton-line .skeleton {
+  display: block;
+  height: 0.62em;
+  border-radius: 5px;
+}
+.note-skeleton-gap {
+  height: calc(0.6em * var(--editor-line-height));
 }
 .note-banner {
   display: flex;

@@ -930,13 +930,182 @@
 }
 .setting-control {
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 60%;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .setting-control .input,
 .setting-control .select {
   width: 220px;
+  max-width: 100%;
+}
+.setting-control .input.input-num {
+  width: 110px;
+}
+.setting-control .range {
+  width: 200px;
+  max-width: 100%;
+  accent-color: var(--accent);
+}
+
+/* avatar / icon + name header at the top of a section */
+.settings-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-summary-text {
+  flex: 1;
+  min-width: 0;
+}
+.settings-summary-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--bg-hover);
+  color: var(--text-2);
+}
+.settings-summary-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.settings-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+@media (max-width: 560px) {
+  .settings-summary {
+    flex-wrap: wrap;
+  }
+  .settings-summary-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+.settings-summary-title {
+  font-weight: 650;
+  font-size: 16px;
+  letter-spacing: -0.015em;
+}
+.settings-summary-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 3px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.badge.badge-truncate {
+  max-width: 100%;
+  min-width: 0;
+}
+.badge.badge-truncate .truncate {
+  min-width: 0;
+}
+
+/* label on top, control underneath at full width */
+.setting.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.setting.stacked .setting-control {
+  max-width: none;
+  justify-content: flex-start;
+}
+.setting.stacked .accent-swatches {
+  justify-content: flex-start;
+}
+
+/* several inputs + an optional button on one line; wraps when narrow */
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+.setting-control .field-row .input {
+  flex: 1 1 200px;
+  width: auto;
+}
+.setting-control .field-row .input.input-branch {
+  flex: 0 1 130px;
+}
+.field-row .btn {
+  flex-shrink: 0;
+}
+
+.setting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 14px;
+}
+.setting-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+/* rows that highlight on hover but keep their content aligned with the section text */
+.settings-list {
+  margin: 0 -10px;
+}
+
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.shortcut-row:last-child {
+  border-bottom: none;
+}
+.tip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.tip-list li {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+}
+.tip-list li::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  margin-top: 0.62em;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
 }
 .palette-grid {
   display: grid;
@@ -1076,6 +1245,8 @@
   }
   .setting-control {
     width: 100%;
+    max-width: none;
+    justify-content: flex-start;
   }
 }
 
@@ -1165,16 +1336,26 @@
 }
 .emoji-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
   gap: 2px;
+  width: 100%;
+}
+.emoji-field {
+  width: 100%;
+  max-width: 420px;
 }
 .emoji-grid button {
   border: none;
   background: none;
   font-size: 18px;
-  padding: 4px;
-  border-radius: 6px;
+  line-height: 1;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border-radius: 8px;
   cursor: pointer;
+  display: grid;
+  place-items: center;
 }
 .emoji-grid button:hover,
 .emoji-grid button.active {
