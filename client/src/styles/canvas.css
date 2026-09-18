@@ -438,16 +438,13 @@ svg.cv-el {
 }
 .cv-tool {
   position: relative;
-  /* the shortcut letter sits beside the icon, not on it and not under it —
-     under it made the whole bar taller than it needs to be */
-  width: 38px;
-  height: 34px;
+  /* Square button, icon centred, shortcut tucked into the bottom-right
+     corner: the button is big enough that the two never meet. */
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   display: grid;
-  grid-auto-flow: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
+  place-items: center;
   border: none;
   border-radius: var(--radius);
   background: none;
@@ -468,23 +465,26 @@ svg.cv-el {
   cursor: default;
 }
 .cv-tool svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
 }
 .cv-tool kbd {
-  align-self: end;
-  margin-bottom: 2px;
-  font: 600 8.5px var(--font-ui);
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font: 500 8px var(--font-ui);
   line-height: 1;
   color: var(--text-faint);
+  opacity: 0.65;
   background: none;
   border: none;
   padding: 0;
   box-shadow: none;
+  pointer-events: none;
 }
-/* buttons without a shortcut are square again */
-.cv-tool:not(:has(kbd)) {
-  width: 34px;
+.cv-tool:hover kbd,
+.cv-tool.active kbd {
+  opacity: 1;
 }
 .cv-tool.active kbd {
   color: var(--accent-text);
@@ -949,9 +949,9 @@ svg.cv-el {
   .cv-tool kbd {
     display: none;
   }
-  /* no shortcut letters on a phone, so the buttons go back to square */
   .cv-tool {
     width: 34px;
+    height: 34px;
   }
 }
 
