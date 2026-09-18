@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Menu, Search, Network, ListChecks, Settings, Plus, PanelRight, ShieldCheck, LogOut, CalendarDays, Star, X, Loader2,
   AlertTriangle, RefreshCw, FolderGit2, FileText, Maximize2, Layers, CheckCircle2, KeyRound, PanelLeftOpen, Shapes,
+  Pencil, Eye, MoreHorizontal,
 } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
@@ -281,18 +282,33 @@ function Ribbon({ user }) {
 
 function MobileHeader({ ws, activeTab }) {
   const layout = useLayout()
+  const defaultMode = usePrefs((s) => s.defaultMode)
+  const isNoteTab = activeTab?.kind === 'note'
+  const reading = isNoteTab && (activeTab.mode || defaultMode) === 'read'
   return (
     <div className="mobile-header">
-      <button className="icon-btn" onClick={() => layout.toggleLeft()}>
+      <button className="icon-btn" title="Files" onClick={() => layout.toggleLeft()}>
         <Menu />
       </button>
-      <div className="mobile-title truncate">{activeTab?.kind === 'note' ? stripExt(basename(activeTab.path)) : ws?.name || 'Obi'}</div>
-      <button className="icon-btn" onClick={() => useUI.getState().openPalette('files')}>
+      <div className="mobile-title truncate">{isNoteTab ? stripExt(basename(activeTab.path)) : ws?.name || 'Obi'}</div>
+      <button className="icon-btn" title="Search" onClick={() => useUI.getState().openPalette('files')}>
         <Search />
       </button>
-      <button className="icon-btn" onClick={() => layout.toggleRight()}>
-        <PanelRight />
-      </button>
+      {/* the note header is hidden at this width, so its two essentials live here */}
+      {isNoteTab && (
+        <button className="icon-btn" title={reading ? 'Edit' : 'Reading view'} onClick={() => runCommand('toggle-mode')}>
+          {reading ? <Pencil /> : <Eye />}
+        </button>
+      )}
+      {isNoteTab ? (
+        <button className="icon-btn" title="More" onClick={(e) => window.dispatchEvent(new CustomEvent('obi:note-menu', { detail: { currentTarget: e.currentTarget } }))}>
+          <MoreHorizontal />
+        </button>
+      ) : (
+        <button className="icon-btn" title="Panel" onClick={() => layout.toggleRight()}>
+          <PanelRight />
+        </button>
+      )}
     </div>
   )
 }

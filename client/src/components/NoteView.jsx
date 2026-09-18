@@ -112,10 +112,20 @@ export function NoteView({ tab, paneId, active }) {
     return () => window.removeEventListener('obi:scroll-to', onScrollTo)
   }, [active, mode])
 
+  // The note header is hidden on phones, so the mobile header asks for this
+  // note's own menu instead of building a second copy of it.
+  useEffect(() => {
+    if (!active) return
+    const onMenu = (e) => noteMenuRef.current?.(e.detail)
+    window.addEventListener('obi:note-menu', onMenu)
+    return () => window.removeEventListener('obi:note-menu', onMenu)
+  }, [active])
+
   const setMode = (m) => useLayout.getState().updateTab(tab.id, { mode: m })
 
   const viewers = (presence[tab.path] || []).filter((u) => u.id !== user?.id)
 
+  const noteMenuRef = useRef(null)
   const noteMenu = (e) => {
     const bookmarked = isBookmarked(tab.path, tab.ws)
     useUI.getState().showContextMenu(menuFromElement(e.currentTarget), [
@@ -134,6 +144,7 @@ export function NoteView({ tab, paneId, active }) {
       !foreign && { label: 'Delete note', icon: Trash2, danger: true, run: () => deleteEntry(tab.path) },
     ])
   }
+  noteMenuRef.current = noteMenu
 
   const crumbs = tab.path.split('/')
   const title = stripExt(basename(tab.path))
