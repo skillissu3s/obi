@@ -285,7 +285,7 @@ function pathSvg(p) {
   return `<path ${attrs.join(' ')}/>`
 }
 
-function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, extra = '' } = {}) {
+function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, extra = '', innerStyle = '' } = {}) {
   const font = val(el, 'font')
   const fs = num(val(el, 'fs'), DEFAULTS.fs) * fontScale(font)
   const style = [
@@ -307,7 +307,9 @@ function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, ex
     bg ? `background:${bg}` : '',
     extra,
   ].filter(Boolean)
-  return `<foreignObject x="0" y="0" width="${f(w)}" height="${f(h)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${esc(style.join(';'))}"><div>${esc(el.text)}</div></div></foreignObject>`
+  // innerStyle puts a patch behind the words themselves, not the whole box
+  const inner = innerStyle ? ` style="${esc(innerStyle)}"` : ''
+  return `<foreignObject x="0" y="0" width="${f(w)}" height="${f(h)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${esc(style.join(';'))}"><div${inner}>${esc(el.text)}</div></div></foreignObject>`
 }
 
 const basenameOf = (p) => String(p || '').split('/').pop().replace(/\.md$/i, '')
@@ -326,7 +328,7 @@ function hostOf(url) {
  */
 export function boardToSvg(elements, opts = {}) {
   const padding = opts.padding ?? 24
-  const list = elements.filter((e) => e.type !== 'highlight' && !e.anchor).sort((a, b) => (a.z || 0) - (b.z || 0))
+  const list = elements.filter((e) => e.type !== 'highlight' && (opts.position || !e.anchor)).sort((a, b) => (a.z || 0) - (b.z || 0))
   const byId = new Map(list.map((e) => [e.id, e]))
   const target = elementTarget(byId)
   const resolved = new Map()
@@ -353,7 +355,18 @@ export function boardToSvg(elements, opts = {}) {
       case 'ellipse':
       case 'diamond':
         body.push(...drawables(el).map(pathSvg))
-        if (el.text) body.push(textBlock(el, el.w, el.h, { color: colorCss(el.stroke), padding: 10, valign: 'middle' }))
+        if (el.text) {
+          // a hatched fill would otherwise run straight through the letters
+          const patterned = el.fill && (el.fillStyle ?? DEFAULTS.fillStyle) !== 'solid'
+          body.push(
+            textBlock(el, el.w, el.h, {
+              color: colorCss(el.stroke),
+              padding: 10,
+              valign: 'middle',
+              innerStyle: patterned ? 'background:var(--cv-bg);border-radius:4px;padding:1px 6px' : '',
+            }),
+          )
+        }
         break
       case 'line':
       case 'arrow': {
@@ -406,8 +419,11 @@ export function boardToSvg(elements, opts = {}) {
     width = (width * opts.maxHeight) / height
     height = opts.maxHeight
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" class="board-svg" viewBox="${f(vx)} ${f(vy)} ${f(vw)} ${f(vh)}" width="${f(width)}" height="${f(height)}" style="max-width:100%;height:auto">${opts.title ? `<title>${esc(opts.title)}</title>` : ''}${parts.join('')}</svg>`
-  return { svg, width: vw, height: vh, empty: false }
+  // `position` keeps the drawing at its own size: the caller places it in the
+  // page itself (a note's canvas layer), rather than fitting it to a column.
+  const style = opts.position ? 'display:block' : 'max-width:100%;height:auto'
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" class="board-svg" viewBox="${f(vx)} ${f(vy)} ${f(vw)} ${f(vh)}" width="${f(width)}" height="${f(height)}" style="${style}">${opts.title ? `<title>${esc(opts.title)}</title>` : ''}${parts.join('')}</svg>`
+  return { svg, width: vw, height: vh, x: vx, y: vy, empty: false }
 }
 
 export { isLinear }

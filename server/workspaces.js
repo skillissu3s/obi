@@ -500,12 +500,17 @@ wsRouter.delete('/:id/shares', access('editor'), (req, res) => {
 wsRouter.post('/:id/publish', access('editor'), async (req, res) => {
   const p = safePath(req.body?.path)
   const rt = await getRuntime(req.ws.id)
-  if (!rt.hasFile(p) || !isNote(p)) throw new HttpError(404, 'Note not found')
+  if (!rt.hasFile(p) || !(isNote(p) || isBoardPath(p))) throw new HttpError(404, 'Note not found')
+  // The reader should see the page the way the author sees it, so the author's
+  // resolved colours travel with the link.
+  const theme = req.body?.theme && typeof req.body.theme === 'object' ? JSON.stringify(req.body.theme).slice(0, 4000) : null
   let row = one('SELECT slug FROM published WHERE workspace_id = ? AND path = ?', req.ws.id, p)
   if (!row) {
     const slug = randomToken(9)
-    run('INSERT INTO published (slug, workspace_id, path, created_by, created_at) VALUES (?,?,?,?,?)', slug, req.ws.id, p, req.user.id, now())
+    run('INSERT INTO published (slug, workspace_id, path, created_by, created_at, theme) VALUES (?,?,?,?,?,?)', slug, req.ws.id, p, req.user.id, now(), theme)
     row = { slug }
+  } else if (theme) {
+    run('UPDATE published SET theme = ? WHERE workspace_id = ? AND path = ?', theme, req.ws.id, p)
   }
   res.json({ slug: row.slug })
 })

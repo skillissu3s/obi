@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS published (
   path TEXT NOT NULL,
   created_by TEXT,
   created_at INTEGER NOT NULL,
+  theme TEXT,
   UNIQUE (workspace_id, path)
 );
 
@@ -117,6 +118,13 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT NOT NULL
 );
 `)
+
+// Additive migrations for databases created before a column existed.
+function addColumn(table, column, decl) {
+  const has = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column)
+  if (!has) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`)
+}
+addColumn('published', 'theme', 'TEXT')
 
 export const now = () => Date.now()
 

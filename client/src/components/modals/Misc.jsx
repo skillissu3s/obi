@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { Modal, Spinner, Avatar, Switch, EmojiPicker } from '../ui.jsx'
 import { api } from '../../lib/api.js'
+import { themeSnapshot } from '../../lib/themesnapshot.js'
 import { useApp } from '../../store/app.js'
 import { useUI, toast, confirmDialog } from '../../store/ui.js'
 import * as A from '../../lib/actions.js'
@@ -295,7 +296,7 @@ export function ShareModal({ ws: wsId, path }) {
             onChange={async (v) => {
               setPublishing(true)
               try {
-                if (v) await api.publish(wsId, path)
+                if (v) await api.publish(wsId, path, themeSnapshot())
                 else await api.unpublish(wsId, path)
                 await load()
                 toast.success(v ? 'Published — link copied below' : 'Unpublished')

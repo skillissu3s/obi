@@ -261,6 +261,10 @@ export function createMarkdown(opts = {}) {
           }
         }
       }
+      // published pages anchor canvas drawings to the block they belong to
+      if (opts.sourceLines && tok.map && /_open$|^fence$|^hr$|^html_block$/.test(tok.type)) {
+        tok.attrSet('data-line', String(tok.map[0] + lineOffset))
+      }
       if (tok.type === 'heading_open' && tokens[i + 1]?.type === 'inline') {
         let slug = slugify(tokens[i + 1].content)
         const n = slugs.get(slug) || 0
