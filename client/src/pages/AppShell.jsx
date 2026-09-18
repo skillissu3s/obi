@@ -273,9 +273,6 @@ function Ribbon({ user, closed }) {
         <Shapes />
       </button>
       <div className="ribbon-spacer" />
-      <button className={`icon-btn ${useLayout.getState().right ? 'active' : ''}`} title="Toggle right panel" onClick={() => layout.toggleRight()}>
-        <PanelRight />
-      </button>
       <button className="icon-btn" title="Settings" onClick={() => useUI.getState().openModal('settings')}>
         <Settings />
       </button>

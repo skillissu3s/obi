@@ -51,7 +51,11 @@ export function Toolbar({ ctl, mode, extra, onCollapse }) {
             title={`${t.label} (${t.key})`}
             disabled={disabled}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => ctl.setTool(t.id)}
+            onClick={() => {
+              // picking the tool you already have brings its settings back
+              if (state.tool === t.id) window.dispatchEvent(new CustomEvent('obi:tool-settings', { detail: ctl }))
+              ctl.setTool(t.id)
+            }}
           >
             <t.icon />
             <kbd>{t.key}</kbd>
@@ -228,6 +232,21 @@ const labelOf = (options, value, fallback = '') => options.find((o) => o.value =
 // Contextual style controls for the selection (or the active drawing tool).
 export function StyleBar({ ctl, mode }) {
   const state = useController(ctl)
+  const rootRef = useRef(null)
+  // A drawing tool's settings open by themselves, right above that tool's
+  // button. Clicking away closes them until the tool is picked again.
+  const [toolAnchor, setToolAnchor] = useState(null)
+  const [dismissed, setDismissed] = useState(null)
+  useEffect(() => setDismissed(null), [state.tool])
+  useEffect(() => {
+    const reopen = (e) => e.detail === ctl && setDismissed(null)
+    window.addEventListener('obi:tool-settings', reopen)
+    return () => window.removeEventListener('obi:tool-settings', reopen)
+  }, [ctl])
+  useLayoutEffect(() => {
+    const dock = rootRef.current?.closest('.cv-dock')
+    setToolAnchor(dock?.querySelector('.cv-tool.active') || null)
+  })
   if (ctl.readOnly || state.editing || state.panning) return null
   const layout = ctl.layout()
   const sel = state.selection.map((id) => layout.byId.get(id)).filter(Boolean).map(source)
@@ -292,18 +311,7 @@ export function StyleBar({ ctl, mode }) {
     { value: 'cross', title: 'Cross-hatched', label: 'Cross' },
   ]
 
-  return (
-    <div className="cv-stylebar" onPointerDown={(e) => e.stopPropagation()}>
-      <PopButton
-        title="Style and arrangement"
-        label={
-          <>
-            {has('stroke') ? <span className="cv-dot" style={{ background: colorCss(stroke) }} /> : <SlidersHorizontal />}
-            <span className="cv-sbtn-label">{multi ? `${sel.length} selected` : 'Style'}</span>
-          </>
-        }
-      >
-        {(close) => (
+  const menu = (close) => (
           <div className="cv-menu">
             {has('stroke') && (
               <MenuRow name="Stroke" value={<span className="cv-dot sm" style={{ background: colorCss(stroke) }} />}>
@@ -521,7 +529,36 @@ export function StyleBar({ ctl, mode }) {
               </>
             )}
           </div>
+  )
+
+  // Nothing selected, drawing tool in hand: its settings, above its button.
+  if (!sel.length) {
+    const tool = state.tool
+    const hide = () => setDismissed(tool)
+    return (
+      <span ref={rootRef} style={{ display: 'contents' }}>
+        {toolAnchor && dismissed !== tool && (
+          <Popover anchor={toolAnchor} onClose={hide}>
+            {menu(hide)}
+          </Popover>
         )}
+      </span>
+    )
+  }
+
+  // A selection: its settings behind one Style button above the toolbar.
+  return (
+    <div className="cv-stylebar" ref={rootRef} onPointerDown={(e) => e.stopPropagation()}>
+      <PopButton
+        title="Style and arrangement"
+        label={
+          <>
+            {has('stroke') ? <span className="cv-dot" style={{ background: colorCss(stroke) }} /> : <SlidersHorizontal />}
+            <span className="cv-sbtn-label">{multi ? `${sel.length} selected` : 'Style'}</span>
+          </>
+        }
+      >
+        {(close) => menu(close)}
       </PopButton>
     </div>
   )

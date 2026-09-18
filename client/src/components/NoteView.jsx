@@ -307,14 +307,13 @@ export function NoteView({ tab, paneId, active }) {
         <button className="icon-btn" title="More" onClick={noteMenu}>
           <MoreHorizontal />
         </button>
-        {/* the panel opens from the side it lives on */}
-        <button
-          className={`icon-btn ${rightOpen ? 'active' : ''}`}
-          title={rightOpen ? 'Close right panel (Ctrl/⌘ Shift \)' : 'Open right panel (Ctrl/⌘ Shift \)'}
-          onClick={() => useLayout.getState().toggleRight()}
-        >
-          <PanelRight />
-        </button>
+        {/* Opens the panel from the side it lives on. Once it is open, the
+            panel's own close button is the only one, so this steps aside. */}
+        {!rightOpen && (
+          <button className="icon-btn" title="Open right panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight(true)}>
+            <PanelRight />
+          </button>
+        )}
       </div>
       <div className="note-scroll" ref={setScroll} tabIndex={-1}>
         {body()}
