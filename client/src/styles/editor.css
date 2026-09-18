@@ -598,14 +598,13 @@
   padding-top: 2px !important;
 }
 .cm-lp-frontmatter-end {
-  padding-bottom: 2px !important;
-  margin-bottom: 10px;
+  padding-bottom: 12px !important;
 }
 .cm-lp-image {
   display: block;
   max-width: 100%;
   border-radius: var(--radius-sm);
-  margin: 6px 0;
+  padding: 6px 0;
   cursor: text;
 }
 .cm-lp-image-missing {
@@ -621,10 +620,14 @@
 .cm-lp-embed {
   display: block;
   border-left: 3px solid var(--accent-soft);
+  /* transparent borders instead of margins: same gap, but inside the box the
+     editor measures (the background is clipped so it still looks the same) */
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  background-clip: padding-box;
   border-radius: 0 8px 8px 0;
   background: var(--bg-hover);
   padding: 8px 14px;
-  margin: 6px 0;
   font-size: 0.93em;
   cursor: text;
 }
@@ -651,7 +654,7 @@
   padding-bottom: 0;
 }
 .cm-lp-table {
-  margin: 12px 0;
+  padding: 12px 0;
   overflow-x: auto;
   cursor: text;
 }
@@ -1056,12 +1059,22 @@
 }
 /* front matter, shown as properties in both the editor and reading view */
 .properties {
-  border-bottom: 1px solid var(--border);
-  padding: 2px 0 14px;
-  margin: 0 0 22px;
+  /* The gap below belongs inside this element: CodeMirror measures block
+     widgets by their border box, and a margin would sit outside it, leaving
+     the editor's idea of the page shorter than the page really is — which
+     lands clicks on the wrong line further down. */
+  padding: 2px 0 0;
+  margin: 0;
   font-family: var(--font-ui);
   font-size: 13px;
   line-height: 1.5;
+}
+.properties::after {
+  content: '';
+  display: block;
+  height: 22px;
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
 }
 .properties .prop {
   display: grid;
