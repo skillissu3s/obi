@@ -117,6 +117,9 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     [measure],
   )
 
+  // ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing.
+  // "A line's top" here is CodeMirror's line block top (it includes a heading's
+  // padding); the published page measures the same thing from its DOM.
   // env handed to the layout: where anchored lines and text ranges are right now
   const env = useMemo(() => {
     if (!view) return null

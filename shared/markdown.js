@@ -234,6 +234,7 @@ export function createMarkdown(opts = {}) {
     const tokens = state.tokens
     const lineOffset = state.env?.lineOffset || 0
     const slugs = new Map()
+    const srcLines = opts.sourceLines ? state.src.split('\n') : null
     for (let i = 0; i < tokens.length; i++) {
       const tok = tokens[i]
       if (tok.type === 'inline' && tokens[i - 1]?.type === 'paragraph_open' && tokens[i - 2]?.type === 'list_item_open') {
@@ -261,9 +262,57 @@ export function createMarkdown(opts = {}) {
           }
         }
       }
-      // published pages anchor canvas drawings to the block they belong to
-      if (opts.sourceLines && tok.map && /_open$|^fence$|^hr$|^html_block$/.test(tok.type)) {
+      // ⚠ LAYOUT CONTRACT (published pages) — see client/src/publish/README.md.
+      // A published note has to put every source line exactly where the editor
+      // does, because canvas drawings are pinned to lines. So:
+      //  • each block carries data-line (its first source line), and
+      //  • the blank source lines before it become real space (data-gap), since
+      //    the editor gives every blank line one line-height of room.
+      if (opts.sourceLines && tok.map && /_open$|^fence$|^hr$|^html_block$|^code_block$/.test(tok.type)) {
         tok.attrSet('data-line', String(tok.map[0] + lineOffset))
+        if (tok.type === 'fence' || tok.type === 'code_block') tok.attrSet('data-line-end', String(tok.map[1] + lineOffset))
+        // (a list's first item shares the list's own gap, so it doesn't count it again)
+        const firstItem = tok.type === 'list_item_open' && /_list_open$/.test(tokens[i - 1]?.type || '')
+        if ((tok.type === 'list_item_open' && !firstItem) || tok.level === 0) {
+          // count the blank source lines straight above this block (markdown-it's
+          // own ranges can swallow a trailing blank line, so they can't be used)
+          let gap = 0
+          for (let l = tok.map[0] - 1; l >= 0 && !srcLines[l]?.trim(); l--) gap++
+          if (gap && tok.map[0] - gap > 0) tok.attrSet('data-gap', String(Math.min(gap, 20)))
+        }
+      }
+      // List items: draw the marker the way the editor does — its indentation from
+      // the source, a bullet (or the number), then the source's own space — so
+      // the item's text starts at the same x as it does in the note.
+      if (opts.sourceLines && tok.type === 'inline' && tokens[i - 1]?.type === 'paragraph_open' && tokens[i - 2]?.type === 'list_item_open' && tok.children) {
+        const li = tokens[i - 2]
+        const isTask = (li.attrGet('class') || '').includes('task-list-item')
+        const indent = /^[ \t]*/.exec(srcLines[li.map?.[0] ?? -1] || '')[0]
+        const ordered = li.markup === '.' || li.markup === ')'
+        const parts = []
+        if (indent) parts.push(`<span class="obi-indent">${indent}</span>`)
+        if (!isTask) parts.push(ordered ? `<span class="obi-num">${escapeHtml(li.info || '1')}${escapeHtml(li.markup)}</span> ` : '<span class="obi-bullet">•</span> ')
+        if (parts.length) {
+          const lead = new state.Token('html_inline', '', 0)
+          lead.content = parts.join('')
+          tok.children.unshift(lead)
+        }
+      }
+      // …and every line inside a paragraph (after a line break) gets a marker,
+      // so a drawing pinned to the third line of a paragraph finds that line.
+      if (opts.sourceLines && tok.type === 'inline' && tok.map && tok.children?.length) {
+        let line = tok.map[0] + lineOffset
+        const out = []
+        for (const c of tok.children) {
+          out.push(c)
+          if (c.type === 'softbreak' || c.type === 'hardbreak') {
+            line++
+            const mark = new state.Token('html_inline', '', 0)
+            mark.content = `<span class="obi-ln" data-line="${line}"></span>`
+            out.push(mark)
+          }
+        }
+        tok.children = out
       }
       if (tok.type === 'heading_open' && tokens[i + 1]?.type === 'inline') {
         let slug = slugify(tokens[i + 1].content)
@@ -318,7 +367,25 @@ export function createMarkdown(opts = {}) {
     const t = tokens[idx]
     const lang = (t.info || '').trim().split(/\s+/)[0].toLowerCase()
     if (lang === 'mermaid') return `<div class="mermaid-block">${escapeHtml(t.content)}</div>\n`
-    return defaultFence(tokens, idx, options, env, self)
+    const html = defaultFence(tokens, idx, options, env, self)
+    if (!opts.sourceLines) return html
+    // ⚠ LAYOUT CONTRACT: a fence's source-line markers go on the <pre> — that is
+    // the box a published page measures — rather than on the inner <code>
+    const marks = ['data-line', 'data-line-end', 'data-gap'].map((k) => (t.attrGet(k) != null ? ` ${k}="${t.attrGet(k)}"` : '')).join('')
+    return html.replace(/ data-line="[^"]*"| data-line-end="[^"]*"| data-gap="[^"]*"/g, '').replace(/^<pre>/, `<pre${marks}>`)
+  }
+
+  // ⚠ LAYOUT CONTRACT: on a published page a table sits in a wrapper that owns
+  // its source-line markers and its own padding. Padding, unlike a margin, can't
+  // collapse into the blank-line gap above it, so the spacing adds up the way it
+  // does in the editor (a blank line, then the table widget's own 12px).
+  if (opts.sourceLines) {
+    md.renderer.rules.table_open = (tokens, idx, options, env, self) => {
+      const t = tokens[idx]
+      const marks = ['data-line', 'data-gap'].map((k) => (t.attrGet(k) != null ? ` ${k}="${t.attrGet(k)}"` : '')).join('')
+      return `<div class="obi-table"${marks}><table>\n`
+    }
+    md.renderer.rules.table_close = () => '</table></div>\n'
   }
 
   const render = (content, env = {}) => {

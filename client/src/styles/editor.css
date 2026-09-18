@@ -162,6 +162,10 @@
 }
 
 /* ---------- CodeMirror ---------- */
+/* ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing.
+   The editor's font, size, line-height and the 2px line padding below are
+   mirrored by client/src/publish/publish.css — a published note must set its
+   lines exactly where the editor does, or its canvas drawings move. */
 .obi-editor .cm-editor {
   background: transparent;
   font-family: var(--font-editor);
@@ -389,7 +393,10 @@
 .hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: 700; }
 
-/* live preview specifics */
+/* live preview specifics
+   ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing.
+   Heading sizes/padding, code block padding, quote indent, bullet/number
+   widths and the rule's height are copied, rule for rule, into publish.css. */
 .cm-lp-codeblock {
   font-family: var(--font-mono);
   font-size: 0.86em;
@@ -1059,7 +1066,8 @@
 }
 /* front matter, shown as properties in both the editor and reading view */
 .properties {
-  /* The gap below belongs inside this element: CodeMirror measures block
+  /* ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing.
+     The gap below belongs inside this element: CodeMirror measures block
      widgets by their border box, and a margin would sit outside it, leaving
      the editor's idea of the page shorter than the page really is — which
      lands clicks on the wrong line further down. */

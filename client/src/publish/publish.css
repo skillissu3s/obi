@@ -1,0 +1,374 @@
+/*
+  ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing this file.
+
+  A published note must set every source line where the editor sets it, or the
+  canvas drawings pinned to those lines land in the wrong place. So this file
+  mirrors the editor's LIVE PREVIEW (client/src/styles/editor.css, the .cm-lp-*
+  and .obi-editor rules), not the reading view:
+
+    • one source line = one line box, at the author's font, size and line-height
+    • a blank source line = one line of space (data-gap), never a margin rule
+    • headings get the editor's padding-top, font-size and line-height
+    • nothing gets vertical margins of its own — they would collapse into the
+      blank-line gaps and throw every line below them off
+
+  If you change a .cm-lp-* size or spacing in editor.css, change it here too.
+*/
+
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource-variable/caveat';
+@import '@fontsource-variable/literata';
+
+:root {
+  /* the author's values arrive inline from the server (theme snapshot) */
+  --pub-fs: 16px;
+  --pub-lh: 1.75;
+  --pub-col: 620px;
+  --pub-line: calc(var(--pub-fs) * var(--pub-lh));
+  --font-ui: 'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+  --font-serif: 'Literata Variable', Literata, Georgia, serif;
+  --font-editor: var(--font-ui);
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg, #fcfbf7);
+  color: var(--text, #201d18);
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  font-family: var(--font-ui);
+  /* drawings can sit well to either side of the column */
+  overflow-x: auto;
+}
+main {
+  box-sizing: content-box;
+  width: var(--pub-col);
+  max-width: calc(100vw - 32px);
+  margin: 0 auto;
+  padding: 56px 16px 120px;
+}
+
+/* ---- the text column: the editor's content box ---- */
+#content {
+  position: relative;
+  z-index: 1;
+  /* the editor's .cm-line has 2px of padding each side; x = 0 for drawings is
+     the column edge, and the text starts 2px in, exactly as it does there */
+  padding: 0 2px;
+  font-family: var(--font-editor);
+  font-size: var(--pub-fs);
+  line-height: var(--pub-lh);
+  color: var(--text);
+  overflow-wrap: break-word;
+  tab-size: 4;
+}
+#content * {
+  box-sizing: border-box;
+}
+#content > *,
+#content li:not(svg *),
+#content li > p:not(svg *),
+#content ul:not(svg *),
+#content ol:not(svg *) {
+  margin: 0;
+}
+
+/* blank source lines → space (data-gap = how many) */
+#content [data-gap='1'] { margin-top: calc(1 * var(--pub-line)); }
+#content [data-gap='2'] { margin-top: calc(2 * var(--pub-line)); }
+#content [data-gap='3'] { margin-top: calc(3 * var(--pub-line)); }
+#content [data-gap='4'] { margin-top: calc(4 * var(--pub-line)); }
+#content [data-gap='5'] { margin-top: calc(5 * var(--pub-line)); }
+#content [data-gap='6'] { margin-top: calc(6 * var(--pub-line)); }
+#content [data-gap='7'] { margin-top: calc(7 * var(--pub-line)); }
+#content [data-gap='8'] { margin-top: calc(8 * var(--pub-line)); }
+#content [data-gap='9'] { margin-top: calc(9 * var(--pub-line)); }
+#content [data-gap='10'] { margin-top: calc(10 * var(--pub-line)); }
+#content [data-gap='11'] { margin-top: calc(11 * var(--pub-line)); }
+#content [data-gap='12'] { margin-top: calc(12 * var(--pub-line)); }
+#content [data-gap='13'] { margin-top: calc(13 * var(--pub-line)); }
+#content [data-gap='14'] { margin-top: calc(14 * var(--pub-line)); }
+#content [data-gap='15'] { margin-top: calc(15 * var(--pub-line)); }
+#content [data-gap='16'] { margin-top: calc(16 * var(--pub-line)); }
+#content [data-gap='17'] { margin-top: calc(17 * var(--pub-line)); }
+#content [data-gap='18'] { margin-top: calc(18 * var(--pub-line)); }
+#content [data-gap='19'] { margin-top: calc(19 * var(--pub-line)); }
+#content [data-gap='20'] { margin-top: calc(20 * var(--pub-line)); }
+
+/* a line marker sits at the top of its line box and takes no room */
+#content .obi-ln {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  vertical-align: top;
+}
+
+/* ---- headings: .cm-lp-h1 … .cm-lp-h6 ---- */
+#content h1:not(svg *),
+#content h2:not(svg *),
+#content h3:not(svg *),
+#content h4:not(svg *),
+#content h5:not(svg *),
+#content h6:not(svg *) {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text);
+}
+#content h1:not(svg *) { font-size: 1.7em; line-height: 1.3; padding-top: 0.7em; letter-spacing: -0.03em; }
+#content h2:not(svg *) { font-size: 1.38em; line-height: 1.34; padding-top: 0.62em; }
+#content h3:not(svg *) { font-size: 1.16em; padding-top: 0.5em; }
+#content h4:not(svg *) { font-size: 1.02em; padding-top: 0.38em; }
+#content h5:not(svg *),
+#content h6:not(svg *) { font-size: 1em; padding-top: 0.2em; }
+#content h6:not(svg *) { color: var(--text-2); }
+/* the page title the server adds is not part of the note's lines */
+#content > h1.obi-title { padding-top: 0; margin-bottom: calc(0.6 * var(--pub-line)); }
+
+/* ---- inline ---- */
+#content a:not(svg *) {
+  color: var(--accent-text, var(--accent));
+  text-decoration: none;
+}
+#content a:not(svg *):hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#content a.is-unresolved {
+  opacity: 0.7;
+}
+#content code:not(svg *) {
+  /* .cm-inline-code */
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--bg-code);
+  border-radius: 5px;
+  padding: 0.12em 0.3em;
+}
+#content mark:not(svg *) {
+  background: var(--mark-bg);
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 3px;
+}
+#content .tag {
+  color: var(--accent-text, var(--accent));
+}
+
+/* ---- lists: the editor's bullet and number marks ---- */
+#content ul:not(svg *),
+#content ol:not(svg *) {
+  list-style: none;
+  padding: 0;
+}
+#content .obi-indent {
+  white-space: pre;
+}
+#content .obi-bullet {
+  /* .cm-lp-bullet */
+  display: inline-block;
+  width: 0.9em;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-3);
+}
+#content .obi-num {
+  /* .cm-lp-number */
+  display: inline-block;
+  min-width: 1.6em;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+#content .task-checkbox {
+  /* .cm-lp-checkbox input */
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0 0.35em 0 0;
+  border: 1.5px solid var(--text-3);
+  border-radius: 0.3em;
+  vertical-align: middle;
+  position: relative;
+  top: -0.08em;
+}
+#content .task-checkbox:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#content .task-checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 32%;
+  top: 12%;
+  width: 28%;
+  height: 52%;
+  border: solid #fff;
+  border-width: 0 0.14em 0.14em 0;
+  transform: rotate(45deg);
+}
+#content .task-list-item.is-checked {
+  color: var(--text-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
+}
+
+/* ---- blocks drawn by live preview ---- */
+#content blockquote:not(svg *) {
+  /* .cm-lp-quote: border at the column edge, text 18px in */
+  margin-left: -2px;
+  border-left: 2px solid var(--border-strong);
+  padding-left: 16px;
+  color: var(--text-2);
+  font-style: italic;
+}
+#content pre:not(svg *) {
+  /* .cm-lp-codeblock (its fence lines are hidden in the editor) */
+  margin-left: -2px;
+  margin-right: -2px;
+  padding: 6px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: 1.6;
+  background: var(--bg-code);
+  border-radius: 7px;
+  overflow-x: auto;
+}
+#content pre code:not(svg *) {
+  font-size: inherit;
+  background: none;
+  padding: 0;
+}
+#content hr:not(svg *) {
+  /* .cm-lp-hr: one line of height, a hairline through the middle */
+  border: 0;
+  height: var(--pub-line);
+  background: linear-gradient(var(--border-strong), var(--border-strong)) center / 100% 1px no-repeat;
+}
+#content img:not(svg *) {
+  /* .cm-lp-image */
+  display: block;
+  max-width: 100%;
+  padding: 6px 0;
+  border-radius: 7px;
+}
+#content .obi-table:not(svg *) {
+  /* .cm-lp-table: padding, not margin, so it can't collapse into a gap */
+  padding: 12px 0;
+  overflow-x: auto;
+}
+#content table:not(svg *) {
+  border-collapse: collapse;
+  font-size: 0.93em;
+  line-height: 1.5;
+}
+#content th:not(svg *),
+#content td:not(svg *) {
+  border: none;
+  border-bottom: 1px solid rgb(var(--tint, 128 128 128) / 0.16);
+  padding: 7px 14px 7px 0;
+  text-align: left;
+  vertical-align: top;
+}
+#content th:not(svg *) {
+  font-weight: 600;
+  color: var(--text-2);
+  font-size: 0.92em;
+  border-bottom-color: rgb(var(--tint, 128 128 128) / 0.3);
+}
+#content tr:last-child td:not(svg *) {
+  border-bottom: none;
+}
+#content .callout {
+  margin-left: -2px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  padding: 6px 12px 6px 16px;
+}
+#content .callout-title {
+  font-weight: 650;
+  color: var(--accent);
+}
+
+/* drawings inside the article (a published or embedded board) keep their own
+   text rules: the #content rules above skip anything inside an <svg> */
+#content figure.board svg {
+  overflow: visible;
+}
+
+/* ---- canvas layers ---- */
+/* A markdown block on the canvas: the same rules as .cv-md in canvas.css and
+   the <style> boardsvg.js puts in exported SVGs — the runtime measures blocks
+   with these, so all three have to agree. */
+.cv-md {
+  overflow-wrap: anywhere;
+}
+.cv-md > :first-child { margin-top: 0; }
+.cv-md > :last-child { margin-bottom: 0; }
+.cv-md p,
+.cv-md ul,
+.cv-md ol,
+.cv-md blockquote,
+.cv-md pre { margin: 0.4em 0; }
+.cv-md h1,
+.cv-md h2,
+.cv-md h3,
+.cv-md h4 { margin: 0.5em 0 0.25em; line-height: 1.25; }
+.cv-md h1 { font-size: 1.5em; }
+.cv-md h2 { font-size: 1.28em; }
+.cv-md h3 { font-size: 1.12em; }
+.cv-md ul,
+.cv-md ol { padding-left: 1.3em; }
+.cv-md code { font-family: var(--font-mono); font-size: 0.88em; }
+.obi-under,
+.obi-over {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.obi-under {
+  z-index: 0;
+}
+.obi-over {
+  z-index: 2;
+}
+.obi-over svg {
+  overflow: visible;
+}
+.obi-hl {
+  /* .cm-anno-hl */
+  position: absolute;
+  border-radius: 3px;
+  margin-top: -1px;
+  padding: 1px 0;
+  box-sizing: content-box;
+}
+.obi-ref {
+  /* .cm-anno-ref: a dashed underline under the text an arrow points at */
+  position: absolute;
+  box-sizing: border-box;
+  border-bottom: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+  transform: translateY(4px);
+}
+
+footer {
+  margin-top: 64px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 13px;
+}
+body.is-board main {
+  width: auto;
+  max-width: none;
+  padding: 24px;
+}
+body.is-board figure.board {
+  margin: 0;
+  text-align: center;
+}

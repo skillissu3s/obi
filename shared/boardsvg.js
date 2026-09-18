@@ -285,9 +285,13 @@ function pathSvg(p) {
   return `<path ${attrs.join(' ')}/>`
 }
 
+// ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing.
+// How text sits inside an element when exported or published; it must match
+// how ElementView draws it on the canvas (font, size, line-height, alignment).
 function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, extra = '', innerStyle = '', html = null } = {}) {
   const font = val(el, 'font')
-  const fs = num(val(el, 'fs'), DEFAULTS.fs) * fontScale(font)
+  // a markdown block (html) is set in the editor font: no hand-font boost
+  const fs = num(val(el, 'fs'), DEFAULTS.fs) * (html != null ? 1 : fontScale(font))
   const style = [
     `width:${f(w)}px`,
     `height:${f(h)}px`,
@@ -295,9 +299,11 @@ function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, ex
     `padding:${padding}px`,
     `font-family:${html != null ? 'var(--font-editor)' : FONTS[font] || FONTS.sans}`,
     `font-size:${f(fs)}px`,
-    `line-height:${lineHeight(font)}`,
+    `line-height:${html != null ? lineHeight('sans') : lineHeight(font)}`,
     `color:${color}`,
-    `text-align:${ALIGNS.has(el.align) ? el.align : DEFAULTS.align}`,
+    // a free text block reads from the left unless told otherwise, as the
+    // canvas draws it (textStyle in ElementView); labels in shapes centre
+    `text-align:${ALIGNS.has(el.align) ? el.align : el.type === 'text' ? 'left' : DEFAULTS.align}`,
     // rendered markdown is HTML, where the newlines between tags are just
     // whitespace — keeping pre-wrap turns each of them into a blank line
     html != null ? 'white-space:normal' : 'white-space:pre-wrap',
@@ -389,7 +395,7 @@ export function boardToSvg(elements, opts = {}) {
       case 'text':
         // a markdown block exports as the formatting it means, when the caller
         // hands us a renderer (published pages and exports both do)
-        body.push(textBlock(el, el.w, el.h, { color: colorCss(el.stroke), html: el.md ? opts.renderMarkdown?.(el.text || '') : null }))
+        body.push(textBlock(el, el.w, el.h, { color: colorCss(el.stroke), html: el.md ? opts.renderMarkdown?.(el.text || '', el) : null }))
         break
       case 'sticky':
         body.push(`<rect x="1" y="3" width="${f(el.w)}" height="${f(el.h)}" rx="4" style="fill:rgba(0,0,0,.18)"/>`)

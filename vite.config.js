@@ -25,7 +25,15 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
+      input: {
+        main: path.resolve(import.meta.dirname, 'client/index.html'),
+        // the runtime for published notes; the server links it by these fixed
+        // names (publish.js / publish.css), so they must not be hashed
+        publish: path.resolve(import.meta.dirname, 'client/src/publish/main.js'),
+      },
       output: {
+        entryFileNames: (chunk) => (chunk.name === 'publish' ? 'publish.js' : 'assets/[name]-[hash].js'),
+        assetFileNames: (asset) => ((asset.names || [asset.name]).includes('publish.css') ? 'publish.css' : 'assets/[name]-[hash][extname]'),
         manualChunks(id) {
           if (!id.includes('node_modules')) return
           const core = [

@@ -22,6 +22,15 @@ const TOKENS = [
   'font-ui',
   'font-editor',
   'font-mono',
+  'font-serif',
+  'tint',
+  // text highlights on the canvas layer
+  'cv-hl-yellow',
+  'cv-hl-green',
+  'cv-hl-blue',
+  'cv-hl-pink',
+  'cv-hl-violet',
+  'cv-hl-orange',
   // canvas ink, fills and sticky colours, so drawings match too
   'cv-ink',
   'cv-gray',
@@ -65,7 +74,13 @@ export function themeSnapshot() {
       const v = cs.getPropertyValue(`--${t}`).trim()
       if (v) vars[t] = v
     }
+    // ⚠ LAYOUT CONTRACT: the published page wraps text at exactly this width,
+    // so it is measured from the note's own text column, not assumed
+    // other open tabs keep their editors mounted but hidden (0 wide), so take
+    // the one actually on screen
+    const col = Math.max(0, ...[...document.querySelectorAll('.obi-editor .cm-content')].map((el) => el.getBoundingClientRect().width))
     return {
+      columnWidth: col && col > 120 ? Math.round(col) : null,
       theme: root.dataset.theme || 'dark',
       palette: root.dataset.palette || '',
       noteWidth: cs.getPropertyValue('--note-width').trim() || '620px',

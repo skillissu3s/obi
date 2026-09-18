@@ -33,8 +33,11 @@ export function textStyle(el, defaults = {}) {
     // a markdown block follows the editor font from Settings, since it is
     // writing rather than lettering on a drawing
     fontFamily: el.md ? 'var(--font-editor)' : FONTS[font] || FONTS.sans,
-    fontSize: fs * fontScale(font),
-    lineHeight: lineHeight(font),
+    // ⚠ LAYOUT CONTRACT: a markdown block is set in the editor font, so the
+    // hand-drawn font's size boost and line-height never apply to it — the
+    // measurer (layout.js) and the export (boardsvg.js) follow the same rule
+    fontSize: fs * (el.md ? 1 : fontScale(font)),
+    lineHeight: el.md ? lineHeight('sans') : lineHeight(font),
     textAlign: el.align ?? defaults.align ?? 'center',
   }
 }

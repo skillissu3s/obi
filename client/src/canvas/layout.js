@@ -9,6 +9,10 @@ const shapeOf = (type) => (type === 'ellipse' ? 'ellipse' : type === 'diamond' ?
 const resolvedCache = new WeakMap()
 
 /**
+ * ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing.
+ * The published page runs this very function (client/src/publish/main.js), so
+ * a change here changes both — keep it a pure function of snapshot + env.
+ *
  * env (note mode only):
  *   lineTop(anchor) -> world y of the anchored line, or null
  *   textRect(anchor) -> { x, y, w, h } in world space, or null
@@ -252,7 +256,11 @@ export function measureMarkdown(html, { font = 'sans', fs = 16, width = 320, fam
     document.body.appendChild(mdMeasurer)
   }
   mdMeasurer.style.fontFamily = family || FONTS[font] || FONTS.sans
-  mdMeasurer.style.fontSize = `${fs * fontScale(font)}px`
+  // ⚠ LAYOUT CONTRACT: markdown blocks use the editor font, so no hand-font
+  // size boost and the sans line-height — as ElementView and boardsvg do
+  void font
+  mdMeasurer.style.fontSize = `${fs}px`
+  mdMeasurer.style.lineHeight = String(lineHeight('sans'))
   mdMeasurer.style.width = `${Math.max(40, width)}px`
   mdMeasurer.innerHTML = html || '<p></p>'
   // a couple of pixels of slack so a descender or a border never gets clipped

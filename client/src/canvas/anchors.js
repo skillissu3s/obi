@@ -1,3 +1,8 @@
+// ⚠ LAYOUT CONTRACT — read client/src/publish/README.md before changing.
+// Anchors are persisted in every note's canvas layer, and the published page
+// resolves them with this same code. Changing the format or the matching
+// changes where existing drawings land, everywhere.
+//
 // Anchors tie canvas elements to text in a note without touching the markdown.
 // Stored as a quote plus a little context (like W3C text-quote selectors), so they
 // survive edits made anywhere — other devices, git pulls, other apps.
