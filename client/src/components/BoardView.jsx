@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Copy, Link2, FolderInput, SplitSquareHorizontal, AlertTriangle,
-  FileWarning, WifiOff, Star, Download, Image as ImageIcon, Shapes, Eye,
+  FileWarning, WifiOff, Star, Download, Image as ImageIcon, Shapes, Eye, Share2,
 } from 'lucide-react'
 import { conn } from '../lib/socket.js'
 import { useApp } from '../store/app.js'
@@ -57,6 +57,7 @@ export function BoardView({ tab, paneId, active }) {
       { label: bookmarked ? 'Remove bookmark' : 'Bookmark', icon: Star, run: () => toggleBookmark(tab.path, tab.ws) },
       { label: 'Copy link', icon: Link2, run: () => copyNoteLink(tab.ws, tab.path) },
       { label: 'Copy embed code', icon: Copy, run: () => navigator.clipboard?.writeText(`![[${basename(tab.path)}]]`) },
+      { label: 'Share & publish', icon: Share2, run: () => useUI.getState().openModal('share', { ws: tab.ws, path: tab.path }) },
       'divider',
       handle?.status === 'ready' && { label: 'Export as PNG', icon: ImageIcon, run: () => exportBoard(ctlFor(handle), tab.ws, tab.path, 'png') },
       handle?.status === 'ready' && { label: 'Export as SVG', icon: Download, run: () => exportBoard(ctlFor(handle), tab.ws, tab.path, 'svg') },
