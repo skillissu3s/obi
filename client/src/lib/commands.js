@@ -3,6 +3,7 @@ import {
   Maximize2, SplitSquareHorizontal, X, RefreshCw, Share2, Globe, History, Pencil, Trash2, Copy, Link2, Star, Shuffle,
   Download, Upload, LogOut, ShieldCheck, Command, FolderInput, Keyboard, Plus, LayoutGrid, BookOpen, Undo2, Redo2,
   Bold, Italic, Quote, IndentIncrease, IndentDecrease, Hash, Users, Layers, Palette, Shapes, PencilRuler, PanelLeftOpen,
+  Printer,
 } from 'lucide-react'
 import { indentMore, indentLess, undo, redo } from '@codemirror/commands'
 import { yUndoManagerKeymap } from 'y-codemirror.next'
@@ -102,6 +103,14 @@ export function buildCommands() {
         if (!t) return
         const cur = t.mode || prefs.defaultMode
         layout.updateTab(t.id, { mode: cur === 'source' ? 'live' : 'source' })
+      } },
+    // Ctrl/⌘ P would print the live editor, which only renders the lines on
+    // screen — so take it over and print the note the way it reads.
+    { id: 'print-note', name: 'Print / save as PDF', icon: Printer, hotkey: 'Mod+P', group: 'View', run: () => {
+        const t = activeNote()
+        if (!t) return window.print()
+        layout.updateTab(t.id, { mode: 'read' })
+        setTimeout(() => window.print(), 450)
       } },
     { id: 'focus-mode', name: 'Toggle focus mode', icon: Maximize2, hotkey: 'Mod+Shift+Enter', group: 'View', run: () => layout.toggleFocus() },
     { id: 'split-right', name: 'Split right', icon: SplitSquareHorizontal, group: 'View', run: () => layout.splitRight() },

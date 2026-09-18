@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, MoreHorizontal, Eye, Pencil, Code2, LayoutGrid, Share2, History, Star, Trash2, Copy, Link2,
   FolderInput, SplitSquareHorizontal, Info, Globe, AlertTriangle, FileWarning, Wifi, WifiOff, Bold, Italic, List, ListChecks,
   Heading1, Heading2, Quote, Link as LinkIcon, Image as ImageIcon, Undo2, Redo2, IndentIncrease, IndentDecrease, Hash, FileText,
-  ChevronDown,
+  ChevronDown, Printer, Download,
 } from 'lucide-react'
 import { conn } from '../lib/socket.js'
 import { useApp } from '../store/app.js'
@@ -21,7 +21,7 @@ import { renameEntry, deleteEntry, duplicateNote, toggleBookmark, isBookmarked, 
 import { api } from '../lib/api.js'
 import { setActiveEditorView } from '../lib/commands.js'
 import { slugify } from '@shared/markdown.js'
-import { plainSnippet } from '../lib/util.js'
+import { plainSnippet, downloadBlob } from '../lib/util.js'
 
 export function useDocHandle(ws, path, enabled = true) {
   const [handle, setHandle] = useState(null)
@@ -135,6 +135,8 @@ export function NoteView({ tab, paneId, active }) {
       { label: 'Copy note path', icon: Copy, run: () => navigator.clipboard?.writeText(tab.path) },
       'divider',
       { label: 'Version history', icon: History, run: () => useUI.getState().openModal('history', { ws: tab.ws, path: tab.path }) },
+      { label: 'Print or save as PDF', icon: Printer, run: printNote },
+      { label: 'Download as markdown', icon: Download, run: downloadNote },
       { label: 'Share & publish', icon: Share2, run: () => useUI.getState().openModal('share', { ws: tab.ws, path: tab.path }) },
       isBoard && { label: mode === 'board' ? 'Open as markdown' : 'Open as board', icon: LayoutGrid, run: () => setMode(mode === 'board' ? 'live' : 'board') },
       !foreign && { label: 'Move to folder…', icon: FolderInput, run: () => useUI.getState().openModal('move', { path: tab.path }) },
@@ -145,6 +147,25 @@ export function NoteView({ tab, paneId, active }) {
     ])
   }
   noteMenuRef.current = noteMenu
+
+  // Printing reads the page, and live preview only renders the lines on screen —
+  // so switch to reading view first and let it lay out.
+  const printNote = async () => {
+    if (mode !== 'read') {
+      setMode('read')
+      await new Promise((r) => setTimeout(r, 450))
+    }
+    window.print()
+  }
+
+  const downloadNote = async () => {
+    try {
+      const { content } = await api.readNote(tab.ws, tab.path)
+      downloadBlob(new Blob([content], { type: 'text/markdown;charset=utf-8' }), basename(tab.path))
+    } catch (e) {
+      toast.error(e)
+    }
+  }
 
   const crumbs = tab.path.split('/')
   const title = stripExt(basename(tab.path))
