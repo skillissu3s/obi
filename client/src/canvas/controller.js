@@ -13,11 +13,40 @@ const STYLE_KEYS = ['stroke', 'fill', 'fillStyle', 'sw', 'dash', 'rough', 'round
 const DBL_MS = 350
 const STYLE_STORE = 'obi:canvasStyle'
 
+// Which style bucket an element type or tool draws from.
+const TOOL_ELEMENT = { shape: 'rect', linear: 'arrow', pen: 'pen', marker: 'pen', text: 'text', sticky: 'sticky' }
+export function styleGroup(typeOrTool) {
+  switch (typeOrTool) {
+    case 'rect':
+    case 'ellipse':
+    case 'diamond':
+    case 'frame':
+      return 'shape'
+    case 'line':
+    case 'arrow':
+      return 'linear'
+    case 'pen':
+      return 'pen'
+    case 'marker':
+      return 'marker'
+    case 'text':
+      return 'text'
+    case 'sticky':
+      return 'sticky'
+    default:
+      return null
+  }
+}
+
 function loadStyle() {
+  const base = { ...DEFAULTS, heads: ['none', 'arrow'], curve: false }
   try {
-    return { ...DEFAULTS, heads: ['none', 'arrow'], curve: false, ...JSON.parse(localStorage.getItem(STYLE_STORE) || '{}') }
+    const saved = JSON.parse(localStorage.getItem(STYLE_STORE) || '{}')
+    // older versions stored one flat style for every tool
+    if (saved.base || saved.byTool) return { style: { ...base, ...saved.base }, byTool: saved.byTool || {} }
+    return { style: { ...base, ...saved }, byTool: {} }
   } catch {
-    return { ...DEFAULTS, heads: ['none', 'arrow'], curve: false }
+    return { style: base, byTool: {} }
   }
 }
 
@@ -45,11 +74,13 @@ export class CanvasController {
       erasing: [],
       laser: [],
       draft: null,
+      rawPoints: null, // unsimplified pen points; the draft shows the simplified ones
       panning: false,
       spaceDown: false,
       hover: null,
       grid: mode === 'board' && localStorage.getItem('obi:canvasGrid') !== '0',
-      style: loadStyle(),
+      style: loadStyle().style,
+      styleByTool: loadStyle().byTool,
       version: 0,
     }
     this.unsub = store.subscribe(() => {
@@ -130,14 +161,28 @@ export class CanvasController {
     this.set({ grid })
   }
 
-  // Apply a style to the current tool defaults and to the selection.
+  // A shape, a line and a pen stroke each keep their own look: setting the
+  // thickness of a line used to become the thickness of the next box too.
+  styleFor(group) {
+    return { ...this.state.style, ...(this.state.styleByTool[group] || {}) }
+  }
+
+  // Apply a style to the tools it belongs to, and to the selection.
   setStyle(patch) {
-    const style = { ...this.state.style, ...patch }
-    try {
-      localStorage.setItem(STYLE_STORE, JSON.stringify(Object.fromEntries(STYLE_KEYS.map((k) => [k, style[k]]))))
-    } catch {}
-    this.set({ style })
     const sel = this.selected().filter((el) => !el.locked)
+    const groups = sel.length ? [...new Set(sel.map((el) => styleGroup(el.tool === 'marker' ? 'marker' : el.type)))] : [styleGroup(this.state.tool)]
+    const styleByTool = { ...this.state.styleByTool }
+    for (const g of groups) {
+      if (!g) continue
+      const next = { ...(styleByTool[g] || {}) }
+      for (const [k, v] of Object.entries(patch)) if (appliesTo(k, { type: TOOL_ELEMENT[g] || 'rect' }) || k === 'markerStroke' || k === 'heads' || k === 'curve') next[k] = v
+      styleByTool[g] = next
+    }
+    // the shared base stays at the defaults; each tool remembers its own
+    try {
+      localStorage.setItem(STYLE_STORE, JSON.stringify({ base: Object.fromEntries(STYLE_KEYS.map((k) => [k, this.state.style[k]])), byTool: styleByTool }))
+    } catch {}
+    this.set({ styleByTool })
     if (!sel.length || this.readOnly) return
     this.store.checkpoint()
     this.store.update(
@@ -152,7 +197,7 @@ export class CanvasController {
 
   // ---------- creation helpers ----------
   base(type, extra = {}) {
-    const s = this.state.style
+    const s = this.styleFor(styleGroup(extra.tool === 'marker' ? 'marker' : type))
     const el = { id: newElementId(), type, z: this.store.maxZ() + 1, seed: newSeed(), by: this.host.userId?.() || undefined }
     for (const k of STYLE_KEYS) if (k !== 'heads' && appliesTo(k, { type }) && s[k] !== undefined && s[k] !== DEFAULTS[k]) el[k] = s[k]
     return { ...el, ...extra }
@@ -339,8 +384,7 @@ export class CanvasController {
       const start = this.bindingAt(p, e, null)
       const el = this.base(tool, { x: p.x, y: p.y, w: 0, h: 0, points: [[0, 0], [0, 0]], ...(start ? { start } : {}) })
       if (tool === 'arrow') {
-        const s = this.state.style
-        el.heads = s.heads || ['none', 'arrow']
+        el.heads = this.styleFor('linear').heads || ['none', 'arrow']
       }
       this.store.checkpoint()
       this.store.add(el)
@@ -350,9 +394,9 @@ export class CanvasController {
     }
     if (tool === 'pen' || tool === 'marker') {
       const draft = this.base('pen', { x: p.x, y: p.y, points: [[0, 0, pressureOf(e)]], tool: tool === 'marker' ? 'marker' : undefined })
-      if (tool === 'marker') draft.stroke = this.state.style.markerStroke || 'yellow'
+      if (tool === 'marker') draft.stroke = this.styleFor('marker').markerStroke || 'yellow'
       this.startGesture({ type: 'draw', origin: p }, e)
-      this.set({ draft, selection: [] })
+      this.set({ draft, rawPoints: draft.points, selection: [] })
       return true
     }
     if (tool === 'text') {
@@ -365,7 +409,7 @@ export class CanvasController {
     }
     if (tool === 'sticky') {
       const size = 190
-      const el = this.base('sticky', { x: p.x - size / 2, y: p.y - size / 2, w: size, h: size, color: this.state.style.color || 'yellow', align: 'left' })
+      const el = this.base('sticky', { x: p.x - size / 2, y: p.y - size / 2, w: size, h: size, color: this.styleFor('sticky').color || 'yellow', align: 'left' })
       this.addElement(el, { edit: true })
       if (!this.state.lockTool) this.set({ tool: 'select' })
       this.startGesture({ type: 'noop' }, e)
@@ -387,7 +431,7 @@ export class CanvasController {
   }
 
   createTextAt(p) {
-    const s = this.state.style
+    const s = this.styleFor('text')
     const fs = s.fs || DEFAULTS.fs
     const el = this.base('text', { x: p.x, y: p.y - fs * 0.7, w: 8, h: fs * 1.3, text: '', align: 'left' })
     this.addElement(el, { edit: true })
@@ -470,12 +514,17 @@ export class CanvasController {
       const events = e.getCoalescedEvents?.() || [e]
       const draft = this.state.draft
       if (!draft) return
-      const pts = draft.points.slice()
+      const pts = (this.state.rawPoints || draft.points).slice()
       for (const ev of events) {
         const q = this.host.toWorld(ev.clientX, ev.clientY)
         pts.push([q.x - draft.x, q.y - draft.y, pressureOf(ev)])
       }
-      this.set({ draft: { ...draft, points: pts } })
+      // Simplify as we go, exactly as the finished stroke is simplified:
+      // perfect-freehand fakes pressure from point spacing, so a draft made
+      // of raw dense points draws thicker than the stroke it turns into.
+      const zoom = this.host.zoom()
+      const shown = pts.length > 2 ? simplify(pts, 0.35 / zoom) : pts
+      this.set({ draft: { ...draft, points: shown }, rawPoints: pts })
       return
     }
     g.last = e
@@ -596,10 +645,11 @@ export class CanvasController {
       }
       case 'draw': {
         const draft = this.state.draft
-        this.set({ draft: null })
+        const raw = this.state.rawPoints
+        this.set({ draft: null, rawPoints: null })
         if (!draft) break
         const zoom = this.host.zoom()
-        let pts = draft.points
+        let pts = raw || draft.points
         if (pts.length > 2) pts = simplify(pts, 0.35 / zoom)
         const el = normalizeLinear({ ...draft, points: pts.map((q) => q.map((n) => Math.round(n * 100) / 100)) })
         this.store.checkpoint()
@@ -1045,7 +1095,7 @@ export class CanvasController {
       this.addElement(el)
       return true
     }
-    const fs = this.state.style.fs || DEFAULTS.fs
+    const fs = this.styleFor('text').fs || DEFAULTS.fs
     const el = this.base('text', { x: at.x, y: at.y, text: trimmed.slice(0, 5000), align: 'left' })
     Object.assign(el, this.textSize({ ...el, fs }))
     if (el.w > 520) Object.assign(el, { wrap: true, w: 520 }, this.textSize({ ...el, wrap: true, w: 520 }))

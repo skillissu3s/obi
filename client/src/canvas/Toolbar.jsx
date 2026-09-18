@@ -8,7 +8,7 @@ import {
   ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, FileText,
 } from 'lucide-react'
 import { STROKE_COLORS, STICKY_COLORS, colorCss, fillCss, stickyCss, DEFAULTS } from '@shared/boardsvg.js'
-import { appliesTo } from './controller.js'
+import { appliesTo, styleGroup } from './controller.js'
 import { useController } from './CanvasLayer.jsx'
 import { source } from './layout.js'
 
@@ -200,7 +200,8 @@ export function StyleBar({ ctl, mode }) {
   const layout = ctl.layout()
   const sel = state.selection.map((id) => layout.byId.get(id)).filter(Boolean).map(source)
   const toolType = TOOL_TYPE[state.tool]
-  const subjects = sel.length ? sel : toolType ? [{ type: toolType, ...state.style, ...(state.tool === 'marker' ? { tool: 'marker', stroke: state.style.markerStroke || 'yellow' } : {}) }] : []
+  const toolStyle = ctl.styleFor(styleGroup(state.tool))
+  const subjects = sel.length ? sel : toolType ? [{ type: toolType, ...toolStyle, ...(state.tool === 'marker' ? { tool: 'marker', stroke: toolStyle.markerStroke || 'yellow' } : {}) }] : []
   if (!subjects.length) return null
   const has = (k) => subjects.some((el) => appliesTo(k, el))
   const first = (k) => {

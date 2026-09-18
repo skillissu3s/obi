@@ -439,10 +439,13 @@ svg.cv-el {
 .cv-tool {
   position: relative;
   width: 34px;
-  height: 34px;
+  /* the shortcut letter gets a row of its own — it used to sit on the icon */
+  height: 38px;
   flex-shrink: 0;
   display: grid;
+  grid-template-rows: 1fr auto;
   place-items: center;
+  padding: 3px 0 2px;
   border: none;
   border-radius: var(--radius);
   background: none;
@@ -467,15 +470,17 @@ svg.cv-el {
   height: 17px;
 }
 .cv-tool kbd {
-  position: absolute;
-  right: 3px;
-  bottom: 1px;
   font: 600 8.5px var(--font-ui);
+  line-height: 1;
   color: var(--text-faint);
   background: none;
   border: none;
   padding: 0;
   box-shadow: none;
+}
+/* buttons without a shortcut keep the icon optically centred */
+.cv-tool:not(:has(kbd)) {
+  grid-template-rows: 1fr;
 }
 .cv-tool.active kbd {
   color: var(--accent-text);
@@ -735,6 +740,13 @@ svg.cv-el {
 /* world x = 0 is where the text starts, so drawings stay beside the words they belong to */
 .nc-portal {
   display: contents;
+}
+.nc-extent {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
 }
 .nc-origin {
   position: absolute;

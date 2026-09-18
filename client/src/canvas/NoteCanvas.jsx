@@ -766,7 +766,13 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
 
   return (
     <>
-      {portalHost && createPortal(<CanvasLayer ctl={ctl} ctx={ctx} zoom={1} />, portalHost)}
+      {portalHost && createPortal(
+        <>
+          <CanvasLayer ctl={ctl} ctx={ctx} zoom={1} />
+          <CanvasExtent ctl={ctl} />
+        </>,
+        portalHost,
+      )}
       {Math.abs(pan) > 2 && (
         <button className="btn btn-sm nc-recenter" onClick={() => animatePan(0)} title="Move the note back to the centre">
           <LocateFixed /> Re-center
@@ -839,6 +845,20 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       </div>
     </>
   )
+}
+
+// Drawings can sit below the end of the text. Without this the page has
+// nothing to scroll to down there, so the canvas felt stuck vertically.
+function CanvasExtent({ ctl }) {
+  const state = useController(ctl)
+  void state.version
+  let bottom = 0
+  for (const el of ctl.layout().list) {
+    const b = visualBounds(el)
+    if (b.y + b.h > bottom) bottom = b.y + b.h
+  }
+  if (bottom <= 0) return null
+  return <div className="nc-extent" style={{ top: Math.round(bottom) + 120 }} />
 }
 
 const DUMMY_STATE = { tool: 'select', selection: [], erasing: [], laser: [], snapLines: [] }
