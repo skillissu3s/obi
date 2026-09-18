@@ -61,6 +61,10 @@ function Overlay({ ctl, state, layout, zoom, peers }) {
   let box = null
   if (selected.length) box = unionBounds(selected.map(visualBounds))
   const pad = 6 * inv
+  // arrows can be pulled out of whatever shape you are pointing at, or the one
+  // you have selected on its own
+  const budCandidate = hover || (selected.length === 1 ? single : null)
+  const budTarget = budCandidate && !budCandidate.locked && !isLinear(budCandidate) && budCandidate.type !== 'frame' ? budCandidate : null
 
   return (
     <div className="cv-overlay" style={{ '--inv': inv }}>
@@ -76,6 +80,7 @@ function Overlay({ ctl, state, layout, zoom, peers }) {
           return <div key={h} className="cv-handle" data-handle={h} style={{ left: x, top: y, cursor: HANDLE_CURSOR[h] }} />
         })}
       {single && isLinear(single) && single.type !== 'pen' && <PointHandles el={single} show={showHandles && !single.locked} />}
+      {showHandles && <ArrowBuds el={budTarget} inv={inv} />}
       {state.marquee && <div className="cv-marquee" style={rectStyle(state.marquee)} />}
       {state.bindHint && <div className="cv-bind-hint" style={rectStyle(state.bindHint, 4 * inv)} />}
       {state.snapLines.map((l, i) => (
@@ -86,6 +91,27 @@ function Overlay({ ctl, state, layout, zoom, peers }) {
         <Peer key={p.clientId} peer={p} layout={layout} inv={inv} pad={pad} />
       ))}
     </div>
+  )
+}
+
+// Excalidraw-style: little buds on a shape's four sides that pull out an arrow
+// already bound to it.
+function ArrowBuds({ el, inv }) {
+  if (!el) return null
+  const b = visualBounds(el)
+  const off = 13 * inv
+  const spots = {
+    n: [b.x + b.w / 2, b.y - off],
+    s: [b.x + b.w / 2, b.y + b.h + off],
+    w: [b.x - off, b.y + b.h / 2],
+    e: [b.x + b.w + off, b.y + b.h / 2],
+  }
+  return (
+    <>
+      {Object.entries(spots).map(([side, [x, y]]) => (
+        <div key={side} className="cv-arrowbud" data-arrowbud={side} data-owner={el.id} style={{ left: x, top: y }} title="Drag to connect" />
+      ))}
+    </>
   )
 }
 

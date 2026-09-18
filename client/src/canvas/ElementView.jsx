@@ -1,6 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FileText, Globe, ExternalLink, Link2, ImageOff } from 'lucide-react'
-import { drawables, val, colorCss, stickyCss, FONTS, fontScale, lineHeight } from '@shared/boardsvg.js'
+import { drawables, val, colorCss, stickyCss, FONTS, fontScale, lineHeight, DEFAULTS } from '@shared/boardsvg.js'
 import { midPoint } from '@shared/boardgeom.js'
 import { measureText } from './layout.js'
 
@@ -137,7 +137,9 @@ function ShapeEl({ el, editing, ctx }) {
           <EditText el={el} ctx={ctx} kind="label" style={{ ...ts, position: 'static', width: '100%' }} />
         </div>
       ) : el.text ? (
-        <div className="cv-label cv-text" style={ts}>
+        // a hatched or cross-hatched fill runs straight through the letters,
+        // so the text sits on its own patch of the page colour
+        <div className={`cv-label cv-text ${el.fill && (el.fillStyle ?? DEFAULTS.fillStyle) !== 'solid' ? 'on-pattern' : ''}`} style={ts}>
           <div>
             <RichText text={el.text} ctx={ctx} />
           </div>

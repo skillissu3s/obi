@@ -130,6 +130,12 @@ svg.cv-el {
 .cv-label > div {
   max-width: 100%;
 }
+/* text on a hatched fill: give it a patch of the page colour to sit on */
+.cv-label.on-pattern > div {
+  background: var(--cv-bg);
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+}
 .cv-arrow-label {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -320,6 +326,24 @@ svg.cv-el {
 }
 .cv-sel-box.locked {
   border-color: var(--text-3);
+}
+.cv-arrowbud {
+  position: absolute;
+  width: calc(9px * var(--inv));
+  height: calc(9px * var(--inv));
+  margin-left: calc(-4.5px * var(--inv));
+  margin-top: calc(-4.5px * var(--inv));
+  border-radius: 50%;
+  background: var(--cv-bg);
+  border: calc(1.5px * var(--inv)) solid var(--accent);
+  opacity: 0.55;
+  cursor: crosshair;
+  pointer-events: auto;
+  transition: opacity var(--t-fast), transform var(--t-fast);
+}
+.cv-arrowbud:hover {
+  opacity: 1;
+  transform: scale(1.35);
 }
 .cv-handle {
   position: absolute;

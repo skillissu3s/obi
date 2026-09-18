@@ -330,6 +330,12 @@ export class CanvasController {
     if (this.readOnly && tool !== 'select') return false
 
     if (tool === 'select') {
+      // the little buds around a shape start an arrow that is already bound to it
+      const budEl = target?.closest?.('[data-arrowbud]')
+      if (budEl && !this.readOnly) {
+        this.startArrowFrom(budEl.dataset.arrowbud, budEl.dataset.owner, p, e)
+        return true
+      }
       const handleEl = target?.closest?.('[data-handle]')
       if (handleEl && !this.readOnly) {
         this.startHandle(handleEl.dataset, p, e)
@@ -458,6 +464,25 @@ export class CanvasController {
       }
     }
     this.set({ selection: [el.id], editing: { id: el.id } })
+  }
+
+  // Drag out of a shape's edge bud: an arrow that starts bound to that shape.
+  startArrowFrom(side, ownerId, p, e) {
+    const owner = this.layout().byId.get(ownerId)
+    if (!owner || owner.locked) return
+    const b = visualBounds(owner)
+    const from = {
+      n: { x: b.x + b.w / 2, y: b.y },
+      s: { x: b.x + b.w / 2, y: b.y + b.h },
+      w: { x: b.x, y: b.y + b.h / 2 },
+      e: { x: b.x + b.w, y: b.y + b.h / 2 },
+    }[side] || p
+    const el = this.base('arrow', { x: from.x, y: from.y, w: 0, h: 0, points: [[0, 0], [0, 0]], start: { id: owner.id } })
+    el.heads = this.styleFor('linear').heads || ['none', 'arrow']
+    this.store.checkpoint()
+    this.store.add(el)
+    this.startGesture({ type: 'create-linear', id: el.id, start: from }, e)
+    this.set({ selection: [el.id], hover: null })
   }
 
   bindingAt(p, e, skipId) {
