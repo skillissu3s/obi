@@ -469,9 +469,10 @@ svg.cv-el {
   height: 16px;
 }
 .cv-tool kbd {
+  /* absolute, so it never moves the icon or changes the button's size */
   position: absolute;
-  right: 3px;
-  bottom: 1px;
+  right: 4px;
+  bottom: 3px;
   font: 500 8px var(--font-ui);
   line-height: 1;
   color: var(--text-faint);
