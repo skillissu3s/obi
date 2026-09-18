@@ -27,7 +27,10 @@ export function EdgeToggles() {
       const rightPanel = host.querySelector(':scope > .sidebar.right')
       const leftEdge = leftPanel ? leftPanel.getBoundingClientRect().right : body.left
       const rightEdge = rightPanel ? rightPanel.getBoundingClientRect().left : body.right
-      const clampY = (v) => Math.max(34, Math.min(body.height - 34, v - body.top))
+      // Keep it in the middle band: at the top it covered the back arrow and the
+      // note's own buttons, at the bottom the status bar.
+      const band = Math.min(120, body.height * 0.22)
+      const clampY = (v) => Math.max(band, Math.min(body.height - band, v - body.top))
       // only on the content side of the edge, so panels keep their own hover space
       if (x >= leftEdge - 6 && x - leftEdge < NEAR) setHot({ side: 'left', x: leftEdge - body.left, y: clampY(y) })
       else if (x <= rightEdge + 6 && rightEdge - x < NEAR) setHot({ side: 'right', x: rightEdge - body.left, y: clampY(y) })

@@ -76,6 +76,30 @@
 .sidebar.right {
   background: var(--bg-sidebar);
 }
+/* Panels stay mounted and collapse, so opening and closing slides. */
+.sidebar.left,
+.sidebar.right,
+.ribbon {
+  transition: width 190ms var(--ease), opacity 130ms var(--ease);
+}
+.sidebar.is-closed,
+.ribbon.is-closed {
+  width: 0 !important;
+  min-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sidebar.is-closed .resizer {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar.left,
+  .sidebar.right,
+  .ribbon {
+    transition: none;
+  }
+}
 .resizer {
   position: absolute;
   top: 0;

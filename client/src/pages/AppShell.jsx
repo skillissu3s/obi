@@ -143,9 +143,11 @@ export default function AppShell() {
       {user?.isAdmin && <StorageWarning compact />}
       <MobileHeader ws={ws} activeTab={activeTab} />
       <div className="app-body">
-        {/* one or the other: the full sidebar when open, the compact ribbon when closed */}
-        {!(layout.left && !mobile) && <Ribbon user={user} />}
-        {layout.left && <Sidebar user={user} />}
+        {/* one or the other: the full sidebar when open, the compact ribbon when closed.
+            On desktop both stay mounted and collapse to nothing, so opening and
+            closing slides instead of snapping. */}
+        {mobile ? null : <Ribbon user={user} closed={layout.left} />}
+        {mobile ? layout.left && <Sidebar user={user} /> : <Sidebar user={user} closed={!layout.left} />}
         {layout.left && mobile && <div className="scrim" onClick={() => layout.toggleLeft(false)} />}
         <div className="main">
           {loadingWs ? (
@@ -192,7 +194,9 @@ export default function AppShell() {
             layout.panes.map((pane) => <Pane key={pane.id} pane={pane} isActive={pane.id === layout.activePane} multi={layout.panes.length > 1} />)
           )}
         </div>
-        {layout.right && !layout.focus && <RightPanel tab={activeTab} />}
+        {mobile
+          ? layout.right && !layout.focus && <RightPanel tab={activeTab} />
+          : !layout.focus && <RightPanel tab={activeTab} closed={!layout.right} />}
         {layout.right && mobile && <div className="scrim" onClick={() => layout.toggleRight(false)} />}
         {!mobile && !layout.focus && <EdgeToggles />}
       </div>
@@ -234,14 +238,14 @@ function Modals() {
   }
 }
 
-function Ribbon({ user }) {
+function Ribbon({ user, closed }) {
   const wsId = useApp((s) => s.wsId)
   const workspaces = useApp((s) => s.workspaces)
   const layout = useLayout()
   const ws = workspaces.find((w) => w.id === wsId)
 
   return (
-    <div className="ribbon">
+    <div className={`ribbon ${closed ? 'is-closed' : ''}`} inert={closed ? '' : undefined}>
       <button className="ws-avatar" onClick={() => useUI.getState().openPalette('workspaces')} title={`${ws?.name || 'Workspace'} — switch (⌘⇧O)`}>
         <WsIcon ws={ws} size={32} />
       </button>

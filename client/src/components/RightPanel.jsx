@@ -10,7 +10,7 @@ import { AvatarStack } from './ui.jsx'
 import { basename, dirname, stripExt, isNote } from '@shared/paths.js'
 import { formatDate, timeAgo, readingTime, formatBytes, plainSnippet } from '../lib/util.js'
 
-export function RightPanel({ tab }) {
+export function RightPanel({ tab, closed }) {
   const rightTab = useLayout((s) => s.rightTab)
   const width = useLayout((s) => s.rightWidth)
   const [dragging, setDragging] = useState(false)
@@ -36,7 +36,7 @@ export function RightPanel({ tab }) {
   ]
 
   return (
-    <div className="sidebar right" style={{ width }}>
+    <div className={`sidebar right ${closed ? 'is-closed' : ''}`} style={{ width }} inert={closed ? '' : undefined}>
       <div className={`resizer ${dragging ? 'dragging' : ''}`} onMouseDown={() => setDragging(true)} />
       <div className="rp-tabs">
         {tabs.map((t) => (

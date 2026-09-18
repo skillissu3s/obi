@@ -678,7 +678,7 @@ export function BookmarksPanel() {
 
 // ---------------- Sidebar shell ----------------
 
-export function Sidebar({ user }) {
+export function Sidebar({ user, closed }) {
   const leftTab = useLayout((s) => s.leftTab)
   const width = useLayout((s) => s.leftWidth)
   const rightOpen = useLayout((s) => s.right)
@@ -719,7 +719,7 @@ export function Sidebar({ user }) {
   }
 
   return (
-    <div className="sidebar left" style={{ width }} ref={rootRef}>
+    <div className={`sidebar left ${closed ? 'is-closed' : ''}`} style={{ width }} ref={rootRef} inert={closed ? '' : undefined}>
       <div className="sidebar-header">
         <button className="ws-switcher" onClick={() => useUI.getState().openPalette('workspaces')} title="Switch workspace">
           <WsIcon ws={ws} />
