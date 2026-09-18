@@ -195,7 +195,7 @@ export function FileTree() {
     dragRef.current = null
     if (!path) return
     if (dest === dirname(path) || path === dest || dest.startsWith(path + '/')) return
-    A.moveEntry(path, dest)
+    A.moveEntryWithUndo(path, dest)
   }
 
   return (

@@ -480,8 +480,7 @@ export function MoveModal({ path }) {
 
   const moveTo = async (folder) => {
     close()
-    await A.moveEntry(path, folder)
-    toast.success(`Moved to ${folder || 'root'}`)
+    await A.moveEntryWithUndo(path, folder)
   }
 
   return (

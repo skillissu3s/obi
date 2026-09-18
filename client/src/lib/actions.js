@@ -171,6 +171,19 @@ export async function moveEntry(path, destFolder) {
   return moveTo(path, joinPath(destFolder, basename(path)))
 }
 
+// Dragging in the tree is easy to do by accident, so a move says what it did
+// and offers the way back.
+export async function moveEntryWithUndo(path, destFolder) {
+  const from = dirname(path)
+  const target = await moveEntry(path, destFolder)
+  if (!target) return null
+  toast.success(`Moved ${basename(path)} to ${destFolder || 'the vault root'}`, {
+    timeout: 7000,
+    action: { label: 'Undo', run: () => moveEntry(target, from) },
+  })
+  return target
+}
+
 export async function moveTo(path, target) {
   if (target === path) return
   const ws = app().wsId
