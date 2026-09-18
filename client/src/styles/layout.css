@@ -708,7 +708,13 @@ button.status-item:hover {
   font-weight: 550;
   font-size: 12.5px;
 }
-.bl-note-title .grow:hover {
+.bl-open {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.bl-open:hover {
   color: var(--accent-text);
 }
 .bl-fold {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { List, Link2, Network, CalendarDays, Info, FileText, ChevronLeft, ChevronRight, Plus, Hash, Clock, Users, PanelRightClose } from 'lucide-react'
+import { List, Link2, Network, CalendarDays, Info, FileText, ChevronLeft, ChevronRight, Plus, Clock, Users, PanelRightClose } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
@@ -142,7 +142,8 @@ function BacklinkGroup({ note, ws }) {
         <button className="bl-fold" title={open ? 'Hide mentions' : 'Show mentions'} onClick={() => setOpen(!open)}>
           <ChevronRight style={{ transform: open ? 'rotate(90deg)' : 'none' }} />
         </button>
-        <span className="truncate grow" style={{ cursor: 'pointer' }} onClick={() => useLayout.getState().openNote(ws, note.path)}>
+        <span className="truncate grow bl-open" onClick={() => useLayout.getState().openNote(ws, note.path)}>
+          <FileText />
           {stripExt(basename(note.path))}
         </span>
         <span className="badge">{note.hits.length}</span>
