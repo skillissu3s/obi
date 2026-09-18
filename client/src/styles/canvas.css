@@ -465,18 +465,25 @@ svg.cv-el {
   cursor: default;
 }
 .cv-tool svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 .cv-tool kbd {
-  /* absolute, so it never moves the icon or changes the button's size */
+  /* Absolute, so it never moves the icon or resizes the button. A fixed
+     10px cell in the corner: the glyph centres inside it, which keeps every
+     letter the same distance from the icon (15px, ending 25.5px in) and
+     from the button's own edges — no letter creeps up into the icon. */
   position: absolute;
-  right: 4px;
-  bottom: 3px;
-  font: 500 8px var(--font-ui);
+  right: 1px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  display: grid;
+  place-items: center;
+  font: 500 7.5px var(--font-ui);
   line-height: 1;
   color: var(--text-faint);
-  opacity: 0.65;
+  opacity: 0.6;
   background: none;
   border: none;
   padding: 0;
