@@ -6,7 +6,7 @@ import { api } from '../lib/api.js'
 import { toast } from '../store/ui.js'
 import * as A from '../lib/actions.js'
 import { renderInline } from '../lib/render.js'
-import { formatDate } from '../lib/util.js'
+import { formatDate, dueLabel } from '../lib/util.js'
 import { basename, stripExt, dirname } from '@shared/paths.js'
 
 const today = () => formatDate(new Date(), 'YYYY-MM-DD')
@@ -121,8 +121,20 @@ export function TasksView() {
             {list.map((t) => (
               <div className={`task-row ${t.checked ? 'done' : ''} ${busy === `${t.path}:${t.line}` ? 'busy' : ''}`} key={`${t.path}:${t.line}`}>
                 <input type="checkbox" className="task-cb" checked={t.checked} disabled={busy === `${t.path}:${t.line}`} onChange={() => toggle(t)} />
-                <div className="task-text" dangerouslySetInnerHTML={{ __html: renderInline(t.text.replace(/📅\s*(\d{4}-\d{2}-\d{2})/, ''), { ws: wsId, path: t.path }) }} />
-                {t.due && <span className={`due-chip ${!t.checked && t.due < today() ? 'overdue' : t.due === today() ? 'today' : ''}`}>{t.due}</span>}
+                <div
+                  className="task-text"
+                  title="Open this line"
+                  onClick={(e) => {
+                    if (e.target.closest('a')) return
+                    useLayout.getState().openNote(wsId, t.path, { line: t.line })
+                  }}
+                  dangerouslySetInnerHTML={{ __html: renderInline(t.text.replace(/📅\s*(\d{4}-\d{2}-\d{2})/, ''), { ws: wsId, path: t.path }) }}
+                />
+                {t.due && (
+                  <span className={`due-chip ${!t.checked && t.due < today() ? 'overdue' : t.due === today() ? 'today' : ''}`} title={t.due}>
+                    {dueLabel(t.due)}
+                  </span>
+                )}
                 {group !== 'note' && (
                   <span className="task-source" onClick={() => useLayout.getState().openNote(wsId, t.path, { line: t.line })}>
                     {stripExt(basename(t.path))}

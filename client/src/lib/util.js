@@ -156,6 +156,21 @@ export function colorFor(str) {
   return palette[Math.abs(h) % palette.length]
 }
 
+// "Today", "Tomorrow", "Fri 26 Sep" — a due date you read rather than parse.
+export function dueLabel(iso) {
+  if (!iso) return ''
+  const d = new Date(iso + 'T00:00:00')
+  if (Number.isNaN(+d)) return iso
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const days = Math.round((d - start) / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Tomorrow'
+  if (days === -1) return 'Yesterday'
+  if (days > 1 && days < 7) return formatDate(d, 'dddd')
+  return formatDate(d, d.getFullYear() === start.getFullYear() ? 'ddd D MMM' : 'D MMM YYYY')
+}
+
 export function readingTime(words) {
   const m = Math.max(1, Math.round(words / 230))
   return `${m} min read`

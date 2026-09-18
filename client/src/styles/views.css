@@ -627,6 +627,10 @@
   flex: 1;
   min-width: 0;
   line-height: 1.5;
+  cursor: text;
+}
+.task-row:hover .task-text {
+  cursor: pointer;
 }
 .task-text p {
   margin: 0;
