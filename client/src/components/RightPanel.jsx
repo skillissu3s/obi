@@ -159,6 +159,9 @@ function BacklinkGroup({ note, ws }) {
 
 export function CalendarPanel() {
   const [cursor, setCursor] = useState(() => new Date())
+  const panes = useLayout((s) => s.panes)
+  const openPath = useLayout.getState().activeTab()?.path || null
+  void panes // re-read the active tab whenever the panes change
   const treeMap = useApp((s) => s.treeMap)
   const version = useApp((s) => s.version)
   const settings = A.wsSettings()
@@ -209,7 +212,7 @@ export function CalendarPanel() {
           return (
             <button
               key={i}
-              className={`cal-day ${c.other ? 'other' : ''} ${isToday ? 'today' : ''} ${has ? 'has-note' : ''} ${tasks ? 'has-tasks' : ''}`}
+              className={`cal-day ${c.other ? 'other' : ''} ${isToday ? 'today' : ''} ${has ? 'has-note' : ''} ${tasks ? 'has-tasks' : ''} ${path === openPath ? 'active' : ''}`}
               title={`${formatDate(c.date, 'dddd D MMMM')}${has ? ' · daily note' : ''}${tasks ? ` · ${tasks} task(s) due` : ''}`}
               onClick={() => A.openDailyNote(c.date)}
             >

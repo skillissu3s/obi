@@ -6,7 +6,7 @@ import { usePrefs } from '../store/prefs.js'
 import { useUI } from '../store/ui.js'
 import * as A from '../lib/actions.js'
 import { runCommand } from '../lib/commands.js'
-import { timeAgo, modKey, formatDate } from '../lib/util.js'
+import { timeAgo, modKey, formatDate, dueLabel, plainSnippet } from '../lib/util.js'
 import { basename, stripExt } from '@shared/paths.js'
 
 export function Home() {
@@ -128,8 +128,8 @@ export function Home() {
             {tasks.map((t, i) => (
               <div key={i} className="recent-item" onClick={() => useLayout.getState().openNote(wsId, t.path, { line: t.line })}>
                 <ListChecks />
-                <span className="truncate grow">{t.text.replace(/📅\s*\d{4}-\d{2}-\d{2}/, '').trim()}</span>
-                <span className="when">{t.due}</span>
+                <span className="truncate grow">{plainSnippet(t.text.replace(/📅\s*\d{4}-\d{2}-\d{2}/, ''), 120)}</span>
+                <span className="when" title={t.due}>{dueLabel(t.due)}</span>
               </div>
             ))}
             {!!A.allTasks().length && (
