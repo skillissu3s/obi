@@ -5,7 +5,7 @@ import {
   Frame, Eraser, Pointer, Lock, LockOpen, Copy, Trash2, Group, Ungroup, Layers, AlignStartVertical, AlignCenterVertical,
   AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter, AlignLeft, AlignCenter, AlignRight, SlidersHorizontal, Spline, ChevronsDown, Link as LinkIcon,
-  ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, FileText,
+  ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, FileText, Hash,
 } from 'lucide-react'
 import { STROKE_COLORS, STICKY_COLORS, colorCss, fillCss, stickyCss, DEFAULTS } from '@shared/boardsvg.js'
 import { appliesTo, styleGroup } from './controller.js'
@@ -405,6 +405,15 @@ export function StyleBar({ ctl, mode }) {
               </>
             )}
           </PopButton>
+          {sel.length === 1 && sel[0].type === 'text' && (
+            <Btn
+              title={sel[0].md ? 'Reading as markdown — switch to plain text' : 'Read this block as markdown'}
+              active={!!sel[0].md}
+              onClick={() => ctl.toggleMarkdown()}
+            >
+              <Hash />
+            </Btn>
+          )}
           {multi && !grouped && (
             <Btn title="Group (Ctrl G)" onClick={() => ctl.group()}>
               <Group />

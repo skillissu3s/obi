@@ -285,7 +285,7 @@ function pathSvg(p) {
   return `<path ${attrs.join(' ')}/>`
 }
 
-function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, extra = '', innerStyle = '' } = {}) {
+function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, extra = '', innerStyle = '', html = null } = {}) {
   const font = val(el, 'font')
   const fs = num(val(el, 'fs'), DEFAULTS.fs) * fontScale(font)
   const style = [
@@ -298,7 +298,9 @@ function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, ex
     `line-height:${lineHeight(font)}`,
     `color:${color}`,
     `text-align:${ALIGNS.has(el.align) ? el.align : DEFAULTS.align}`,
-    'white-space:pre-wrap',
+    // rendered markdown is HTML, where the newlines between tags are just
+    // whitespace — keeping pre-wrap turns each of them into a blank line
+    html != null ? 'white-space:normal' : 'white-space:pre-wrap',
     'overflow-wrap:anywhere',
     'overflow:hidden',
     'display:flex',
@@ -309,7 +311,8 @@ function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, ex
   ].filter(Boolean)
   // innerStyle puts a patch behind the words themselves, not the whole box
   const inner = innerStyle ? ` style="${esc(innerStyle)}"` : ''
-  return `<foreignObject x="0" y="0" width="${f(w)}" height="${f(h)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${esc(style.join(';'))}"><div${inner}>${esc(el.text)}</div></div></foreignObject>`
+  const content = html != null ? `<div xmlns="http://www.w3.org/1999/xhtml" class="cv-md">${html}</div>` : `<div${inner}>${esc(el.text)}</div>`
+  return `<foreignObject x="0" y="0" width="${f(w)}" height="${f(h)}"><div xmlns="http://www.w3.org/1999/xhtml" style="${esc(style.join(';'))}">${content}</div></foreignObject>`
 }
 
 const basenameOf = (p) => String(p || '').split('/').pop().replace(/\.md$/i, '')
@@ -384,7 +387,9 @@ export function boardToSvg(elements, opts = {}) {
         body.push(...drawables(el).map(pathSvg))
         break
       case 'text':
-        body.push(textBlock(el, el.w, el.h, { color: colorCss(el.stroke) }))
+        // a markdown block exports as the formatting it means, when the caller
+        // hands us a renderer (published pages and exports both do)
+        body.push(textBlock(el, el.w, el.h, { color: colorCss(el.stroke), html: el.md ? opts.renderMarkdown?.(el.text || '') : null }))
         break
       case 'sticky':
         body.push(`<rect x="1" y="3" width="${f(el.w)}" height="${f(el.h)}" rx="4" style="fill:rgba(0,0,0,.18)"/>`)
@@ -422,7 +427,12 @@ export function boardToSvg(elements, opts = {}) {
   // `position` keeps the drawing at its own size: the caller places it in the
   // page itself (a note's canvas layer), rather than fitting it to a column.
   const style = opts.position ? 'display:block' : 'max-width:100%;height:auto'
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" class="board-svg" viewBox="${f(vx)} ${f(vy)} ${f(vw)} ${f(vh)}" width="${f(width)}" height="${f(height)}" style="${style}">${opts.title ? `<title>${esc(opts.title)}</title>` : ''}${parts.join('')}</svg>`
+  // Markdown blocks carry their own compact rules so an exported file or a
+  // published page shows them the way the canvas does.
+  const mdStyle = parts.some((p) => p.includes('class="cv-md"'))
+    ? `<style>.cv-md{overflow-wrap:anywhere}.cv-md>*:first-child{margin-top:0}.cv-md>*:last-child{margin-bottom:0}.cv-md p,.cv-md ul,.cv-md ol,.cv-md blockquote,.cv-md pre{margin:.4em 0}.cv-md h1,.cv-md h2,.cv-md h3,.cv-md h4{margin:.5em 0 .25em;line-height:1.25}.cv-md h1{font-size:1.5em}.cv-md h2{font-size:1.28em}.cv-md h3{font-size:1.12em}.cv-md ul,.cv-md ol{padding-left:1.3em}.cv-md code{font-family:ui-monospace,monospace;font-size:.88em}.cv-md blockquote{border-left:2px solid currentColor;opacity:.85;padding-left:.7em}</style>`
+    : ''
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" class="board-svg" viewBox="${f(vx)} ${f(vy)} ${f(vw)} ${f(vh)}" width="${f(width)}" height="${f(height)}" style="${style}">${opts.title ? `<title>${esc(opts.title)}</title>` : ''}${mdStyle}${parts.join('')}</svg>`
   return { svg, width: vw, height: vh, x: vx, y: vy, empty: false }
 }
 

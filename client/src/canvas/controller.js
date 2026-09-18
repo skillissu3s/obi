@@ -2,7 +2,7 @@
 import { elementBounds, unionBounds, isLinear, normalizeLinear, simplify, absPoints, midPoint } from '@shared/boardgeom.js'
 import { DEFAULTS, val } from '@shared/boardsvg.js'
 import { newElementId, newSeed } from './store.js'
-import { resolveLayout, hitTest, inMarquee, erasedBy, bindTargetAt, visualBounds, source, measureText, visiblePoints } from './layout.js'
+import { resolveLayout, hitTest, inMarquee, erasedBy, bindTargetAt, visualBounds, source, measureText, measureMarkdown, visiblePoints } from './layout.js'
 
 export const TOOL_KEYS = {
   v: 'select', h: 'hand', r: 'rect', o: 'ellipse', d: 'diamond', a: 'arrow', l: 'line', p: 'pen', m: 'marker',
@@ -217,6 +217,11 @@ export class CanvasController {
   }
 
   textSize(el) {
+    if (el.md) {
+      const html = this.host.renderMarkdown?.(el.text || '') ?? ''
+      const m = measureMarkdown(html, { font: val(el, 'font'), fs: val(el, 'fs'), width: el.w || 320 })
+      return { h: m.h }
+    }
     const m = measureText(el.text || '', { font: val(el, 'font'), fs: val(el, 'fs'), width: el.wrap ? el.w : null })
     return el.wrap ? { h: m.h } : { w: Math.max(m.w, 8), h: m.h }
   }
@@ -368,7 +373,7 @@ export class CanvasController {
         return false
       }
       if (dbl && !this.readOnly) {
-        this.createTextAt(p)
+        this.createTextAt(p, this.defaultTextKind())
         return true
       }
       this.host.focusCanvas?.()
@@ -409,7 +414,7 @@ export class CanvasController {
       const hitText = hitTest(layout, p.x, p.y, { tol })
       if (hitText && (hitText.type === 'text' || hitText.type === 'sticky')) {
         this.set({ selection: [hitText.id], editing: { id: hitText.id } })
-      } else this.createTextAt(p)
+      } else this.createTextAt(p, this.state.tool === 'text' ? 'plain' : this.defaultTextKind())
       this.startGesture({ type: 'noop' }, e)
       return true
     }
@@ -436,12 +441,33 @@ export class CanvasController {
     return this.layout().list.filter((x) => x.group === el.group).map((x) => x.id)
   }
 
-  createTextAt(p) {
+  // kind: 'plain' types exactly what you type; 'markdown' follows the same
+  // rules as a note, in a block you can size yourself.
+  createTextAt(p, kind = 'plain') {
     const s = this.styleFor('text')
     const fs = s.fs || DEFAULTS.fs
-    const el = this.base('text', { x: p.x, y: p.y - fs * 0.7, w: 8, h: fs * 1.3, text: '', align: 'left' })
+    const el =
+      kind === 'markdown'
+        ? this.base('text', { x: p.x, y: p.y - fs * 0.7, w: 320, h: fs * 2, text: '', align: 'left', md: true, wrap: true, font: 'sans' })
+        : this.base('text', { x: p.x, y: p.y - fs * 0.7, w: 8, h: fs * 1.3, text: '', align: 'left' })
     this.addElement(el, { edit: true })
     if (!this.state.lockTool) this.set({ tool: 'select' })
+  }
+
+  // Turn a text block between "exactly what I typed" and "read this as markdown".
+  toggleMarkdown() {
+    const el = this.selected()[0]
+    if (!el || el.type !== 'text' || el.locked || this.readOnly) return
+    const src = source(el)
+    const md = !src.md
+    const next = { md: md || undefined, wrap: md ? true : undefined, w: md ? Math.max(src.w, 280) : src.w }
+    this.store.checkpoint()
+    this.store.update([[el.id, { ...next, ...this.textSize({ ...src, ...next }) }]])
+  }
+
+  // what a double-click on empty canvas makes
+  defaultTextKind() {
+    return this.host.textKind?.() || 'markdown'
   }
 
   doubleClick(hit, p) {

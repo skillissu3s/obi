@@ -11,6 +11,8 @@ import { Toolbar, StyleBar } from './Toolbar.jsx'
 import { visualBounds } from './layout.js'
 import { api } from '../lib/api.js'
 import * as A from '../lib/actions.js'
+import { renderMarkdown } from '../lib/render.js'
+import { usePrefs } from '../store/prefs.js'
 import { fetchNote } from '../lib/render.js'
 import { useApp } from '../store/app.js'
 import { useUI, toast } from '../store/ui.js'
@@ -152,6 +154,10 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
       pointerWorld: () => pointerRef.current,
       focusCanvas,
       userId: () => useApp.getState().user?.id,
+      // what a double-click on empty canvas creates, and how a markdown block
+      // is measured before it is drawn
+      textKind: () => usePrefs.getState().canvasTextKind,
+      renderMarkdown: (text) => renderMarkdown(text || '', { ws: ctx?.ws, path: ctx?.path }).html,
       pickImages: pickImageFiles,
       uploadFiles: (files) => A.uploadFiles(files),
       pickLink: (opts) => A.pickLink(opts),
@@ -517,7 +523,7 @@ export async function exportBoard(ctl, ws, path, format) {
   const elements = ctl.store.getSnapshot().list
   if (!elements.length) return toast.info('Nothing to export yet')
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fff'
-  let { svg, width, height } = boardToSvg(elements, { fileUrl: (p) => api.fileUrl(ws, p), padding: 32 })
+  let { svg, width, height } = boardToSvg(elements, { fileUrl: (p) => api.fileUrl(ws, p), padding: 32, renderMarkdown: (t) => renderMarkdown(t || '', { ws, path }).html })
   svg = resolveCssVars(svg).replace('<svg ', `<svg style="background:${bg}" `)
   svg = svg.replace(/(<svg[^>]*>)/, `$1<rect x="-100000" y="-100000" width="200000" height="200000" fill="${bg}"/>`)
   svg = await inlineImages(svg)

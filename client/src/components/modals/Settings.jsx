@@ -373,6 +373,16 @@ function EditorSection() {
       <Setting name="Show note title at top" desc="Edit the file name inline, like a document title.">
         <Switch checked={prefs.inlineTitle} onChange={(v) => prefs.set({ inlineTitle: v })} />
       </Setting>
+      <Setting name="Double-click on canvas" desc="Markdown blocks follow the same rules as a note; plain text is exactly what you type.">
+        <Segmented
+          value={prefs.canvasTextKind}
+          onChange={(v) => prefs.set({ canvasTextKind: v })}
+          options={[
+            { value: 'markdown', label: 'Markdown' },
+            { value: 'plain', label: 'Plain text' },
+          ]}
+        />
+      </Setting>
       <Setting name="Paste web pages as markdown" desc="Turn copied rich text into headings, lists and links instead of plain text.">
         <Switch checked={prefs.pasteMarkdown} onChange={(v) => prefs.set({ pasteMarkdown: v })} />
       </Setting>

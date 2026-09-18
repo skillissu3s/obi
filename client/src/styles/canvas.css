@@ -327,6 +327,76 @@ svg.cv-el {
 .cv-sel-box.locked {
   border-color: var(--text-3);
 }
+/* a markdown text block on the canvas: note rules, canvas sizing */
+.cv-md {
+  overflow-wrap: anywhere;
+}
+.cv-md > :first-child {
+  margin-top: 0;
+}
+.cv-md > :last-child {
+  margin-bottom: 0;
+}
+.cv-md p,
+.cv-md ul,
+.cv-md ol,
+.cv-md blockquote,
+.cv-md pre {
+  margin: 0.4em 0;
+}
+.cv-md h1,
+.cv-md h2,
+.cv-md h3,
+.cv-md h4 {
+  margin: 0.5em 0 0.25em;
+  line-height: 1.25;
+}
+.cv-md h1 {
+  font-size: 1.5em;
+}
+.cv-md h2 {
+  font-size: 1.28em;
+}
+.cv-md h3 {
+  font-size: 1.12em;
+}
+.cv-md ul,
+.cv-md ol {
+  padding-left: 1.3em;
+}
+.cv-md code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--bg-code);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-xs);
+}
+.cv-md pre {
+  background: var(--bg-code);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  overflow: auto;
+}
+.cv-md pre code {
+  background: none;
+  padding: 0;
+}
+.cv-md blockquote {
+  border-left: 2px solid var(--border-strong);
+  padding-left: 0.7em;
+  color: var(--text-2);
+}
+.cv-md a {
+  color: var(--accent-text);
+}
+.cv-md table {
+  border-collapse: collapse;
+}
+.cv-md th,
+.cv-md td {
+  border: 1px solid var(--border-strong);
+  padding: 3px 7px;
+}
 .cv-arrowbud {
   position: absolute;
   width: calc(9px * var(--inv));

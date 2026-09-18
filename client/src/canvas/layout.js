@@ -241,6 +241,24 @@ export function elementsInRect(layout, rect) {
 // ---------------- text measuring ----------------
 
 let measurer = null
+// Markdown text blocks are measured from the rendered HTML, since a heading or
+// a list takes a different amount of room than the source line it came from.
+let mdMeasurer = null
+export function measureMarkdown(html, { font = 'sans', fs = 16, width = 320 } = {}) {
+  if (!mdMeasurer) {
+    mdMeasurer = document.createElement('div')
+    mdMeasurer.className = 'cv-md'
+    mdMeasurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none'
+    document.body.appendChild(mdMeasurer)
+  }
+  mdMeasurer.style.fontFamily = FONTS[font] || FONTS.sans
+  mdMeasurer.style.fontSize = `${fs * fontScale(font)}px`
+  mdMeasurer.style.width = `${Math.max(40, width)}px`
+  mdMeasurer.innerHTML = html || '<p></p>'
+  // a couple of pixels of slack so a descender or a border never gets clipped
+  return { w: Math.ceil(mdMeasurer.offsetWidth), h: Math.max(24, Math.ceil(mdMeasurer.offsetHeight) + 4) }
+}
+
 export function measureText(text, { font = 'hand', fs = 20, width = null, padding = 0 } = {}) {
   if (!measurer) {
     measurer = document.createElement('div')

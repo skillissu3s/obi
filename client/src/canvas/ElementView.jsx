@@ -3,6 +3,7 @@ import { FileText, Globe, ExternalLink, Link2, ImageOff } from 'lucide-react'
 import { drawables, val, colorCss, stickyCss, FONTS, fontScale, lineHeight, DEFAULTS } from '@shared/boardsvg.js'
 import { midPoint } from '@shared/boardgeom.js'
 import { measureText } from './layout.js'
+import { renderMarkdown } from '../lib/render.js'
 
 function Paths({ list }) {
   return list.map((p, i) => (
@@ -200,10 +201,23 @@ function PenEl({ el }) {
 function TextEl({ el, editing, ctx }) {
   const ts = { ...textStyle(el, { align: 'left' }), color: colorCss(el.stroke) }
   const box = { width: el.w, minHeight: el.h, whiteSpace: el.wrap ? 'pre-wrap' : 'pre' }
+  // A markdown block writes as markdown and reads as the formatting it means:
+  // headings, lists, quotes, code and links, the same rules as a note.
+  const markdown = el.md ? renderMarkdown(el.text || '', { ws: ctx?.ws, path: ctx?.path }).html : null
   return (
     <div className="cv-el" style={place(el)}>
       {editing ? (
         <EditText el={el} ctx={ctx} kind="text" style={{ ...ts, ...box, height: el.h, minWidth: 24 }} />
+      ) : el.md ? (
+        <div
+          className="cv-text cv-md"
+          style={{ ...ts, width: el.w, minHeight: el.h, whiteSpace: 'normal' }}
+          onPointerDown={(e) => {
+            // links inside the block stay clickable
+            if (e.target.closest('a')) e.stopPropagation()
+          }}
+          dangerouslySetInnerHTML={{ __html: markdown }}
+        />
       ) : (
         <div className="cv-text" style={{ ...ts, ...box }}>
           <RichText text={el.text || ''} ctx={ctx} />

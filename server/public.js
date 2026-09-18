@@ -100,7 +100,7 @@ function renderFor({ row, rt, content, boards }) {
 // beside. Elements that share an anchor are drawn together so arrows between
 // them still resolve, and each group is placed by the reader's browser against
 // the block carrying that source line.
-function layerHtml(layer, fileUrl) {
+function layerHtml(layer, fileUrl, renderMarkdown) {
   if (!layer?.length) return ''
   const buckets = new Map()
   for (const el of layer) {
@@ -113,7 +113,7 @@ function layerHtml(layer, fileUrl) {
   const parts = []
   for (const [key, els] of buckets) {
     const flat = els.map(({ anchor, ...rest }) => rest)
-    const { svg, empty, x, y, width, height } = boardToSvg(flat, { padding: 8, fileUrl, position: true })
+    const { svg, empty, x, y, width, height } = boardToSvg(flat, { padding: 8, fileUrl, position: true, renderMarkdown })
     if (empty) continue
     // for an anchored group, y is measured from the top of its anchor line
     let offsetY = y
@@ -128,6 +128,10 @@ function layerHtml(layer, fileUrl) {
   }
   return parts.length ? `<div class="cvlayer" aria-hidden="true">${parts.join('')}</div>` : ''
 }
+
+// markdown inside a canvas text block, with links left inert on a static page
+const plainMd = createMarkdown({ html: false, noteEmbeds: false, resolve: () => ({ href: null, exists: false, path: null }), fileUrl: (p) => p })
+const plainMarkdown = (text) => plainMd.render(String(text || ''), {}).html
 
 const LAYER_SCRIPT = `
 (function(){
@@ -215,6 +219,7 @@ function boardPageHtml(data) {
   const { svg, empty } = boardToSvg(elements, {
     title: noteTitle(data.row.path),
     fileUrl: (src) => `/p/${data.row.slug}/file?path=${encodeURIComponent(src)}`,
+    renderMarkdown: plainMarkdown,
   })
   return empty ? '<p class="board-missing">This whiteboard is empty.</p>' : `<figure class="board">${svg}</figure>`
 }
@@ -230,7 +235,7 @@ publicRouter.get('/:slug', async (req, res) => {
   res.send(
     page(title, board ? html : bodyHtml(title, html), data.row.slug, {
       themeCss: themeCss(data.theme),
-      layer: board ? '' : layerHtml(data.layer, (src) => `/p/${data.row.slug}/file?path=${encodeURIComponent(src)}`),
+      layer: board ? '' : layerHtml(data.layer, (src) => `/p/${data.row.slug}/file?path=${encodeURIComponent(src)}`, plainMarkdown),
       bodyClass: board ? 'is-board' : '',
     }),
   )

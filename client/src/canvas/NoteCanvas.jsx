@@ -12,6 +12,7 @@ import { IMAGE_EXT, extname, isNote } from '@shared/paths.js'
 import { isBoardPath } from '@shared/board.js'
 import { conn } from '../lib/socket.js'
 import * as A from '../lib/actions.js'
+import { renderMarkdown } from '../lib/render.js'
 import { usePrefs } from '../store/prefs.js'
 import { useUI } from '../store/ui.js'
 import { setAnnotations, annotationAt } from '../editor/annotations.js'
@@ -184,6 +185,10 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       pointerWorld: () => pointerRef.current,
       focusCanvas,
       userId: () => conn.user?.id,
+      // what a double-click on empty canvas creates, and how a markdown block
+      // is measured before it is drawn
+      textKind: () => usePrefs.getState().canvasTextKind,
+      renderMarkdown: (text) => renderMarkdown(text || '', { ws: ctx?.ws, path: ctx?.path }).html,
       pickImages: pickImageFiles,
       uploadFiles: (files) => A.uploadFiles(files),
       pickLink: (opts) => A.pickLink(opts),
