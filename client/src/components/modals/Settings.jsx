@@ -373,6 +373,9 @@ function EditorSection() {
       <Setting name="Show note title at top" desc="Edit the file name inline, like a document title.">
         <Switch checked={prefs.inlineTitle} onChange={(v) => prefs.set({ inlineTitle: v })} />
       </Setting>
+      <Setting name="Paste web pages as markdown" desc="Turn copied rich text into headings, lists and links instead of plain text.">
+        <Switch checked={prefs.pasteMarkdown} onChange={(v) => prefs.set({ pasteMarkdown: v })} />
+      </Setting>
       <Setting name="Typewriter scrolling" desc="Keep the line you are writing in the middle of the screen.">
         <Switch checked={prefs.typewriter} onChange={(v) => prefs.set({ typewriter: v })} />
       </Setting>

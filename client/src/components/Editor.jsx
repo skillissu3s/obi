@@ -4,6 +4,7 @@ import { ySyncAnnotation } from 'y-codemirror.next'
 import { EditorState } from '@codemirror/state'
 import { baseExtensions, compartments, collabExtensions, modeExtensions, readOnlyExtensions, prefsExtensions } from '../editor/setup.js'
 import { editorCtx, refreshEffect } from '../editor/livePreview.js'
+import { htmlToMarkdown, worthConverting } from '../editor/htmlmd.js'
 import { IMAGE_EXT, extname } from '@shared/paths.js'
 import { usePrefs } from '../store/prefs.js'
 import { useApp } from '../store/app.js'
@@ -53,6 +54,16 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
               return true
             }
             const text = event.clipboardData?.getData('text/plain')?.trim()
+            // rich text from a web page or a doc comes in as markdown
+            const html = event.clipboardData?.getData('text/html')
+            if (html && usePrefs.getState().pasteMarkdown && worthConverting(html, text)) {
+              const md = htmlToMarkdown(html)
+              if (md) {
+                event.preventDefault()
+                view.dispatch(view.state.replaceSelection(md))
+                return true
+              }
+            }
             if (text && /^https?:\/\/\S+$/.test(text) && !view.state.selection.main.empty) {
               event.preventDefault()
               const { from, to } = view.state.selection.main

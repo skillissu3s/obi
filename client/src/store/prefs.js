@@ -45,6 +45,7 @@ export const DEFAULT_PREFS = {
   uiScale: 'default',
   editorFont: 'sans',
   readableWidth: true,
+  pasteMarkdown: true, // rich text from the clipboard arrives as markdown
   lineWidth: 'normal', // narrow | normal | wide
   lineHeight: 1.7,
   defaultMode: 'live',
