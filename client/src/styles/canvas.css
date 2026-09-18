@@ -475,14 +475,33 @@ svg.cv-el {
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-strong);
   z-index: 2;
 }
-.cv-row.has-sub:hover > .cv-sub,
+/* open is decided in JS (MenuRows) so the pointer can travel to it */
+.cv-row.has-sub.open > .cv-sub,
 .cv-row.has-sub:focus-within > .cv-sub {
   display: flex;
+}
+.cv-row.has-sub.open {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+/* an invisible bridge over the 6px gap, so crossing it never counts as
+   leaving the row */
+.cv-sub::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: 8px;
 }
 /* near the right edge the options open on the other side instead */
 .cv-pop.flip-sub .cv-sub {
   left: auto;
   right: calc(100% + 6px);
+}
+.cv-pop.flip-sub .cv-sub::before {
+  right: auto;
+  left: 100%;
 }
 
 /* the live markdown editor sitting inside a canvas block */

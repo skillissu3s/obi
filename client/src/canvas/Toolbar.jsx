@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   MousePointer2, Hand, Square, Circle, Diamond, MoveUpRight, Minus, Pencil, Highlighter, Type, StickyNote, ImagePlus, Link2,
@@ -206,21 +206,75 @@ const TOOL_TYPE = { rect: 'rect', ellipse: 'ellipse', diamond: 'diamond', arrow:
 
 // One settings area rather than a row of unlabelled icons: every row says what
 // it is and shows what it is set to, and its options open beside it.
+// Which submenu is open, with hover intent: when one is already showing, a
+// row the pointer merely passes over on its way there doesn't steal it — only
+// a row the pointer stays on does. Leaving the menu altogether gives a moment
+// to come back before everything closes.
+const SubmenuCtx = createContext(null)
+const SWITCH_DELAY = 180
+const CLOSE_DELAY = 300
+
+function MenuRows({ children }) {
+  const [open, setOpen] = useState(null)
+  const openRef = useRef(null)
+  const timer = useRef(0)
+  openRef.current = open
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const api = {
+    open,
+    // pointer on a row
+    enter(id) {
+      clearTimeout(timer.current)
+      if (openRef.current == null || openRef.current === id) return setOpen(id)
+      timer.current = setTimeout(() => setOpen(id), SWITCH_DELAY)
+    },
+    // pointer arrived inside an open submenu: keep it
+    hold(id) {
+      clearTimeout(timer.current)
+      if (openRef.current !== id) setOpen(id)
+    },
+    // pointer on a plain row (no submenu): close after the same pause
+    plain() {
+      clearTimeout(timer.current)
+      if (openRef.current != null) timer.current = setTimeout(() => setOpen(null), SWITCH_DELAY)
+    },
+  }
+  return (
+    <SubmenuCtx.Provider value={api}>
+      <div
+        className="cv-menu"
+        onPointerLeave={() => {
+          clearTimeout(timer.current)
+          timer.current = setTimeout(() => setOpen(null), CLOSE_DELAY)
+        }}
+      >
+        {children}
+      </div>
+    </SubmenuCtx.Provider>
+  )
+}
+
 function MenuRow({ name, value, children, hint, danger, active, onClick }) {
+  const sub = useContext(SubmenuCtx)
   if (!children) {
     return (
-      <button className={`cv-row ${danger ? 'danger' : ''} ${active ? 'active' : ''}`} onMouseDown={(e) => e.preventDefault()} onClick={onClick}>
+      <button
+        className={`cv-row ${danger ? 'danger' : ''} ${active ? 'active' : ''}`}
+        onPointerEnter={() => sub?.plain()}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={onClick}
+      >
         <span className="cv-row-name">{name}</span>
         {hint && <span className="cv-row-hint">{hint}</span>}
       </button>
     )
   }
   return (
-    <div className="cv-row has-sub">
+    <div className={`cv-row has-sub ${sub?.open === name ? 'open' : ''}`} onPointerEnter={() => sub?.enter(name)}>
       <span className="cv-row-name">{name}</span>
       {value != null && <span className="cv-row-value">{value}</span>}
       <ChevronRight className="cv-row-arrow" />
-      <div className="cv-sub" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="cv-sub" onPointerEnter={() => sub?.hold(name)} onPointerDown={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>
@@ -312,7 +366,7 @@ export function StyleBar({ ctl, mode }) {
   ]
 
   const menu = (close) => (
-          <div className="cv-menu">
+          <MenuRows>
             {has('stroke') && (
               <MenuRow name="Stroke" value={<span className="cv-dot sm" style={{ background: colorCss(stroke) }} />}>
                 <Swatches colors={STROKE_COLORS} value={stroke} css={colorCss} onPick={(c) => set({ stroke: c })} />
@@ -528,7 +582,7 @@ export function StyleBar({ ctl, mode }) {
                 />
               </>
             )}
-          </div>
+          </MenuRows>
   )
 
   // Nothing selected, drawing tool in hand: its settings, above its button.
