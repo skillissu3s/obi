@@ -228,7 +228,8 @@ export function ContextMenu() {
   useEffect(() => {
     if (!menu) return
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) close()
+      if (!ref.current || ref.current.contains(e.target)) return
+      close(true)
     }
     const actionable = menu.items.map((it, i) => (it.label && !it.disabled ? i : -1)).filter((i) => i >= 0)
     const onKey = (e) => {
@@ -253,12 +254,12 @@ export function ContextMenu() {
         })
       }
     }
-    window.addEventListener('mousedown', onDown, true)
+    window.addEventListener('pointerdown', onDown, true)
     window.addEventListener('keydown', onKey, true)
     window.addEventListener('blur', close)
     window.addEventListener('resize', close)
     return () => {
-      window.removeEventListener('mousedown', onDown, true)
+      window.removeEventListener('pointerdown', onDown, true)
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('blur', close)
       window.removeEventListener('resize', close)
@@ -297,7 +298,8 @@ export function ContextMenu() {
 
 export function menuFromElement(el) {
   const r = el.getBoundingClientRect()
-  return { clientX: r.left, clientY: r.bottom + 4, preventDefault() {}, stopPropagation() {} }
+  // trigger travels with the menu so clicking the same button closes it
+  return { clientX: r.left, clientY: r.bottom + 4, trigger: el, preventDefault() {}, stopPropagation() {} }
 }
 
 export function Spinner({ size }) {

@@ -747,6 +747,18 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     requestAnimationFrame(step)
   }
 
+  // The canvas draws into a node of its own rather than straight into the
+  // React-rendered origin: when a tab closes, React and the portal would
+  // otherwise race to remove the same children and one of them would find
+  // them already gone, taking the whole app down with it.
+  const [portalHost] = useState(() => document.createElement('div'))
+  useLayoutEffect(() => {
+    if (!originEl) return undefined
+    portalHost.className = 'nc-portal'
+    originEl.appendChild(portalHost)
+    return () => portalHost.remove()
+  }, [originEl, portalHost])
+
   if (!ctl || !originEl) return null
   const open = prefs.canvasBar
   const count = ctl.layout().list.length + store.getSnapshot().list.filter((e) => e.type === 'highlight').length
@@ -754,7 +766,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
 
   return (
     <>
-      {createPortal(<CanvasLayer ctl={ctl} ctx={ctx} zoom={1} />, originEl)}
+      {portalHost && createPortal(<CanvasLayer ctl={ctl} ctx={ctx} zoom={1} />, portalHost)}
       {Math.abs(pan) > 2 && (
         <button className="btn btn-sm nc-recenter" onClick={() => animatePan(0)} title="Move the note back to the centre">
           <LocateFixed /> Re-center

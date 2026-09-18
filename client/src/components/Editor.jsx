@@ -5,6 +5,7 @@ import { EditorState } from '@codemirror/state'
 import { baseExtensions, compartments, collabExtensions, modeExtensions, readOnlyExtensions, prefsExtensions } from '../editor/setup.js'
 import { editorCtx, refreshEffect } from '../editor/livePreview.js'
 import { htmlToMarkdown, worthConverting } from '../editor/htmlmd.js'
+import { syntaxTree } from '@codemirror/language'
 import { IMAGE_EXT, extname } from '@shared/paths.js'
 import { usePrefs } from '../store/prefs.js'
 import { useApp } from '../store/app.js'
@@ -12,6 +13,13 @@ import { buildEditorCtx, uploadFiles } from '../lib/actions.js'
 import { toast } from '../store/ui.js'
 
 const scrollMemory = new Map()
+
+// Inside a code block or front matter, pasted HTML should stay exactly as it is.
+function inVerbatim(state) {
+  const node = syntaxTree(state).resolveInner(state.selection.main.from, 1)
+  for (let p = node; p; p = p.parent) if (['FencedCode', 'CodeText', 'CodeBlock', 'InlineCode', 'Frontmatter'].includes(p.name)) return true
+  return false
+}
 
 export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, line, heading }) {
   const hostRef = useRef(null)
@@ -56,7 +64,7 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
             const text = event.clipboardData?.getData('text/plain')?.trim()
             // rich text from a web page or a doc comes in as markdown
             const html = event.clipboardData?.getData('text/html')
-            if (html && usePrefs.getState().pasteMarkdown && worthConverting(html, text)) {
+            if (html && usePrefs.getState().pasteMarkdown && !inVerbatim(view.state) && worthConverting(html, text)) {
               const md = htmlToMarkdown(html)
               if (md) {
                 event.preventDefault()

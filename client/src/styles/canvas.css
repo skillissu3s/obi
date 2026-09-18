@@ -733,6 +733,9 @@ svg.cv-el {
   position: relative;
 }
 /* world x = 0 is where the text starts, so drawings stay beside the words they belong to */
+.nc-portal {
+  display: contents;
+}
 .nc-origin {
   position: absolute;
   left: 56px;

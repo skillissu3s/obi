@@ -1193,6 +1193,58 @@ kbd {
   }
 }
 
+.crash {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+  z-index: 9999;
+}
+.crash-card {
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-lg);
+}
+.crash-card svg {
+  width: 22px;
+  height: 22px;
+  color: var(--warning);
+}
+.crash-card h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.crash-card p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.crash-card details {
+  width: 100%;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.crash-card summary {
+  cursor: pointer;
+}
+.crash-card pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 /* ---------- Print: just the note ---------- */
 @media print {
   .ribbon,
