@@ -5,7 +5,7 @@ import {
   Frame, Eraser, Pointer, Lock, LockOpen, Copy, Trash2, Group, Ungroup, Layers, AlignStartVertical, AlignCenterVertical,
   AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter, AlignLeft, AlignCenter, AlignRight, SlidersHorizontal, Spline, ChevronsDown, Link as LinkIcon,
-  ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, FileText, Hash, Pilcrow,
+  ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, ChevronRight, FileText, Hash, Pilcrow,
 } from 'lucide-react'
 import { STROKE_COLORS, STICKY_COLORS, colorCss, fillCss, stickyCss, DEFAULTS } from '@shared/boardsvg.js'
 import { appliesTo, styleGroup } from './controller.js'
@@ -82,14 +82,20 @@ export function Toolbar({ ctl, mode, extra, onCollapse }) {
 function Popover({ anchor, onClose, children }) {
   const ref = useRef(null)
   const [pos, setPos] = useState(null)
+  const [flip, setFlip] = useState(false)
   useLayoutEffect(() => {
     if (!anchor || !ref.current) return
     const r = anchor.getBoundingClientRect()
     const pr = ref.current.getBoundingClientRect()
     let left = r.left + r.width / 2 - pr.width / 2
     left = Math.max(8, Math.min(window.innerWidth - pr.width - 8, left))
+    // Opens above the button it belongs to. When there isn't room, it rises as
+    // far as it needs to stay whole on screen — it never drops below the
+    // toolbar, where it would run off the bottom.
     let top = r.top - pr.height - 8
-    if (top < 8) top = r.bottom + 8
+    if (top < 8) top = Math.max(8, window.innerHeight - pr.height - 8)
+    // submenus open to the right unless there is no room for them there
+    setFlip(left + pr.width + 180 > window.innerWidth)
     setPos({ left, top })
   }, [anchor])
   useEffect(() => {
@@ -111,7 +117,7 @@ function Popover({ anchor, onClose, children }) {
     }
   }, [anchor, onClose])
   return createPortal(
-    <div ref={ref} className="cv-pop" style={pos || { left: -9999, top: -9999 }} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.preventDefault()}>
+    <div ref={ref} className={`cv-pop ${flip ? 'flip-sub' : ''}`} style={pos || { left: -9999, top: -9999 }} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.preventDefault()}>
       {children}
     </div>,
     document.body,
@@ -194,6 +200,31 @@ const headIcon = (kind, flip) => (
 
 const TOOL_TYPE = { rect: 'rect', ellipse: 'ellipse', diamond: 'diamond', arrow: 'arrow', line: 'line', pen: 'pen', marker: 'pen', text: 'text', mdtext: 'text', sticky: 'sticky', frame: 'frame' }
 
+// One settings area rather than a row of unlabelled icons: every row says what
+// it is and shows what it is set to, and its options open beside it.
+function MenuRow({ name, value, children, hint, danger, active, onClick }) {
+  if (!children) {
+    return (
+      <button className={`cv-row ${danger ? 'danger' : ''} ${active ? 'active' : ''}`} onMouseDown={(e) => e.preventDefault()} onClick={onClick}>
+        <span className="cv-row-name">{name}</span>
+        {hint && <span className="cv-row-hint">{hint}</span>}
+      </button>
+    )
+  }
+  return (
+    <div className="cv-row has-sub">
+      <span className="cv-row-name">{name}</span>
+      {value != null && <span className="cv-row-value">{value}</span>}
+      <ChevronRight className="cv-row-arrow" />
+      <div className="cv-sub" onPointerDown={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+const labelOf = (options, value, fallback = '') => options.find((o) => o.value === value)?.title ?? fallback
+
 // Contextual style controls for the selection (or the active drawing tool).
 export function StyleBar({ ctl, mode }) {
   const state = useController(ctl)
@@ -218,230 +249,280 @@ export function StyleBar({ ctl, mode }) {
   const grouped = sel.some((el) => el.group)
   const stroke = first('stroke')
   const fill = first('fill')
+  const single = sel.length === 1 ? sel[0] : null
+
+  const swOpts = [
+    { value: 1, title: 'Thin', label: line(1.2) },
+    { value: 2, title: 'Medium', label: line(2.4) },
+    { value: 4, title: 'Bold', label: line(4) },
+  ]
+  const dashOpts = [
+    { value: 'solid', title: 'Solid', label: line(2) },
+    { value: 'dashed', title: 'Dashed', label: line(2, '5 3') },
+    { value: 'dotted', title: 'Dotted', label: line(2.4, '0.1 4') },
+  ]
+  const roughOpts = [
+    { value: 0, title: 'Clean', label: sloppy(0) },
+    { value: 1, title: 'Sketchy', label: sloppy(1) },
+    { value: 2, title: 'Wild', label: sloppy(2) },
+  ]
+  const roundOpts = [
+    { value: false, title: 'Sharp', label: 'Sharp' },
+    { value: true, title: 'Round', label: 'Round' },
+  ]
+  const fontOpts = [
+    { value: 'hand', title: 'Hand-drawn', label: <span style={{ fontFamily: "'Caveat Variable', cursive", fontSize: 17 }}>Hand</span> },
+    { value: 'sans', title: 'Normal', label: 'Sans' },
+    { value: 'mono', title: 'Code', label: <span style={{ fontFamily: 'var(--font-mono)' }}>Mono</span> },
+  ]
+  const fsOpts = [
+    { value: 14, title: 'Small', label: 'S' },
+    { value: 20, title: 'Medium', label: 'M' },
+    { value: 28, title: 'Large', label: 'L' },
+    { value: 40, title: 'Extra large', label: 'XL' },
+  ]
+  const alignOpts = [
+    { value: 'left', title: 'Left', label: <AlignLeft size={15} /> },
+    { value: 'center', title: 'Centre', label: <AlignCenter size={15} /> },
+    { value: 'right', title: 'Right', label: <AlignRight size={15} /> },
+  ]
+  const fillStyleOpts = [
+    { value: 'solid', title: 'Solid', label: 'Solid' },
+    { value: 'hachure', title: 'Hatched', label: 'Hatch' },
+    { value: 'cross', title: 'Cross-hatched', label: 'Cross' },
+  ]
 
   return (
     <div className="cv-stylebar" onPointerDown={(e) => e.stopPropagation()}>
-      {has('stroke') && (
-        <PopButton title="Stroke colour" label={<span className="cv-dot" style={{ background: colorCss(stroke) }} />}>
-          <div className="cv-pop-label">Stroke</div>
-          <Swatches colors={STROKE_COLORS} value={stroke} css={colorCss} onPick={(c) => set({ stroke: c })} />
-        </PopButton>
-      )}
-      {has('fill') && (
-        <PopButton title="Fill" label={<span className={`cv-dot ${fill === 'none' || !fill ? 'none' : ''}`} style={fill && fill !== 'none' ? { background: fillCss(fill) } : undefined} />}>
-          <div className="cv-pop-label">Fill</div>
-          <Swatches colors={STROKE_COLORS} value={fill} css={fillCss} allowNone onPick={(c) => set({ fill: c })} />
-          {fill && fill !== 'none' && (
-            <Opts
-              value={first('fillStyle')}
-              onPick={(v) => set({ fillStyle: v })}
-              options={[
-                { value: 'solid', title: 'Solid', label: 'Solid' },
-                { value: 'hachure', title: 'Hatched', label: 'Hatch' },
-                { value: 'cross', title: 'Cross-hatched', label: 'Cross' },
-              ]}
-            />
-          )}
-        </PopButton>
-      )}
-      {has('color') && (
-        <PopButton title="Note colour" label={<span className="cv-dot" style={{ background: stickyCss(first('color')), borderRadius: 4 }} />}>
-          <div className="cv-pop-label">Sticky colour</div>
-          <Swatches colors={STICKY_COLORS} value={first('color')} css={stickyCss} onPick={(c) => set({ color: c })} />
-        </PopButton>
-      )}
-      {has('sw') && (
-        <PopButton title="Stroke" label={<SlidersHorizontal />}>
-          <div className="cv-pop-label">Thickness</div>
-          <Opts
-            value={first('sw')}
-            onPick={(v) => set({ sw: v })}
-            options={[
-              { value: 1, title: 'Thin', label: line(1.2) },
-              { value: 2, title: 'Medium', label: line(2.4) },
-              { value: 4, title: 'Bold', label: line(4) },
-            ]}
-          />
-          {has('dash') && (
-            <>
-              <div className="cv-pop-label">Style</div>
-              <Opts
-                value={first('dash')}
-                onPick={(v) => set({ dash: v })}
-                options={[
-                  { value: 'solid', title: 'Solid', label: line(2) },
-                  { value: 'dashed', title: 'Dashed', label: line(2, '5 3') },
-                  { value: 'dotted', title: 'Dotted', label: line(2.4, '0.1 4') },
-                ]}
-              />
-              <div className="cv-pop-label">Sloppiness</div>
-              <Opts
-                value={first('rough')}
-                onPick={(v) => set({ rough: v })}
-                options={[
-                  { value: 0, title: 'Clean', label: sloppy(0) },
-                  { value: 1, title: 'Sketchy', label: sloppy(1) },
-                  { value: 2, title: 'Wild', label: sloppy(2) },
-                ]}
-              />
-            </>
-          )}
-          {has('round') && (
-            <>
-              <div className="cv-pop-label">Corners</div>
-              <Opts
-                value={first('round')}
-                onPick={(v) => set({ round: v })}
-                options={[
-                  { value: false, title: 'Sharp', label: 'Sharp' },
-                  { value: true, title: 'Round', label: 'Round' },
-                ]}
-              />
-            </>
-          )}
-        </PopButton>
-      )}
-      {has('heads') && (
-        <PopButton title="Arrowheads & path" label={<Spline />}>
-          <div className="cv-pop-label">Start</div>
-          <Opts
-            value={first('heads')?.[0] ?? 'none'}
-            onPick={(v) => set({ heads: [v, first('heads')?.[1] ?? 'arrow'] })}
-            options={['none', 'arrow', 'triangle', 'dot', 'bar'].map((k) => ({ value: k, title: k, label: headIcon(k, true) }))}
-          />
-          <div className="cv-pop-label">End</div>
-          <Opts
-            value={first('heads')?.[1] ?? 'arrow'}
-            onPick={(v) => set({ heads: [first('heads')?.[0] ?? 'none', v] })}
-            options={['none', 'arrow', 'triangle', 'dot', 'bar'].map((k) => ({ value: k, title: k, label: headIcon(k) }))}
-          />
-          <div className="cv-pop-label">Path</div>
-          <Opts
-            value={!!first('curve')}
-            onPick={(v) => set({ curve: v })}
-            options={[
-              { value: false, title: 'Straight segments', label: 'Straight' },
-              { value: true, title: 'Smooth curve through bends', label: 'Curved' },
-            ]}
-          />
-        </PopButton>
-      )}
-      {has('font') && (
-        <PopButton title="Text" label={<Type />}>
-          <div className="cv-pop-label">Font</div>
-          <Opts
-            value={first('font')}
-            onPick={(v) => set({ font: v })}
-            options={[
-              { value: 'hand', title: 'Hand-drawn', label: <span style={{ fontFamily: "'Caveat Variable', cursive", fontSize: 17 }}>Hand</span> },
-              { value: 'sans', title: 'Normal', label: 'Sans' },
-              { value: 'mono', title: 'Code', label: <span style={{ fontFamily: 'var(--font-mono)' }}>Mono</span> },
-            ]}
-          />
-          <div className="cv-pop-label">Size</div>
-          <Opts
-            value={first('fs')}
-            onPick={(v) => set({ fs: v })}
-            options={[
-              { value: 14, title: 'Small', label: 'S' },
-              { value: 20, title: 'Medium', label: 'M' },
-              { value: 28, title: 'Large', label: 'L' },
-              { value: 40, title: 'Extra large', label: 'XL' },
-            ]}
-          />
-          {has('align') && (
-            <Opts
-              value={first('align')}
-              onPick={(v) => set({ align: v })}
-              options={[
-                { value: 'left', title: 'Align left', label: <AlignLeft size={15} /> },
-                { value: 'center', title: 'Centre', label: <AlignCenter size={15} /> },
-                { value: 'right', title: 'Align right', label: <AlignRight size={15} /> },
-              ]}
-            />
-          )}
-        </PopButton>
-      )}
-      {sel.length > 0 && (
-        <>
-          <div className="cv-sep" />
-          <PopButton title="Arrange" label={<Layers />}>
-            {(close) => (
-              <>
-                <div className="cv-pop-label">Layer</div>
-                <div className="cv-opts">
-                  <Btn title="Bring to front (Ctrl ])" onClick={() => ctl.order('front')}><ArrowUpToLine /></Btn>
-                  <Btn title="Bring forward (])" onClick={() => ctl.order('forward')}><ChevronUp /></Btn>
-                  <Btn title="Send backward ([)" onClick={() => ctl.order('backward')}><ChevronDown /></Btn>
-                  <Btn title="Send to back (Ctrl [)" onClick={() => ctl.order('back')}><ArrowDownToLine /></Btn>
-                </div>
-                {multi && (
+      <PopButton
+        title="Style and arrangement"
+        label={
+          <>
+            {has('stroke') ? <span className="cv-dot" style={{ background: colorCss(stroke) }} /> : <SlidersHorizontal />}
+            <span className="cv-sbtn-label">{multi ? `${sel.length} selected` : 'Style'}</span>
+          </>
+        }
+      >
+        {(close) => (
+          <div className="cv-menu">
+            {has('stroke') && (
+              <MenuRow name="Stroke" value={<span className="cv-dot sm" style={{ background: colorCss(stroke) }} />}>
+                <Swatches colors={STROKE_COLORS} value={stroke} css={colorCss} onPick={(c) => set({ stroke: c })} />
+              </MenuRow>
+            )}
+            {has('fill') && (
+              <MenuRow
+                name="Fill"
+                value={<span className={`cv-dot sm ${fill === 'none' || !fill ? 'none' : ''}`} style={fill && fill !== 'none' ? { background: fillCss(fill) } : undefined} />}
+              >
+                <Swatches colors={STROKE_COLORS} value={fill} css={fillCss} allowNone onPick={(c) => set({ fill: c })} />
+                {fill && fill !== 'none' && (
                   <>
-                    <div className="cv-pop-label">Align</div>
-                    <div className="cv-opts">
-                      <Btn title="Align left" onClick={() => ctl.align('left')}><AlignStartVertical /></Btn>
-                      <Btn title="Centre horizontally" onClick={() => ctl.align('hcenter')}><AlignCenterVertical /></Btn>
-                      <Btn title="Align right" onClick={() => ctl.align('right')}><AlignEndVertical /></Btn>
-                      <Btn title="Distribute horizontally" onClick={() => ctl.align('hdist')}><AlignHorizontalDistributeCenter /></Btn>
-                    </div>
-                    <div className="cv-opts">
-                      <Btn title="Align top" onClick={() => ctl.align('top')}><AlignStartHorizontal /></Btn>
-                      <Btn title="Centre vertically" onClick={() => ctl.align('vcenter')}><AlignCenterHorizontal /></Btn>
-                      <Btn title="Align bottom" onClick={() => ctl.align('bottom')}><AlignEndHorizontal /></Btn>
-                      <Btn title="Distribute vertically" onClick={() => ctl.align('vdist')}><AlignVerticalDistributeCenter /></Btn>
-                    </div>
+                    <div className="cv-pop-label">Pattern</div>
+                    <Opts value={first('fillStyle')} onPick={(v) => set({ fillStyle: v })} options={fillStyleOpts} />
                   </>
                 )}
-                <div className="cv-pop-label">Opacity</div>
-                <input
-                  className="cv-range"
-                  type="range"
-                  min="10"
-                  max="100"
-                  step="5"
-                  defaultValue={first('opacity') ?? 100}
-                  onChange={(e) => ctl.setStyle({ opacity: Number(e.target.value) })}
-                  onPointerUp={close}
+              </MenuRow>
+            )}
+            {has('color') && (
+              <MenuRow name="Note colour" value={<span className="cv-dot sm" style={{ background: stickyCss(first('color')), borderRadius: 4 }} />}>
+                <Swatches colors={STICKY_COLORS} value={first('color')} css={stickyCss} onPick={(c) => set({ color: c })} />
+              </MenuRow>
+            )}
+            {has('sw') && (
+              <MenuRow name="Thickness" value={labelOf(swOpts, first('sw'), 'Medium')}>
+                <Opts value={first('sw')} onPick={(v) => set({ sw: v })} options={swOpts} />
+              </MenuRow>
+            )}
+            {has('dash') && (
+              <MenuRow name="Line style" value={labelOf(dashOpts, first('dash'), 'Solid')}>
+                <Opts value={first('dash')} onPick={(v) => set({ dash: v })} options={dashOpts} />
+              </MenuRow>
+            )}
+            {has('rough') && (
+              <MenuRow name="Sloppiness" value={labelOf(roughOpts, first('rough'), 'Sketchy')}>
+                <Opts value={first('rough')} onPick={(v) => set({ rough: v })} options={roughOpts} />
+              </MenuRow>
+            )}
+            {has('round') && (
+              <MenuRow name="Corners" value={labelOf(roundOpts, !!first('round'), 'Sharp')}>
+                <Opts value={!!first('round')} onPick={(v) => set({ round: v })} options={roundOpts} />
+              </MenuRow>
+            )}
+            {has('heads') && (
+              <MenuRow name="Ends and path" value={first('curve') ? 'Curved' : 'Straight'}>
+                <div className="cv-pop-label">Start</div>
+                <Opts
+                  value={first('heads')?.[0] ?? 'none'}
+                  onPick={(v) => set({ heads: [v, first('heads')?.[1] ?? 'arrow'] })}
+                  options={['none', 'arrow', 'triangle', 'dot', 'bar'].map((k) => ({ value: k, title: k, label: headIcon(k, true) }))}
+                />
+                <div className="cv-pop-label">End</div>
+                <Opts
+                  value={first('heads')?.[1] ?? 'arrow'}
+                  onPick={(v) => set({ heads: [first('heads')?.[0] ?? 'none', v] })}
+                  options={['none', 'arrow', 'triangle', 'dot', 'bar'].map((k) => ({ value: k, title: k, label: headIcon(k) }))}
+                />
+                <div className="cv-pop-label">Path</div>
+                <Opts
+                  value={!!first('curve')}
+                  onPick={(v) => set({ curve: v })}
+                  options={[
+                    { value: false, title: 'Straight', label: 'Straight' },
+                    { value: true, title: 'Curved', label: 'Curved' },
+                  ]}
+                />
+              </MenuRow>
+            )}
+            {has('font') && (
+              <MenuRow name="Font" value={labelOf(fontOpts, first('font'), 'Hand-drawn')}>
+                <Opts value={first('font')} onPick={(v) => set({ font: v })} options={fontOpts} />
+              </MenuRow>
+            )}
+            {has('fs') && (
+              <MenuRow name="Text size" value={labelOf(fsOpts, first('fs'), 'Medium')}>
+                <Opts value={first('fs')} onPick={(v) => set({ fs: v })} options={fsOpts} />
+              </MenuRow>
+            )}
+            {has('align') && (
+              <MenuRow name="Alignment" value={labelOf(alignOpts, first('align'), 'Left')}>
+                <Opts value={first('align')} onPick={(v) => set({ align: v })} options={alignOpts} />
+              </MenuRow>
+            )}
+            {sel.length > 0 && (
+              <>
+                <div className="cv-menu-sep" />
+                <MenuRow name="Opacity" value={`${first('opacity') ?? 100}%`}>
+                  <input
+                    className="cv-range"
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="5"
+                    defaultValue={first('opacity') ?? 100}
+                    onChange={(e) => ctl.setStyle({ opacity: Number(e.target.value) })}
+                  />
+                </MenuRow>
+                <MenuRow name="Layer">
+                  <div className="cv-opts">
+                    <Btn title="Bring to front (Ctrl ])" onClick={() => ctl.order('front')}>
+                      <ArrowUpToLine />
+                    </Btn>
+                    <Btn title="Bring forward (])" onClick={() => ctl.order('forward')}>
+                      <ChevronUp />
+                    </Btn>
+                    <Btn title="Send backward ([)" onClick={() => ctl.order('backward')}>
+                      <ChevronDown />
+                    </Btn>
+                    <Btn title="Send to back (Ctrl [)" onClick={() => ctl.order('back')}>
+                      <ArrowDownToLine />
+                    </Btn>
+                  </div>
+                </MenuRow>
+                {multi && (
+                  <MenuRow name="Align and distribute">
+                    <div className="cv-opts">
+                      <Btn title="Align left" onClick={() => ctl.align('left')}>
+                        <AlignStartVertical />
+                      </Btn>
+                      <Btn title="Centre horizontally" onClick={() => ctl.align('hcenter')}>
+                        <AlignCenterVertical />
+                      </Btn>
+                      <Btn title="Align right" onClick={() => ctl.align('right')}>
+                        <AlignEndVertical />
+                      </Btn>
+                      <Btn title="Distribute horizontally" onClick={() => ctl.align('hdist')}>
+                        <AlignHorizontalDistributeCenter />
+                      </Btn>
+                    </div>
+                    <div className="cv-opts">
+                      <Btn title="Align top" onClick={() => ctl.align('top')}>
+                        <AlignStartHorizontal />
+                      </Btn>
+                      <Btn title="Centre vertically" onClick={() => ctl.align('vcenter')}>
+                        <AlignCenterHorizontal />
+                      </Btn>
+                      <Btn title="Align bottom" onClick={() => ctl.align('bottom')}>
+                        <AlignEndHorizontal />
+                      </Btn>
+                      <Btn title="Distribute vertically" onClick={() => ctl.align('vdist')}>
+                        <AlignVerticalDistributeCenter />
+                      </Btn>
+                    </div>
+                  </MenuRow>
+                )}
+                <div className="cv-menu-sep" />
+                {single?.type === 'text' && (
+                  <MenuRow
+                    name={single.md ? 'Read as plain text' : 'Read as markdown'}
+                    active={!!single.md}
+                    onClick={() => {
+                      ctl.toggleMarkdown()
+                      close()
+                    }}
+                  />
+                )}
+                {multi && !grouped && (
+                  <MenuRow
+                    name="Group"
+                    hint="Ctrl G"
+                    onClick={() => {
+                      ctl.group()
+                      close()
+                    }}
+                  />
+                )}
+                {grouped && (
+                  <MenuRow
+                    name="Ungroup"
+                    hint="Ctrl ⇧ G"
+                    onClick={() => {
+                      ctl.ungroup()
+                      close()
+                    }}
+                  />
+                )}
+                {single && single.type !== 'note' && single.type !== 'link' && (
+                  <MenuRow
+                    name={single.link ? 'Change link' : 'Link to a note or page'}
+                    active={!!single.link}
+                    onClick={() => {
+                      ctl.setLink()
+                      close()
+                    }}
+                  />
+                )}
+                <MenuRow
+                  name={locked ? 'Unlock' : 'Lock'}
+                  hint="Ctrl ⇧ L"
+                  active={locked}
+                  onClick={() => {
+                    ctl.toggleLock()
+                    close()
+                  }}
+                />
+                <MenuRow
+                  name="Duplicate"
+                  hint="Ctrl D"
+                  onClick={() => {
+                    ctl.duplicate()
+                    close()
+                  }}
+                />
+                <MenuRow
+                  name="Delete"
+                  hint="Del"
+                  danger
+                  onClick={() => {
+                    ctl.deleteSelection()
+                    close()
+                  }}
                 />
               </>
             )}
-          </PopButton>
-          {sel.length === 1 && sel[0].type === 'text' && (
-            <Btn
-              title={sel[0].md ? 'Reading as markdown — switch to plain text' : 'Read this block as markdown'}
-              active={!!sel[0].md}
-              onClick={() => ctl.toggleMarkdown()}
-            >
-              <Hash />
-            </Btn>
-          )}
-          {multi && !grouped && (
-            <Btn title="Group (Ctrl G)" onClick={() => ctl.group()}>
-              <Group />
-            </Btn>
-          )}
-          {grouped && (
-            <Btn title="Ungroup (Ctrl Shift G)" onClick={() => ctl.ungroup()}>
-              <Ungroup />
-            </Btn>
-          )}
-          {sel.length === 1 && sel[0].type !== 'note' && sel[0].type !== 'link' && (
-            <Btn title={sel[0].link ? `Linked to ${sel[0].link}` : 'Link to a note or web page'} active={!!sel[0].link} onClick={() => ctl.setLink()}>
-              {sel[0].link ? <FileText /> : <LinkIcon />}
-            </Btn>
-          )}
-          <Btn title={locked ? 'Unlock (Ctrl Shift L)' : 'Lock (Ctrl Shift L)'} active={locked} onClick={() => ctl.toggleLock()}>
-            {locked ? <Lock /> : <LockOpen />}
-          </Btn>
-          <Btn title="Duplicate (Ctrl D)" onClick={() => ctl.duplicate()}>
-            <Copy />
-          </Btn>
-          <Btn title="Delete (Del)" danger disabled={locked} onClick={() => ctl.deleteSelection()}>
-            <Trash2 />
-          </Btn>
-        </>
-      )}
-      {!sel.length && mode === 'note' && null}
+          </div>
+        )}
+      </PopButton>
     </div>
   )
 }
