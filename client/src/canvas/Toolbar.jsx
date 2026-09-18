@@ -206,46 +206,69 @@ const TOOL_TYPE = { rect: 'rect', ellipse: 'ellipse', diamond: 'diamond', arrow:
 
 // One settings area rather than a row of unlabelled icons: every row says what
 // it is and shows what it is set to, and its options open beside it.
-// Which submenu is open, with hover intent: when one is already showing, a
-// row the pointer merely passes over on its way there doesn't steal it — only
-// a row the pointer stays on does. Leaving the menu altogether gives a moment
-// to come back before everything closes.
+// Which submenu is open follows the pointer at once — with one exception, the
+// one desktop menus make ("menu aim"): while the pointer is heading toward the
+// submenu that is already open, the rows it crosses on the way don't take
+// over. That is decided from the direction of travel on every move, not by
+// waiting, so running up and down the list never lags.
 const SubmenuCtx = createContext(null)
-const SWITCH_DELAY = 180
-const CLOSE_DELAY = 300
+
+// p inside the triangle a-b-c (edges count)
+function inTriangle(p, a, b, c) {
+  const side = (p1, p2, p3) => (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+  const d1 = side(p, a, b)
+  const d2 = side(p, b, c)
+  const d3 = side(p, c, a)
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))
+}
 
 function MenuRows({ children }) {
   const [open, setOpen] = useState(null)
   const openRef = useRef(null)
-  const timer = useRef(0)
   openRef.current = open
-  useEffect(() => () => clearTimeout(timer.current), [])
-  const api = {
-    open,
-    // pointer on a row
-    enter(id) {
-      clearTimeout(timer.current)
-      if (openRef.current == null || openRef.current === id) return setOpen(id)
-      timer.current = setTimeout(() => setOpen(id), SWITCH_DELAY)
-    },
-    // pointer arrived inside an open submenu: keep it
-    hold(id) {
-      clearTimeout(timer.current)
-      if (openRef.current !== id) setOpen(id)
-    },
-    // pointer on a plain row (no submenu): close after the same pause
-    plain() {
-      clearTimeout(timer.current)
-      if (openRef.current != null) timer.current = setTimeout(() => setOpen(null), SWITCH_DELAY)
-    },
+  const trail = useRef([]) // the last few pointer positions, to read direction
+  const rest = useRef(0)
+  useEffect(() => () => clearTimeout(rest.current), [])
+
+  const show = (id) => {
+    clearTimeout(rest.current)
+    if (openRef.current !== id) setOpen(id)
   }
+
+  const onMove = (e) => {
+    const p = { x: e.clientX, y: e.clientY }
+    const from = trail.current[0] // a few moves back: steadier than the last one
+    trail.current = [...trail.current.slice(-2), p]
+    // inside the open options: nothing to decide
+    if (e.target.closest('.cv-sub')) return clearTimeout(rest.current)
+    const id = e.target.closest('.cv-row')?.dataset.sub || null
+    const current = openRef.current
+    if (!current || id === current) return show(id ?? current)
+    const sub = e.currentTarget.querySelector('.cv-row.open > .cv-sub')
+    if (sub && from) {
+      const r = sub.getBoundingClientRect()
+      const flip = !!e.currentTarget.closest('.flip-sub')
+      const edge = flip ? r.right : r.left
+      const toward = flip ? p.x < from.x : p.x > from.x
+      if (toward && inTriangle(p, from, { x: edge, y: r.top - 6 }, { x: edge, y: r.bottom + 6 })) {
+        // on its way there: keep the open options. Only if the pointer comes
+        // to rest on this row does the row get its turn.
+        clearTimeout(rest.current)
+        rest.current = setTimeout(() => setOpen(id), 60)
+        return
+      }
+    }
+    show(id)
+  }
+
   return (
-    <SubmenuCtx.Provider value={api}>
+    <SubmenuCtx.Provider value={open}>
       <div
         className="cv-menu"
+        onPointerMove={onMove}
         onPointerLeave={() => {
-          clearTimeout(timer.current)
-          timer.current = setTimeout(() => setOpen(null), CLOSE_DELAY)
+          trail.current = []
+          show(null)
         }}
       >
         {children}
@@ -255,26 +278,21 @@ function MenuRows({ children }) {
 }
 
 function MenuRow({ name, value, children, hint, danger, active, onClick }) {
-  const sub = useContext(SubmenuCtx)
+  const open = useContext(SubmenuCtx)
   if (!children) {
     return (
-      <button
-        className={`cv-row ${danger ? 'danger' : ''} ${active ? 'active' : ''}`}
-        onPointerEnter={() => sub?.plain()}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={onClick}
-      >
+      <button className={`cv-row ${danger ? 'danger' : ''} ${active ? 'active' : ''}`} onMouseDown={(e) => e.preventDefault()} onClick={onClick}>
         <span className="cv-row-name">{name}</span>
         {hint && <span className="cv-row-hint">{hint}</span>}
       </button>
     )
   }
   return (
-    <div className={`cv-row has-sub ${sub?.open === name ? 'open' : ''}`} onPointerEnter={() => sub?.enter(name)}>
+    <div className={`cv-row has-sub ${open === name ? 'open' : ''}`} data-sub={name}>
       <span className="cv-row-name">{name}</span>
       {value != null && <span className="cv-row-value">{value}</span>}
       <ChevronRight className="cv-row-arrow" />
-      <div className="cv-sub" onPointerEnter={() => sub?.hold(name)} onPointerDown={(e) => e.stopPropagation()}>
+      <div className="cv-sub" onPointerDown={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>
