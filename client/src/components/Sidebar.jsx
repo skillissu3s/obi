@@ -365,7 +365,9 @@ export function SearchPanel() {
   const [took, setTook] = useState(0)
   const [busy, setBusy] = useState(false)
   const inputRef = useRef(null)
+  const listRef = useRef(null)
   const abortRef = useRef(null)
+  const [sel, setSel] = useState(0)
 
   const run = useMemo(
     () =>
@@ -381,6 +383,7 @@ export function SearchPanel() {
         try {
           const r = await api.search(wsId, q, { signal: ac.signal })
           setResults(r.results)
+          setSel(0)
           setTook(r.took)
         } catch (e) {
           if (e.name !== 'AbortError') toast.error(e)
@@ -411,6 +414,35 @@ export function SearchPanel() {
 
   const total = results?.reduce((n, r) => n + Math.max(1, r.matches.length), 0) || 0
 
+  // One flat list of everything the arrow keys can land on, in the order the
+  // panel draws it: a note's own row, then each of its matching lines.
+  const rows = useMemo(() => {
+    const out = []
+    for (const r of results || []) {
+      out.push({ path: r.path })
+      for (const m of r.matches) out.push({ path: r.path, line: m.line })
+    }
+    return out
+  }, [results])
+
+  const open = (row, e = {}) => row && useLayout.getState().openNote(wsId, row.path, { line: row.line, newTab: e.metaKey || e.ctrlKey })
+
+  useEffect(() => {
+    listRef.current?.querySelector('.is-sel')?.scrollIntoView({ block: 'nearest' })
+  }, [sel])
+
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') return onChange('')
+    if (!rows.length) return
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSel((i) => (i + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      open(rows[sel], e)
+    }
+  }
+
   return (
     <>
       <div className="search-box">
@@ -421,9 +453,7 @@ export function SearchPanel() {
           placeholder="Search notes…"
           value={query}
           onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') onChange('')
-          }}
+          onKeyDown={onKeyDown}
         />
       </div>
       {results && (
@@ -434,7 +464,7 @@ export function SearchPanel() {
           <span className="row" style={{ gap: 5 }}>{busy ? <><span className="spinner sm" /> searching</> : `${took}ms`}</span>
         </div>
       )}
-      <div className="sidebar-scroll">
+      <div className="sidebar-scroll" ref={listRef}>
         {!results && (
           <div className="empty" style={{ textAlign: 'left', alignItems: 'flex-start', gap: 6 }}>
             <div style={{ fontWeight: 600, color: 'var(--text-2)' }}>Search tips</div>
@@ -453,20 +483,35 @@ export function SearchPanel() {
           </div>
         )}
         {results?.length === 0 && <div className="empty">No matches</div>}
-        {results?.map((r) => (
-          <div className="search-result" key={r.path}>
-            <div className="search-result-title" onClick={(e) => useLayout.getState().openNote(wsId, r.path, { newTab: e.metaKey || e.ctrlKey })}>
-              <FileText />
-              <span className="truncate">{stripExt(basename(r.path))}</span>
-              <span className="search-result-path truncate">{dirname(r.path)}</span>
-            </div>
-            {r.matches.map((m, i) => (
-              <div key={i} className="search-match" onClick={() => useLayout.getState().openNote(wsId, r.path, { line: m.line })}>
-                <Highlighted {...cleanMatch(m.text, query)} />
+        {(() => {
+          let idx = -1
+          return results?.map((r) => {
+            const head = ++idx
+            const Icon = isBoardPath(r.path) ? Shapes : FileText
+            return (
+              <div className="search-result" key={r.path}>
+                <div className={`search-result-title ${sel === head ? 'is-sel' : ''}`} onClick={(e) => open({ path: r.path }, e)}>
+                  <Icon />
+                  <span className="truncate">{stripExt(basename(r.path))}</span>
+                  {r.matches.length > 1 && <span className="badge">{r.matches.length}</span>}
+                  <span className="search-result-path truncate">{dirname(r.path)}</span>
+                </div>
+                {r.matches.map((m, i) => {
+                  const at = ++idx
+                  return (
+                    <div key={i} className={`search-match ${sel === at ? 'is-sel' : ''}`} onClick={(e) => open({ path: r.path, line: m.line }, e)}>
+                      <span className="sm-line">{m.line + 1}</span>
+                      {/* one flex item, or the snippet's own text nodes get pulled apart by the gap */}
+                      <span className="sm-text">
+                        <Highlighted {...cleanMatch(m.text, query)} />
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-          </div>
-        ))}
+            )
+          })
+        })()}
       </div>
     </>
   )

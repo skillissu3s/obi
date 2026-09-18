@@ -566,16 +566,42 @@ button.status-item:hover {
   max-width: 45%;
 }
 .search-match {
+  display: flex;
+  gap: 7px;
   font-size: 12px;
   color: var(--text-2);
-  padding: 3px 6px 3px 19px;
+  padding: 3px 6px 3px 8px;
   line-height: 1.5;
   border-radius: var(--radius-xs);
   word-break: break-word;
 }
+.search-match .sm-line {
+  flex: none;
+  min-width: 15px;
+  text-align: right;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  line-height: 1.55;
+}
 .search-match:hover {
   background: var(--bg-active);
   color: var(--text);
+}
+/* keyboard selection, matching the command palette's */
+.search-match.is-sel,
+.search-result-title.is-sel {
+  background: var(--bg-active);
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.search-result-title.is-sel {
+  border-radius: var(--radius-xs);
+  margin: 0 -2px;
+  padding: 1px 4px;
+}
+.search-result-title .badge {
+  flex: none;
 }
 .search-match mark,
 .hl-mark {
