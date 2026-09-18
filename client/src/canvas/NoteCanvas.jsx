@@ -819,7 +819,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           />
         ) : (
           <button className="cv-pill" title="Draw, add sticky notes, images and links around this note (Alt C)" onClick={() => usePrefs.getState().set({ canvasBar: true })}>
-            <PencilRuler /> Canvas
+            <PencilRuler /> <span className="cv-pill-label">Canvas</span>
             {count > 0 && <span className="cv-count">{count}</span>}
             {readOnly && <span className="cv-count">view only</span>}
           </button>

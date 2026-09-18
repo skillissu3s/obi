@@ -201,6 +201,14 @@ export function plainSnippet(text, max = 160) {
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[*_~`]+/g, '')
     .replace(/==([^=]+)==/g, '$1')
+    .replace(/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/, '')
+    .replace(/^\s*\|(.+)\|\s*$/, (_, row) =>
+      row
+        .split('|')
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .join(' · '),
+    )
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, max)

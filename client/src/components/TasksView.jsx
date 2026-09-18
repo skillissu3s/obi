@@ -136,7 +136,10 @@ export function TasksView() {
                   </span>
                 )}
                 {group !== 'note' && (
-                  <span className="task-source" onClick={() => useLayout.getState().openNote(wsId, t.path, { line: t.line })}>
+                  /* the icon matters: a daily note is called "2026-09-17", which without it
+                     reads like a due date sitting in the same row as the real ones */
+                  <span className="task-source" title={t.path} onClick={() => useLayout.getState().openNote(wsId, t.path, { line: t.line })}>
+                    <FileText />
                     {stripExt(basename(t.path))}
                   </span>
                 )}

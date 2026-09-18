@@ -986,7 +986,37 @@ h3.shortcut-group {
   align-items: flex-end;
 }
 @media (max-width: 768px) {
+  /* a phone's text runs the full width, so the resting pill shrinks to a
+     round button in the corner instead of sitting on top of a sentence */
   .note-view .cv-dock.is-tucked {
-    right: 12px;
+    right: 10px;
+    /* clear of the formatting toolbar that sits at the foot of the note */
+    bottom: 57px;
+  }
+  .note-view .cv-dock.is-tucked .cv-pill {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    opacity: 0.92;
+  }
+  .note-view .cv-dock.is-tucked .cv-pill-label {
+    display: none;
+  }
+  .note-view .cv-dock.is-tucked .cv-count {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 15px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    line-height: 15px;
+    text-align: center;
+  }
+  .note-view .cv-dock.is-tucked .cv-pill {
+    position: relative;
   }
 }

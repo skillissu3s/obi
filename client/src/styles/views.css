@@ -637,6 +637,10 @@
   display: inline;
 }
 .task-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
   font-size: 11.5px;
   color: var(--text-3);
   cursor: pointer;
@@ -644,6 +648,12 @@
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.task-source svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  opacity: 0.75;
 }
 .task-source:hover {
   color: var(--accent-text);

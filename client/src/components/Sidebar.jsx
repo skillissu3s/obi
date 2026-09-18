@@ -520,7 +520,7 @@ export function SearchPanel() {
 // Search hits read as prose, not markdown source: strip the syntax, then find the
 // typed words again in the cleaned line so the highlighting still lines up.
 function cleanMatch(text, query) {
-  const clean = plainSnippet(text, 240)
+  const clean = plainSnippet(text, 240) || String(text || '').trim().slice(0, 240)
   const terms = String(query || '')
     .toLowerCase()
     .match(/"[^"]+"|[^\s]+/g) || []
@@ -787,7 +787,12 @@ export function Sidebar({ user }) {
         <button className="icon-btn" title="Tasks" onClick={() => useLayout.getState().openView('tasks')}>
           <ListChecks />
         </button>
-        <button className="icon-btn" title="Daily note (Ctrl/⌘ D)" onClick={() => A.openDailyNote()}>
+        {/* the calendar is how you reach any other day; Ctrl/⌘ D still jumps straight to today */}
+        <button
+          className="icon-btn"
+          title="Calendar — today's note is Ctrl/⌘ D"
+          onClick={() => useLayout.getState().setRightTab('calendar')}
+        >
           <CalendarDays />
         </button>
         <button className={`icon-btn ${rightOpen ? 'active' : ''}`} title="Right panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight()}>
