@@ -397,6 +397,32 @@ svg.cv-el {
   border: 1px solid var(--border-strong);
   padding: 3px 7px;
 }
+/* the live markdown editor sitting inside a canvas block */
+.cv-md-edit {
+  background: transparent;
+  cursor: text;
+}
+.cv-md-edit .cm-editor {
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+.cv-md-edit .cm-editor.cm-focused {
+  outline: none;
+}
+.cv-md-edit .cm-scroller {
+  font-family: inherit;
+  line-height: inherit;
+  overflow: visible;
+}
+.cv-md-edit .cm-content {
+  padding: 0;
+  caret-color: var(--accent);
+}
+.cv-md-edit .cm-line {
+  padding: 0;
+}
 .cv-arrowbud {
   position: absolute;
   width: calc(9px * var(--inv));

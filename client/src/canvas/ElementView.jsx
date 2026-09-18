@@ -4,6 +4,7 @@ import { drawables, val, colorCss, stickyCss, FONTS, fontScale, lineHeight, DEFA
 import { midPoint } from '@shared/boardgeom.js'
 import { measureText } from './layout.js'
 import { renderMarkdown } from '../lib/render.js'
+import { MdEdit } from './MdEdit.jsx'
 
 function Paths({ list }) {
   return list.map((p, i) => (
@@ -208,7 +209,9 @@ function TextEl({ el, editing, ctx }) {
   const markdown = el.md ? renderMarkdown(el.text || '', { ws: ctx?.ws, path: ctx?.path }).html : null
   return (
     <div className="cv-el" style={place(el)}>
-      {editing ? (
+      {editing && el.md ? (
+        <MdEdit el={el} ctx={ctx} style={{ ...ts, width: el.w, minHeight: el.h }} />
+      ) : editing ? (
         <EditText el={el} ctx={ctx} kind="text" style={{ ...ts, ...box, height: el.h, minWidth: 24 }} />
       ) : el.md ? (
         <div

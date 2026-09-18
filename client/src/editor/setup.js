@@ -16,7 +16,7 @@ import { markdownKeymapFor } from './commands.js'
 import { annotationField } from './annotations.js'
 import { writingExtensions } from './writing.js'
 
-const obiHighlight = HighlightStyle.define([
+export const obiHighlight = HighlightStyle.define([
   { tag: t.heading1, class: 'cm-hd cm-hd1' },
   { tag: t.heading2, class: 'cm-hd cm-hd2' },
   { tag: t.heading3, class: 'cm-hd cm-hd3' },

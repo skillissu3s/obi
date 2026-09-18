@@ -1068,14 +1068,15 @@ export class CanvasController {
     this.store.update([[el.id, patch]])
   }
 
-  setEditingValue(value) {
+  setEditingValue(value, liveHeight) {
     const ed = this.state.editing
     if (!ed) return
     ed.value = value
     const el = this.store.get(ed.id)
     // grow text boxes live while typing
     if (el?.type === 'text') {
-      const size = this.textSize({ ...el, text: value })
+      // a markdown block is edited in place, so take the height it really has
+      const size = liveHeight && el.md ? { h: Math.max(24, liveHeight) } : this.textSize({ ...el, text: value })
       if (size.w !== el.w || size.h !== el.h) this.store.update([[el.id, size]])
     }
   }
