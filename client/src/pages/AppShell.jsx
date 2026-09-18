@@ -247,7 +247,7 @@ function Ribbon({ user, closed }) {
   const ws = workspaces.find((w) => w.id === wsId)
 
   return (
-    <div className={`ribbon ${closed ? 'is-closed' : ''}`} inert={closed ? '' : undefined}>
+    <div className={`ribbon ${closed ? 'is-closed' : ''}`} inert={closed || undefined}>
       <button className="ws-avatar" onClick={() => useUI.getState().openPalette('workspaces')} title={`${ws?.name || 'Workspace'} — switch (⌘⇧O)`}>
         <WsIcon ws={ws} size={32} />
       </button>

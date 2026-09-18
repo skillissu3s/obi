@@ -36,7 +36,7 @@ export function RightPanel({ tab, closed }) {
   ]
 
   return (
-    <div className={`sidebar right ${closed ? 'is-closed' : ''}`} style={{ width }} inert={closed ? '' : undefined}>
+    <div className={`sidebar right ${closed ? 'is-closed' : ''}`} style={{ width }} inert={closed || undefined}>
       <div className={`resizer ${dragging ? 'dragging' : ''}`} onMouseDown={() => setDragging(true)} />
       <div className="rp-tabs">
         {tabs.map((t) => (

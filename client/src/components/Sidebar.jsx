@@ -719,7 +719,7 @@ export function Sidebar({ user, closed }) {
   }
 
   return (
-    <div className={`sidebar left ${closed ? 'is-closed' : ''}`} style={{ width }} ref={rootRef} inert={closed ? '' : undefined}>
+    <div className={`sidebar left ${closed ? 'is-closed' : ''}`} style={{ width }} ref={rootRef} inert={closed || undefined}>
       <div className="sidebar-header">
         <button className="ws-switcher" onClick={() => useUI.getState().openPalette('workspaces')} title="Switch workspace">
           <WsIcon ws={ws} />
