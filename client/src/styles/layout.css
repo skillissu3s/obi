@@ -704,13 +704,29 @@ button.status-item:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 10px;
+  padding: 7px 10px 7px 4px;
   font-weight: 550;
   font-size: 12.5px;
-  cursor: pointer;
 }
-.bl-note-title:hover {
+.bl-note-title .grow:hover {
   color: var(--accent-text);
+}
+.bl-fold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-3);
+}
+.bl-fold:hover {
+  background: var(--bg-hover);
+  color: var(--text-2);
+}
+.bl-fold svg {
+  transition: transform 140ms var(--ease);
 }
 .bl-note-title svg {
   width: 13px;

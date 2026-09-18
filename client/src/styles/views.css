@@ -1376,8 +1376,12 @@
   text-align: left;
 }
 .ws-list-item:hover,
-.ws-list-item.hl {
+.ws-list-item.hl,
+.ws-list-item.is-sel {
   background: var(--bg-hover);
+}
+.ws-list-item.is-sel {
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .ws-list-item.current {
   background: var(--bg-active);

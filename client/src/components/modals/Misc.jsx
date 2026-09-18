@@ -462,23 +462,53 @@ export function MoveModal({ path }) {
   const folders = useMemo(() => ['', ...tree.filter((e) => e.type === 'folder').map((e) => e.path)].filter((f) => f !== path && !f.startsWith(path + '/')), [tree, path])
   const results = fuzzyFilter(folders, query, (f) => f || 'Vault root', 40)
   const currentFolder = dirname(path)
+  const [sel, setSel] = useState(0)
+  const listRef = useRef(null)
+  const at = Math.min(sel, Math.max(0, results.length - 1))
+
+  useEffect(() => {
+    listRef.current?.querySelector('.is-sel')?.scrollIntoView({ block: 'nearest' })
+  }, [at, query])
+
+  const moveTo = async (folder) => {
+    close()
+    await A.moveEntry(path, folder)
+    toast.success(`Moved to ${folder || 'root'}`)
+  }
 
   return (
     <Modal title={`Move “${basename(path)}”`} center onClose={close} icon={<Folder size={18} />}>
       <div className="search-box" style={{ margin: '0 0 10px' }}>
         <Search />
-        <input className="input" autoFocus placeholder="Search folders…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input
+          className="input"
+          autoFocus
+          placeholder="Search folders…"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setSel(0)
+          }}
+          onKeyDown={(e) => {
+            if (!results.length) return
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault()
+              setSel((i) => (Math.min(i, results.length - 1) + (e.key === 'ArrowDown' ? 1 : results.length - 1)) % results.length)
+            } else if (e.key === 'Enter') {
+              e.preventDefault()
+              moveTo(results[at].item)
+            }
+          }}
+        />
       </div>
-      <div style={{ maxHeight: 340, overflow: 'auto' }}>
-        {results.map(({ item }) => (
+      <div style={{ maxHeight: 340, overflow: 'auto' }} ref={listRef}>
+        {!results.length && <div className="empty">No folder matches “{query}”</div>}
+        {results.map(({ item }, i) => (
           <button
             key={item || '/'}
-            className={`ws-list-item ${item === currentFolder ? 'current' : ''}`}
-            onClick={async () => {
-              close()
-              await A.moveEntry(path, item)
-              toast.success(`Moved to ${item || 'root'}`)
-            }}
+            className={`ws-list-item ${item === currentFolder ? 'current' : ''} ${i === at ? 'is-sel' : ''}`}
+            onMouseMove={() => setSel(i)}
+            onClick={() => moveTo(item)}
           >
             <Folder size={16} style={{ color: 'var(--text-3)' }} />
             <span className="grow truncate">{item || 'Vault root'}</span>

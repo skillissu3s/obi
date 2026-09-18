@@ -138,9 +138,13 @@ function BacklinkGroup({ note, ws }) {
   const [open, setOpen] = useState(true)
   return (
     <div className="bl-note">
-      <div className="bl-note-title" onClick={() => useLayout.getState().openNote(ws, note.path)}>
-        <FileText />
-        <span className="truncate grow">{stripExt(basename(note.path))}</span>
+      <div className="bl-note-title">
+        <button className="bl-fold" title={open ? 'Hide mentions' : 'Show mentions'} onClick={() => setOpen(!open)}>
+          <ChevronRight style={{ transform: open ? 'rotate(90deg)' : 'none' }} />
+        </button>
+        <span className="truncate grow" style={{ cursor: 'pointer' }} onClick={() => useLayout.getState().openNote(ws, note.path)}>
+          {stripExt(basename(note.path))}
+        </span>
         <span className="badge">{note.hits.length}</span>
       </div>
       {open &&
