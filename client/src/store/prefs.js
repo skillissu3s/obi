@@ -127,7 +127,7 @@ export function applyPrefs(p = snapshot(usePrefs.getState())) {
   else root.style.removeProperty('--accent-user')
   root.style.setProperty('--editor-font-size', `${p.fontSize}px`)
   root.style.setProperty('--editor-line-height', String(p.lineHeight))
-  root.style.setProperty('--note-width', { narrow: '580px', normal: '660px', wide: '820px' }[p.lineWidth] || '700px')
+  root.style.setProperty('--note-width', { narrow: '560px', normal: '620px', wide: '800px' }[p.lineWidth] || '620px')
   root.dataset.editorFont = p.editorFont
   root.dataset.uiScale = p.uiScale
   const meta = document.querySelector('meta[name="theme-color"]')

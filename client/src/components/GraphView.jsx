@@ -159,7 +159,7 @@ export function GraphView() {
           </>
         )}
       </div>
-      <div className="graph-legend">{hover ? hover.label : 'Drag to pan · scroll to zoom · double-click to fit'}</div>
+      <div className={`graph-legend ${hover ? 'is-node' : ''}`}>{hover ? hover.label : 'Drag to pan · scroll to zoom · double-click to fit'}</div>
     </div>
   )
 }

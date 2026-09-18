@@ -375,8 +375,9 @@
   width: 240px;
   background: color-mix(in srgb, var(--bg-elev) 90%, transparent);
   backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
   padding: 10px 12px;
   font-size: 12.5px;
   z-index: 2;
@@ -394,11 +395,24 @@
 }
 .graph-legend {
   position: absolute;
-  left: 14px;
+  left: 12px;
   bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 5px 10px;
   font-size: 11.5px;
   color: var(--text-3);
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
+}
+.graph-legend.is-node {
+  color: var(--text);
+  font-weight: 550;
 }
 .graph-search {
   position: absolute;

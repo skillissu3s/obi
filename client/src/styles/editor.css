@@ -800,22 +800,32 @@
 .markdown h5,
 .markdown h6 {
   line-height: 1.3;
-  margin: 1.6em 0 0.5em;
+  /* Same ratios as live preview's heading padding, so switching modes doesn't
+     change how far a heading floats above its section. */
+  margin: 0.7em 0 0.4em;
   letter-spacing: -0.025em;
   font-weight: 700;
 }
 .markdown h1 {
   font-size: 1.7em;
   letter-spacing: -0.03em;
+  margin-top: 0.7em;
 }
 .markdown h2 {
   font-size: 1.38em;
+  margin-top: 0.62em;
 }
 .markdown h3 {
   font-size: 1.16em;
+  margin-top: 0.5em;
 }
 .markdown h4 {
   font-size: 1.02em;
+  margin-top: 0.38em;
+}
+.markdown h5,
+.markdown h6 {
+  margin-top: 0.2em;
 }
 .markdown p {
   margin: 0.55em 0;
