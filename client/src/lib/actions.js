@@ -334,7 +334,7 @@ export function dailyNotePath(date = new Date(), settings = wsSettings()) {
   return joinPath(folder, `${formatDate(date, fmt)}.md`)
 }
 
-export async function openDailyNote(date = new Date(), { newTab } = {}) {
+export async function openDailyNote(date = new Date(), { newTab, announce = false } = {}) {
   const s = app()
   const ws = s.wsId
   const settings = wsSettings()
@@ -357,10 +357,32 @@ export async function openDailyNote(date = new Date(), { newTab } = {}) {
   try {
     await api.writeNote(ws, path, content, { ifMissing: true })
     app().clearPending(ws, path)
+    // Browsing the calendar shouldn't quietly leave a note behind for every day
+    // you looked at, so say a day was started and offer to take it back.
+    if (announce) {
+      toast.success(`Started ${formatDate(date, 'ddd D MMM')}`, {
+        timeout: 7000,
+        action: { label: 'Undo', run: () => discardEmptyDaily(ws, path, content) },
+      })
+    }
   } catch (e) {
     app().clearPending(ws, path)
     app().removeEntry(path)
     layout().closePaths(ws, path)
+    toast.error(e)
+  }
+}
+
+// Only removes the day again if nothing was written into it.
+async function discardEmptyDaily(ws, path, created) {
+  try {
+    const { content } = await api.readNote(ws, path)
+    if (content.trim() !== created.trim()) return toast.info('That day has notes in it now, so it stays')
+    layout().closePaths(ws, path)
+    await api.remove(ws, path)
+    app().removeEntry(path)
+    app().refreshTree()
+  } catch (e) {
     toast.error(e)
   }
 }

@@ -215,7 +215,7 @@ export function CalendarPanel() {
               key={i}
               className={`cal-day ${c.other ? 'other' : ''} ${isToday ? 'today' : ''} ${has ? 'has-note' : ''} ${tasks ? 'has-tasks' : ''} ${path === openPath ? 'active' : ''}`}
               title={`${formatDate(c.date, 'dddd D MMMM')}${has ? ' · daily note' : ''}${tasks ? ` · ${tasks} task(s) due` : ''}`}
-              onClick={() => A.openDailyNote(c.date)}
+              onClick={() => A.openDailyNote(c.date, { announce: !has })}
             >
               {c.day}
             </button>
