@@ -993,12 +993,11 @@ button.status-item:hover {
   box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-strong);
   opacity: 0;
   transform: scale(0.7);
-  transition: opacity 140ms var(--ease), transform 180ms var(--ease-spring), top 80ms linear, background var(--t-fast), color var(--t-fast);
+  /* no transition on `top`: it should appear where the pointer is, not
+     travel there */
+  transition: opacity 90ms var(--ease), transform 120ms var(--ease-spring), background var(--t-fast), color var(--t-fast);
   pointer-events: none;
   cursor: pointer;
-}
-.edge-toggle.right {
-  margin-left: -18px;
 }
 .edge-toggle.show {
   opacity: 1;

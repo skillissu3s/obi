@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useLayout } from '../store/layout.js'
 
-const NEAR = 34 // px from an edge before its toggle fades in
+const NEAR = 40 // px from the edge that counts as "reaching for the sidebar"
+const TOP_GAP = 62 // leave the note's own header buttons alone
+const BOTTOM_GAP = 48 // and the status bar
 
-// Invisible sidebar toggles that appear when the pointer comes close to a panel edge.
+// A toggle for the left sidebar that shows up under the pointer when it comes
+// near the edge, and tracks it while it stays there. The right panel has its
+// own visible close button, so it doesn't get one of these.
 export function EdgeToggles() {
   const left = useLayout((s) => s.left)
-  const right = useLayout((s) => s.right)
   const ref = useRef(null)
-  const [hot, setHot] = useState(null) // { side, x, y }
-  const pos = useRef({ left: { x: 0, y: 0 }, right: { x: 0, y: 0 } })
-  if (hot) pos.current[hot.side] = { x: hot.x, y: hot.y }
+  const [hot, setHot] = useState(null) // { x, y } within the app body
 
   useEffect(() => {
     let raf = 0
@@ -22,18 +23,13 @@ export function EdgeToggles() {
       if (!host || !last) return
       const body = host.getBoundingClientRect()
       const { clientX: x, clientY: y } = last
-      if (y < body.top || y > body.bottom || x < body.left || x > body.right || last.buttons) return setHot(null)
-      const leftPanel = host.querySelector(':scope > .sidebar.left') || host.querySelector(':scope > .ribbon')
-      const rightPanel = host.querySelector(':scope > .sidebar.right')
-      const leftEdge = leftPanel ? leftPanel.getBoundingClientRect().right : body.left
-      const rightEdge = rightPanel ? rightPanel.getBoundingClientRect().left : body.right
-      // Keep it in the middle band: at the top it covered the back arrow and the
-      // note's own buttons, at the bottom the status bar.
-      const band = Math.min(120, body.height * 0.22)
-      const clampY = (v) => Math.max(band, Math.min(body.height - band, v - body.top))
-      // only on the content side of the edge, so panels keep their own hover space
-      if (x >= leftEdge - 6 && x - leftEdge < NEAR) setHot({ side: 'left', x: leftEdge - body.left, y: clampY(y) })
-      else if (x <= rightEdge + 6 && rightEdge - x < NEAR) setHot({ side: 'right', x: rightEdge - body.left, y: clampY(y) })
+      if (last.buttons) return setHot(null) // not while dragging something
+      const inBody = y >= body.top + TOP_GAP && y <= body.bottom - BOTTOM_GAP && x >= body.left && x <= body.right
+      if (!inBody) return setHot(null)
+      const panel = host.querySelector(':scope > .sidebar.left:not(.is-closed)') || host.querySelector(':scope > .ribbon:not(.is-closed)')
+      const edge = panel ? panel.getBoundingClientRect().right : body.left
+      // only on the content side of the edge, so the panel keeps its own hover space
+      if (x >= edge - 6 && x - edge < NEAR) setHot({ x: edge - body.left, y: y - body.top })
       else setHot((h) => (h ? null : h))
     }
     const onMove = (e) => {
@@ -50,36 +46,23 @@ export function EdgeToggles() {
     }
   }, [])
 
-  const leftOpen = left
-  const rightOpen = right
   return (
     <div ref={ref} className="edge-toggles">
-      <button
-        className={`edge-toggle left ${hot?.side === 'left' ? 'show' : ''}`}
-        style={{ left: pos.current.left.x + 6, top: pos.current.left.y }}
-        title={leftOpen ? 'Close sidebar (Ctrl/⌘ \\)' : 'Open sidebar (Ctrl/⌘ \\)'}
-        aria-label={leftOpen ? 'Close sidebar' : 'Open sidebar'}
-        tabIndex={-1}
-        onClick={() => {
-          useLayout.getState().toggleLeft()
-          setHot(null)
-        }}
-      >
-        {leftOpen ? <ChevronLeft /> : <ChevronRight />}
-      </button>
-      <button
-        className={`edge-toggle right ${hot?.side === 'right' ? 'show' : ''}`}
-        style={{ left: pos.current.right.x - 6, top: pos.current.right.y }}
-        title={rightOpen ? 'Close right panel (Ctrl/⌘ Shift \\)' : 'Open right panel (Ctrl/⌘ Shift \\)'}
-        aria-label={rightOpen ? 'Close right panel' : 'Open right panel'}
-        tabIndex={-1}
-        onClick={() => {
-          useLayout.getState().toggleRight()
-          setHot(null)
-        }}
-      >
-        {rightOpen ? <ChevronRight /> : <ChevronLeft />}
-      </button>
+      {hot && (
+        <button
+          className="edge-toggle left show"
+          style={{ left: hot.x + 6, top: hot.y }}
+          title={left ? 'Close sidebar (Ctrl/⌘ \\)' : 'Open sidebar (Ctrl/⌘ \\)'}
+          aria-label={left ? 'Close sidebar' : 'Open sidebar'}
+          tabIndex={-1}
+          onClick={() => {
+            useLayout.getState().toggleLeft()
+            setHot(null)
+          }}
+        >
+          {left ? <ChevronLeft /> : <ChevronRight />}
+        </button>
+      )}
     </div>
   )
 }
