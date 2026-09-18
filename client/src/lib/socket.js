@@ -80,11 +80,31 @@ export class DocHandle extends Emitter {
     })
     this.awareness.on('update', ({ added, updated, removed }, origin) => {
       if (origin !== 'local' || !this.joined) return
+      // Awareness is where the caret goes, and it fires on every keystroke.
+      // With nobody else in the document there is no one to tell, so say
+      // nothing until someone arrives (they announce themselves on join).
+      if (!this._peers() && !this._announcedTo) return
       const changed = added.concat(updated, removed)
       const enc = this._header(MSG_AWARENESS)
       encoding.writeVarUint8Array(enc, awarenessProtocol.encodeAwarenessUpdate(this.awareness, changed))
       this.conn.sendBinary(encoding.toUint8Array(enc))
     })
+    // when someone else shows up, catch them up on where we are
+    this.awareness.on('change', ({ added }) => {
+      const peers = this._peers()
+      this._announcedTo = peers > 0
+      if (!peers || !added.length || !this.joined) return
+      const enc = this._header(MSG_AWARENESS)
+      encoding.writeVarUint8Array(enc, awarenessProtocol.encodeAwarenessUpdate(this.awareness, [this.ydoc.clientID]))
+      this.conn.sendBinary(encoding.toUint8Array(enc))
+    })
+  }
+
+  // other clients currently in this document
+  _peers() {
+    let n = 0
+    for (const id of this.awareness.getStates().keys()) if (id !== this.ydoc.clientID) n++
+    return n
   }
 
   _header(type) {
