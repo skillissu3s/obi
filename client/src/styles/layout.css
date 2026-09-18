@@ -680,6 +680,10 @@ button.status-item:hover {
   width: auto;
   height: 30px;
 }
+.rp-tabs .rp-close {
+  flex: 0 0 26px;
+  margin-right: 4px;
+}
 .rp-body {
   flex: 1;
   overflow: auto;

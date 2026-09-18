@@ -3,7 +3,7 @@ import {
   ChevronRight, FileText, Folder, FolderOpen, FilePlus, FolderPlus, Search, Hash, Star, Share2, Users, ChevronDown,
   MoreHorizontal, Pencil, Trash2, Copy, FolderInput, SplitSquareHorizontal, Link2, History, ListFilter, X, Image, File,
   SortAsc, PanelLeftClose, Layers, Plus, Settings2, Cloud, FolderGit2, LogOut, CheckCircle2, Globe, Shapes, ChevronsDownUp,
-  Network, ListChecks, CalendarDays, Settings, PanelRight,
+  Network, ListChecks, CalendarDays, Settings,
 } from 'lucide-react'
 import { userMenu } from '../lib/userMenu.js'
 import { useApp } from '../store/app.js'
@@ -681,7 +681,6 @@ export function BookmarksPanel() {
 export function Sidebar({ user, closed }) {
   const leftTab = useLayout((s) => s.leftTab)
   const width = useLayout((s) => s.leftWidth)
-  const rightOpen = useLayout((s) => s.right)
   const rootRef = useRef(null)
   const wsId = useApp((s) => s.wsId)
   const workspaces = useApp((s) => s.workspaces)
@@ -794,9 +793,6 @@ export function Sidebar({ user, closed }) {
           onClick={() => useLayout.getState().setRightTab('calendar')}
         >
           <CalendarDays />
-        </button>
-        <button className={`icon-btn ${rightOpen ? 'active' : ''}`} title="Right panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight()}>
-          <PanelRight />
         </button>
         <button className="icon-btn" title="Settings (Ctrl/⌘ ,)" onClick={() => useUI.getState().openModal('settings')}>
           <Settings />

@@ -5,7 +5,7 @@ import {
   Frame, Eraser, Pointer, Lock, LockOpen, Copy, Trash2, Group, Ungroup, Layers, AlignStartVertical, AlignCenterVertical,
   AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter, AlignLeft, AlignCenter, AlignRight, SlidersHorizontal, Spline, ChevronsDown, Link as LinkIcon,
-  ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, FileText, Hash,
+  ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, FileText, Hash, Pilcrow,
 } from 'lucide-react'
 import { STROKE_COLORS, STICKY_COLORS, colorCss, fillCss, stickyCss, DEFAULTS } from '@shared/boardsvg.js'
 import { appliesTo, styleGroup } from './controller.js'
@@ -25,6 +25,7 @@ export const TOOLS = [
   { id: 'pen', key: 'P', label: 'Draw', icon: Pencil },
   { id: 'marker', key: 'M', label: 'Highlighter', icon: Highlighter },
   { id: 'text', key: 'T', label: 'Text', icon: Type },
+  { id: 'mdtext', key: 'W', label: 'Markdown block — headings, lists and links', icon: Pilcrow },
   { id: 'sticky', key: 'N', label: 'Sticky note', icon: StickyNote },
   'sep',
   { id: 'image', key: 'I', label: 'Image', icon: ImagePlus },
@@ -191,7 +192,7 @@ const headIcon = (kind, flip) => (
   </svg>
 )
 
-const TOOL_TYPE = { rect: 'rect', ellipse: 'ellipse', diamond: 'diamond', arrow: 'arrow', line: 'line', pen: 'pen', marker: 'pen', text: 'text', sticky: 'sticky', frame: 'frame' }
+const TOOL_TYPE = { rect: 'rect', ellipse: 'ellipse', diamond: 'diamond', arrow: 'arrow', line: 'line', pen: 'pen', marker: 'pen', text: 'text', mdtext: 'text', sticky: 'sticky', frame: 'frame' }
 
 // Contextual style controls for the selection (or the active drawing tool).
 export function StyleBar({ ctl, mode }) {

@@ -520,6 +520,8 @@ svg.cv-el {
   align-items: center;
   gap: 2px;
   padding: 4px;
+  transform-origin: bottom center;
+  animation: cv-bar-in 220ms var(--ease-spring);
   border-radius: var(--radius-lg);
   background: var(--bg-elev);
   box-shadow: var(--shadow), 0 0 0 1px var(--border-strong);
@@ -600,6 +602,8 @@ svg.cv-el {
   flex-shrink: 0;
 }
 .cv-pill {
+  animation: cv-pill-in 200ms var(--ease-spring);
+  transform-origin: bottom center;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1104,17 +1108,15 @@ h3.shortcut-group {
 }
 
 /* the collapsed canvas pill sits out of the way of the text column */
+/* The resting pill stays where the toolbar was — in the middle — so closing
+   and opening reads as the same thing shrinking and growing in place. */
 .note-view .cv-dock.is-tucked {
-  left: auto;
-  right: 18px;
-  transform: none;
-  align-items: flex-end;
+  align-items: center;
 }
 @media (max-width: 768px) {
   /* a phone's text runs the full width, so the resting pill shrinks to a
      round button in the corner instead of sitting on top of a sentence */
   .note-view .cv-dock.is-tucked {
-    right: 10px;
     /* clear of the formatting toolbar that sits at the foot of the note */
     bottom: 57px;
   }
@@ -1143,5 +1145,34 @@ h3.shortcut-group {
   }
   .note-view .cv-dock.is-tucked .cv-pill {
     position: relative;
+  }
+}
+
+/* opening and closing the canvas bar: it compresses into the pill, and the
+   pill stretches back out into the bar */
+@keyframes cv-bar-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.28) scaleY(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cv-pill-in {
+  from {
+    opacity: 0;
+    transform: scaleX(2.6) scaleY(1.1);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cv-toolbar,
+  .cv-pill {
+    animation: none;
   }
 }

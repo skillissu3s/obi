@@ -293,7 +293,7 @@ function textBlock(el, w, h, { color, padding = 0, valign = 'top', bg = null, ex
     `height:${f(h)}px`,
     'box-sizing:border-box',
     `padding:${padding}px`,
-    `font-family:${FONTS[font] || FONTS.sans}`,
+    `font-family:${html != null ? 'var(--font-editor)' : FONTS[font] || FONTS.sans}`,
     `font-size:${f(fs)}px`,
     `line-height:${lineHeight(font)}`,
     `color:${color}`,

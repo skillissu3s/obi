@@ -6,7 +6,7 @@ import { resolveLayout, hitTest, inMarquee, erasedBy, bindTargetAt, visualBounds
 
 export const TOOL_KEYS = {
   v: 'select', h: 'hand', r: 'rect', o: 'ellipse', d: 'diamond', a: 'arrow', l: 'line', p: 'pen', m: 'marker',
-  t: 'text', n: 'sticky', i: 'image', k: 'note', f: 'frame', e: 'eraser', x: 'laser',
+  t: 'text', w: 'mdtext', n: 'sticky', i: 'image', k: 'note', f: 'frame', e: 'eraser', x: 'laser',
 }
 const CREATE_BOX = new Set(['rect', 'ellipse', 'diamond', 'frame'])
 const STYLE_KEYS = ['stroke', 'fill', 'fillStyle', 'sw', 'dash', 'rough', 'round', 'opacity', 'font', 'fs', 'align', 'color', 'heads', 'curve', 'markerStroke']
@@ -30,6 +30,7 @@ export function styleGroup(typeOrTool) {
     case 'marker':
       return 'marker'
     case 'text':
+    case 'mdtext':
       return 'text'
     case 'sticky':
       return 'sticky'
@@ -219,7 +220,7 @@ export class CanvasController {
   textSize(el) {
     if (el.md) {
       const html = this.host.renderMarkdown?.(el.text || '') ?? ''
-      const m = measureMarkdown(html, { font: val(el, 'font'), fs: val(el, 'fs'), width: el.w || 320 })
+      const m = measureMarkdown(html, { font: val(el, 'font'), fs: val(el, 'fs'), width: el.w || 320, family: 'var(--font-editor)' })
       return { h: m.h }
     }
     const m = measureText(el.text || '', { font: val(el, 'font'), fs: val(el, 'fs'), width: el.wrap ? el.w : null })
@@ -410,11 +411,11 @@ export class CanvasController {
       this.set({ draft, rawPoints: draft.points, selection: [] })
       return true
     }
-    if (tool === 'text') {
+    if (tool === 'text' || tool === 'mdtext') {
       const hitText = hitTest(layout, p.x, p.y, { tol })
       if (hitText && (hitText.type === 'text' || hitText.type === 'sticky')) {
         this.set({ selection: [hitText.id], editing: { id: hitText.id } })
-      } else this.createTextAt(p, this.state.tool === 'text' ? 'plain' : this.defaultTextKind())
+      } else this.createTextAt(p, tool === 'mdtext' ? 'markdown' : 'plain')
       this.startGesture({ type: 'noop' }, e)
       return true
     }

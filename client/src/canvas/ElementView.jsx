@@ -29,7 +29,9 @@ export function textStyle(el, defaults = {}) {
   const font = el.font ?? defaults.font ?? 'hand'
   const fs = el.fs ?? defaults.fs ?? 20
   return {
-    fontFamily: FONTS[font] || FONTS.sans,
+    // a markdown block follows the editor font from Settings, since it is
+    // writing rather than lettering on a drawing
+    fontFamily: el.md ? 'var(--font-editor)' : FONTS[font] || FONTS.sans,
     fontSize: fs * fontScale(font),
     lineHeight: lineHeight(font),
     textAlign: el.align ?? defaults.align ?? 'center',

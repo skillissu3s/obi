@@ -39,14 +39,15 @@ export function RightPanel({ tab, closed }) {
     <div className={`sidebar right ${closed ? 'is-closed' : ''}`} style={{ width }} inert={closed || undefined}>
       <div className={`resizer ${dragging ? 'dragging' : ''}`} onMouseDown={() => setDragging(true)} />
       <div className="rp-tabs">
+        {/* closing is on the edge the panel opens from */}
+        <button className="icon-btn rp-close" title="Close panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight(false)}>
+          <PanelRightClose />
+        </button>
         {tabs.map((t) => (
           <button key={t.id} className={`icon-btn ${rightTab === t.id ? 'active' : ''}`} title={t.title} onClick={() => useLayout.getState().setRightTab(t.id)}>
             <t.icon />
           </button>
         ))}
-        <button className="icon-btn rp-close" title="Close panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight(false)}>
-          <PanelRightClose />
-        </button>
       </div>
       <div className="rp-body">
         {rightTab === 'outline' && <Outline tab={tab} />}

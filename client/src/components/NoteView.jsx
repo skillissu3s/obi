@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, MoreHorizontal, Eye, Pencil, Code2, LayoutGrid, Share2, History, Star, Trash2, Copy, Link2,
   FolderInput, SplitSquareHorizontal, Info, Globe, AlertTriangle, FileWarning, Wifi, WifiOff, Bold, Italic, List, ListChecks,
   Heading1, Heading2, Quote, Link as LinkIcon, Image as ImageIcon, Undo2, Redo2, IndentIncrease, IndentDecrease, Hash, FileText,
-  ChevronDown, Printer, Download,
+  ChevronDown, Printer, Download, PanelRight,
 } from 'lucide-react'
 import { conn } from '../lib/socket.js'
 import { useApp } from '../store/app.js'
@@ -124,6 +124,7 @@ export function NoteView({ tab, paneId, active }) {
   const setMode = (m) => useLayout.getState().updateTab(tab.id, { mode: m })
 
   const viewers = (presence[tab.path] || []).filter((u) => u.id !== user?.id)
+  const rightOpen = useLayout((st) => st.right)
 
   const noteMenuRef = useRef(null)
   const noteMenu = (e) => {
@@ -305,6 +306,14 @@ export function NoteView({ tab, paneId, active }) {
         )}
         <button className="icon-btn" title="More" onClick={noteMenu}>
           <MoreHorizontal />
+        </button>
+        {/* the panel opens from the side it lives on */}
+        <button
+          className={`icon-btn ${rightOpen ? 'active' : ''}`}
+          title={rightOpen ? 'Close right panel (Ctrl/⌘ Shift \)' : 'Open right panel (Ctrl/⌘ Shift \)'}
+          onClick={() => useLayout.getState().toggleRight()}
+        >
+          <PanelRight />
         </button>
       </div>
       <div className="note-scroll" ref={setScroll} tabIndex={-1}>

@@ -244,14 +244,14 @@ let measurer = null
 // Markdown text blocks are measured from the rendered HTML, since a heading or
 // a list takes a different amount of room than the source line it came from.
 let mdMeasurer = null
-export function measureMarkdown(html, { font = 'sans', fs = 16, width = 320 } = {}) {
+export function measureMarkdown(html, { font = 'sans', fs = 16, width = 320, family = null } = {}) {
   if (!mdMeasurer) {
     mdMeasurer = document.createElement('div')
     mdMeasurer.className = 'cv-md'
     mdMeasurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none'
     document.body.appendChild(mdMeasurer)
   }
-  mdMeasurer.style.fontFamily = FONTS[font] || FONTS.sans
+  mdMeasurer.style.fontFamily = family || FONTS[font] || FONTS.sans
   mdMeasurer.style.fontSize = `${fs * fontScale(font)}px`
   mdMeasurer.style.width = `${Math.max(40, width)}px`
   mdMeasurer.innerHTML = html || '<p></p>'
