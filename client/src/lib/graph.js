@@ -188,10 +188,16 @@ export class GraphRenderer {
   resize() {
     const rect = this.canvas.getBoundingClientRect()
     if (!rect.width || !rect.height) return
+    // coming back from a hidden tab (or a first real layout): frame it again
+    if ((!this.width || !this.height) && !this.userMoved) this.autoFit = true
     this.canvas.width = rect.width * this.dpr
     this.canvas.height = rect.height * this.dpr
     this.width = rect.width
     this.height = rect.height
+    if (this.autoFit && !this.userMoved) {
+      this.autoFit = false
+      this.fit()
+    }
     this.needsDraw = true
   }
 
@@ -335,6 +341,12 @@ export class GraphRenderer {
 
   fit() {
     if (!this.nodes.length) return
+    // A tab that is laid out while hidden has no size yet; fitting against it
+    // parks the whole graph in the top-left corner. Wait for a real size.
+    if (!this.width || !this.height) {
+      this.autoFit = true
+      return
+    }
     let minX = Infinity
     let minY = Infinity
     let maxX = -Infinity

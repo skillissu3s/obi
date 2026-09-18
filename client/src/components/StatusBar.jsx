@@ -95,10 +95,14 @@ export function StatusBar() {
             {saveState === 'saving' ? 'Saving…' : 'Saved'}
           </span>
         ))}
-      <span className="status-item" title={connection === 'online' ? 'Connected — changes save instantly' : 'Reconnecting…'}>
-        <span className={`status-dot ${connection === 'online' ? '' : connection === 'offline' ? 'offline' : 'connecting'}`} />
-        {connection === 'online' ? 'Live' : connection === 'reconnecting' ? 'Reconnecting…' : connection === 'offline' ? 'Offline' : 'Connecting…'}
-      </span>
+      {/* Only worth a word when something is wrong: a permanent "Live" chip
+          was just noise next to the save state. */}
+      {connection !== 'online' && (
+        <span className="status-item" title="Changes are kept in this tab until the connection is back">
+          <span className={`status-dot ${connection === 'offline' ? 'offline' : 'connecting'}`} />
+          {connection === 'reconnecting' ? 'Reconnecting…' : connection === 'offline' ? 'Offline' : 'Connecting…'}
+        </span>
+      )}
       {others.length > 0 && (
         <span className="status-item" title={others.map((o) => o.name).join(', ')}>
           <AvatarStack users={others} size={16} max={5} />

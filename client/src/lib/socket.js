@@ -252,6 +252,20 @@ class Connection extends Emitter {
     if (!this.ws) this._connect()
   }
 
+  // "Try now" from the offline banner: skip the backoff and dial again.
+  reconnectNow() {
+    if (this.stopped) return
+    clearTimeout(this.reconnectTimer)
+    this.retry = 0
+    if (this.ws) {
+      try {
+        this.ws.close()
+      } catch {}
+      this.ws = null
+    }
+    this._connect()
+  }
+
   stop() {
     this.stopped = true
     clearTimeout(this.reconnectTimer)

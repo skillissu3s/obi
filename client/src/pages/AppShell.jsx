@@ -24,6 +24,7 @@ import { NewWorkspaceModal, ShareModal, HistoryModal, MoveModal, ImportModal, Sh
 import { Modal, WsIcon, Avatar, Spinner, menuFromElement } from '../components/ui.jsx'
 import { PasswordInput } from './Auth.jsx'
 import { StorageWarning } from '../components/StorageWarning.jsx'
+import { ConnectionBanner } from '../components/ConnectionBanner.jsx'
 import { EdgeToggles } from '../components/EdgeToggles.jsx'
 import { userMenu } from '../lib/userMenu.js'
 import { basename, stripExt } from '@shared/paths.js'
@@ -141,6 +142,7 @@ export default function AppShell() {
   return (
     <div className={`app ${layout.focus ? 'focus-mode' : ''}`}>
       {user?.isAdmin && <StorageWarning compact />}
+      <ConnectionBanner />
       <MobileHeader ws={ws} activeTab={activeTab} />
       <div className="app-body">
         {/* one or the other: the full sidebar when open, the compact ribbon when closed.
