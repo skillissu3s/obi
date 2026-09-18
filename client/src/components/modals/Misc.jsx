@@ -369,16 +369,21 @@ export function HistoryModal({ ws: wsId, path }) {
     api.version(wsId, path, selected.id, selected.path !== path ? selected.path : undefined).then((r) => setContent(r.content)).catch((e) => toast.error(e))
   }, [selected, wsId, path])
 
-  const diffHtml = useMemo(() => {
+  const diff = useMemo(() => {
     if (!showDiff || !content) return null
     const d = dmp.diff_main(content, current)
     dmp.diff_cleanupSemantic(d)
-    return d
+    let added = 0
+    let removed = 0
+    const html = d
       .map(([op, text]) => {
+        if (op === 1) added += text.length
+        if (op === -1) removed += text.length
         const esc = text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c])
         return op === 1 ? `<ins>${esc}</ins>` : op === -1 ? `<del>${esc}</del>` : esc
       })
       .join('')
+    return { html, added, removed }
   }, [content, current, showDiff])
 
   return (
@@ -422,6 +427,9 @@ export function HistoryModal({ ws: wsId, path }) {
                   <div className="faint" style={{ fontSize: 12 }}>
                     {selected.author ? `by ${selected.author} · ` : ''}
                     {selected.source === 'git' ? `commit ${String(selected.id).slice(0, 7)}` : 'snapshot'}
+                    {diff && (diff.added || diff.removed
+                      ? <> · <span className="diff-count add">+{diff.added}</span> <span className="diff-count del">−{diff.removed}</span> characters vs now</>
+                      : ' · identical to the current note')}
                   </div>
                 </div>
                 <button
@@ -444,7 +452,7 @@ export function HistoryModal({ ws: wsId, path }) {
                   {busy ? <Spinner size="sm" /> : <RotateCcw />} {busy ? 'Restoring…' : 'Restore this version'}
                 </button>
               </div>
-              {showDiff ? <div className="diff" dangerouslySetInnerHTML={{ __html: diffHtml }} /> : <div className="markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(content, { ws: wsId, path }).html }} />}
+              {showDiff ? <div className="diff" dangerouslySetInnerHTML={{ __html: diff?.html || '' }} /> : <div className="markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(content, { ws: wsId, path }).html }} />}
             </>
           )}
         </div>

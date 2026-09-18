@@ -1495,6 +1495,16 @@
   color: var(--text-2);
   border-radius: 2px;
 }
+.diff-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.diff-count.add {
+  color: var(--success);
+}
+.diff-count.del {
+  color: var(--danger);
+}
 @media (max-width: 768px) {
   .history {
     flex-direction: column;
