@@ -186,6 +186,45 @@ If the same note is edited in both places at once, git merges it line by line; o
 
 ---
 
+## Desktop app
+
+Obi also runs as a desktop app (Electron) that works fully offline. It is the
+same app: the server runs inside it on `127.0.0.1`, for you alone.
+
+- **Every workspace is a vault** — a folder you choose, new or existing (an
+  Obsidian vault works as is). Notes stay plain markdown files in it; edits
+  made by other apps are picked up.
+- **First run** asks where notes should live: sign in to (or create) an Obi
+  account on your server and pick which cloud workspaces to bring down — each
+  gets a folder — or keep everything on this computer.
+- **Cloud sync** is file by file against the last version both sides agreed
+  on: one-sided changes are copied, edits to different parts of a note are
+  merged, and colliding edits keep both (a “conflict” copy). Offline, the
+  status bar says so and everything is kept; it syncs when the connection is
+  back. The cloud keeps version history and a trash, so nothing is lost. A
+  local vault can go up to the cloud later (Settings → Sync), as a new cloud
+  workspace or into an existing one.
+- **GitHub sync** (Settings → Sync): the vault folder becomes the git working
+  copy. Commit and push on save, on a timer, or only when you press
+  *Commit & push*; set a commit-message template or type one; *Pull* fetches
+  without pushing. Needs git installed.
+
+```bash
+npm run desktop          # build the client and open the app
+npm run desktop:build    # installer for this OS in release/ (Windows .exe, macOS .dmg, Linux AppImage/.deb)
+```
+
+The app keeps its database (vault list, cloud sign-ins, sync state) in the
+per-user app data folder; `OBI_DATA_DIR` overrides it. `OBI_CLOUD_URL` pre-fills
+the server address on the sign-in screen. For development,
+`OBI_DESKTOP=1 OBI_DESKTOP_WEB=1 npm run start` serves the desktop UI to a
+browser at `/desktop-web`, with folders created under `OBI_DESKTOP_WEB_DIR`.
+
+The installers are not code-signed, so Windows SmartScreen and macOS
+Gatekeeper warn on first launch until signing is set up in `package.json → build`.
+
+---
+
 ## Local development
 
 ```bash

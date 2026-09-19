@@ -14,7 +14,9 @@
     "build": "vite build",
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "desktop": "vite build && electron .",
-    "desktop:dev": "electron ."
+    "desktop:dev": "electron .",
+    "desktop:build": "vite build && electron-builder",
+    "desktop:icon": "electron scripts/make-icon.cjs"
   },
   "dependencies": {
     "compression": "^1.8.2",
@@ -61,5 +63,47 @@
     "y-codemirror.next": "^0.3.6",
     "zustand": "^5.0.15"
   },
-  "main": "desktop/main.js"
+  "main": "desktop/main.js",
+  "author": "Obi",
+  "build": {
+    "appId": "app.obi.desktop",
+    "productName": "Obi",
+    "directories": {
+      "output": "release",
+      "buildResources": "desktop"
+    },
+    "files": [
+      "desktop/**",
+      "server/**",
+      "shared/**",
+      "dist/**",
+      "package.json",
+      "!**/*.map"
+    ],
+    "icon": "desktop/icon.png",
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "maintainer": "Obi"
+    }
+  }
 }

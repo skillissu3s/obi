@@ -10,3 +10,4 @@ data-*/
 .DS_Store
 .vscode/
 .idea/
+release/

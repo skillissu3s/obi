@@ -14,3 +14,5 @@ data-test
 README.md
 docker-compose*.yml
 scripts/dev.js
+release
+desktop
