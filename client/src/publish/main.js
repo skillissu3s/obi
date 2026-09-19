@@ -15,6 +15,20 @@ import { boardToSvg, highlightCss } from '@shared/boardsvg.js'
 const article = document.getElementById('content')
 let data = readPayload()
 
+// A phone is narrower than the author's text column. The column keeps its
+// width (so every line breaks where it did for the author and the drawings stay
+// on them) and the browser is asked to lay the page out that wide and show it
+// scaled to the screen; pinch-zoom still works.
+function fitViewport() {
+  const main = article.closest('main')
+  const meta = document.querySelector('meta[name="viewport"]')
+  if (!main || !meta) return
+  const need = Math.ceil(main.offsetWidth)
+  const screenW = Math.min(window.screen?.width || Infinity, document.documentElement.clientWidth || Infinity)
+  if (need > screenW) meta.setAttribute('content', `width=${need}, initial-scale=${(screenW / need).toFixed(4)}`)
+}
+fitViewport()
+
 function readPayload() {
   try {
     return JSON.parse(document.getElementById('obi-canvas')?.textContent || 'null')

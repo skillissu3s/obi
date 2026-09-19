@@ -1013,6 +1013,17 @@ svg.cv-el {
 .note-scroll.nc-hand * {
   cursor: grab !important;
 }
+/* the hand tool pans both ways under a finger too */
+.note-scroll.nc-hand {
+  touch-action: none;
+}
+/* on touch screens a sideways swipe pans the canvas (NoteCanvas), so the
+   browser only takes vertical scrolling */
+@media (pointer: coarse) {
+  .note-scroll {
+    touch-action: pan-y;
+  }
+}
 .note-scroll.nc-panning,
 .note-scroll.nc-panning * {
   cursor: grabbing !important;

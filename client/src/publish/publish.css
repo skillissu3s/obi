@@ -46,8 +46,10 @@ body {
 }
 main {
   box-sizing: content-box;
+  /* never narrower than the author's column, even on a phone: re-wrapping
+     would move the text out from under the drawings (main.js fits the
+     viewport to it instead) */
   width: var(--pub-col);
-  max-width: calc(100vw - 32px);
   margin: 0 auto;
   padding: 56px 16px 120px;
 }

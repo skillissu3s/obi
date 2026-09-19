@@ -379,6 +379,18 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     return store.subscribe(bump)
   }, [store, bump])
 
+  // ⚠ LAYOUT CONTRACT — a note with drawings keeps the author's column width
+  // on a phone (see .nc-fixed-col in editor.css): re-wrapping its text to the
+  // screen would move lines out from under the drawings pinned to them. The
+  // column then pans sideways under a finger instead.
+  const hasDrawings = !!store && store.getSnapshot().list.length > 0
+  useEffect(() => {
+    if (!innerEl) return
+    innerEl.classList.toggle('nc-fixed-col', hasDrawings)
+    bump()
+    return () => innerEl.classList.remove('nc-fixed-col')
+  }, [innerEl, hasDrawings, bump])
+
   // ----- persist anchors that moved because of local typing -----
   const saveTimer = useRef(0)
   const scheduleAnchorSave = () => {
@@ -473,6 +485,9 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
   // ----- pointer / keyboard plumbing on the scroll area -----
   useEffect(() => {
     if (!scrollEl || !ctl) return
+    // a finger swiping sideways pans the canvas; up and down stays the
+    // page's own scrolling (the scroll area is touch-action: pan-y)
+    let swipe = null
     const onPointerDown = (e) => {
       if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .cv-pop, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
       if (e.target.closest?.('.cv-edit, .cv-edit-frame')) return
@@ -484,11 +499,26 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         setBubble(null)
       } else if (e.button === 1) {
         e.preventDefault()
+      } else if (e.pointerType === 'touch' && e.isPrimary && !e.target.closest?.('.cm-lp-table, .cm-lp-codeblock, pre')) {
+        swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, pan: panRef.current, on: false }
       }
     }
     const onMove = (e) => {
+      if (swipe && e.pointerId === swipe.id) {
+        const dx = e.clientX - swipe.x
+        const dy = e.clientY - swipe.y
+        if (!swipe.on && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) swipe.on = true
+        if (swipe.on) {
+          setPan(swipe.pan + dx)
+          e.preventDefault()
+        }
+        return
+      }
       pointerRef.current = toWorld(e.clientX, e.clientY)
       ctl.hoverAt(e)
+    }
+    const endSwipe = (e) => {
+      if (swipe && e.pointerId === swipe.id) swipe = null
     }
     const onKeyDown = (e) => {
       const inText = e.target.closest?.('.cm-editor, input, textarea, .cv-edit')
@@ -567,6 +597,8 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     }
     scrollEl.addEventListener('pointerdown', onPointerDown, true)
     scrollEl.addEventListener('pointermove', onMove)
+    scrollEl.addEventListener('pointerup', endSwipe)
+    scrollEl.addEventListener('pointercancel', endSwipe)
     scrollEl.addEventListener('keydown', onKeyDown)
     scrollEl.addEventListener('keyup', onKeyUp)
     scrollEl.addEventListener('paste', onPaste)
@@ -579,6 +611,8 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     return () => {
       scrollEl.removeEventListener('pointerdown', onPointerDown, true)
       scrollEl.removeEventListener('pointermove', onMove)
+      scrollEl.removeEventListener('pointerup', endSwipe)
+      scrollEl.removeEventListener('pointercancel', endSwipe)
       scrollEl.removeEventListener('keydown', onKeyDown)
       scrollEl.removeEventListener('keyup', onKeyUp)
       scrollEl.removeEventListener('paste', onPaste)

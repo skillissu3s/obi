@@ -1236,6 +1236,15 @@
   .note-inner {
     padding: 8px 18px 40vh;
   }
+  /* ⚠ LAYOUT CONTRACT — a note with drawings keeps the author's column
+     (--note-width, the readable width on a computer) instead of wrapping to
+     the phone: its lines, and the drawings pinned to them, stay where they
+     were drawn. NoteCanvas sets the class and pans the column sideways. */
+  .note-inner.nc-fixed-col {
+    width: calc(var(--note-width, 620px) + 36px);
+    max-width: none;
+    margin: 0;
+  }
   .inline-title {
     font-size: calc(var(--editor-font-size) * 1.75);
     padding-top: 14px;
