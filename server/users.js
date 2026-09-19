@@ -38,7 +38,7 @@ export function checkUsername(username) {
   return username
 }
 
-export async function createUser({ username, displayName, password, passwordHash, email = null, emailVerified = false, isAdmin = false, mustChangePassword = false }) {
+export async function createUser({ username, displayName, password, passwordHash, email = null, emailVerified = false, isAdmin = false, mustChangePassword = false, withWorkspace = true }) {
   username = checkUsername(username)
   if (!passwordHash) validatePassword(password)
   if (email && one('SELECT id FROM users WHERE email = ?', email)) throw new HttpError(409, 'An account with that email already exists')
@@ -52,7 +52,7 @@ export async function createUser({ username, displayName, password, passwordHash
       email || null, email && emailVerified ? t : null,
     )
   })
-  await createOnlineWorkspace({ ownerId: id, name: 'Personal', icon: '🌱', isDefault: true, welcome: true })
+  if (withWorkspace) await createOnlineWorkspace({ ownerId: id, name: 'Personal', icon: '🌱', isDefault: true, welcome: true })
   return one('SELECT * FROM users WHERE id = ?', id)
 }
 

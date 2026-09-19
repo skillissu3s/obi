@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Command, FileText, FilePlus, Layers, Cloud, FolderGit2, CornerDownLeft, ArrowUp, ArrowDown, Copy, Globe, X, Shapes, Link2 } from 'lucide-react'
+import { wsWhere, isDesktop } from '../lib/desktop.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
@@ -62,14 +63,14 @@ export function CommandPalette() {
               <div className="pi-title">
                 <Highlight text={item.name} indices={indices} />
               </div>
-              <div className="pi-sub">{item.type === 'github' ? `GitHub · ${item.github?.label}` : `Online${item.memberCount > 1 ? ` · ${item.memberCount} members` : ''}`}</div>
+              <div className="pi-sub">{wsWhere(item)}</div>
             </div>
             {item.id === app.wsId && <span className="badge accent">current</span>}
           </>
         ),
         run: () => A.switchWorkspace(item.id),
       }))
-      res.push({ key: '__new', icon: Layers, title: 'Create new workspace…', run: () => useUI.getState().openModal('new-workspace') })
+      res.push({ key: '__new', icon: Layers, title: isDesktop ? 'Add a vault…' : 'Create new workspace…', run: () => useUI.getState().openModal('new-workspace') })
       return res
     }
     if (mode === 'templates') {

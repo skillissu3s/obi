@@ -158,12 +158,23 @@ export async function initRepo(dir, { url, branch }) {
   if (!(await isRepo(dir))) {
     await must(dir, ['init', '-b', branch])
     await must(dir, ['remote', 'add', 'origin', url])
-  } else {
-    await runGit(dir, ['remote', 'set-url', 'origin', url])
+  } else if ((await runGit(dir, ['remote', 'set-url', 'origin', url])).code !== 0) {
+    // an existing repository without an "origin" yet
+    await must(dir, ['remote', 'add', 'origin', url])
   }
 }
 
-function conflictName(p) {
+/** The installed git's version, or null when there is none */
+export async function gitVersion() {
+  try {
+    const r = await runGit(process.cwd(), ['--version'], { timeout: 10000 })
+    return r.code === 0 ? r.stdout.trim().replace(/^git version\s*/, '') : null
+  } catch {
+    return null
+  }
+}
+
+export function conflictName(p) {
   const d = new Date()
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`
   const dot = p.lastIndexOf('.')
@@ -181,7 +192,7 @@ async function showStage(dir, stage, file) {
  * Full sync cycle: commit local changes, fetch, merge (saving conflict copies), push.
  * Returns { changed: string[] | null (null = unknown/all), pushed, conflicts }
  */
-export async function syncRepo(dir, { url, branch, token, username, authorName, authorEmail, message }) {
+export async function syncRepo(dir, { url, branch, token, username, authorName, authorEmail, message, push = true }) {
   const auth = { token, username }
   const ident = ['-c', `user.name=${authorName || 'Obi'}`, '-c', `user.email=${authorEmail || 'obi@localhost'}`]
   await runGit(dir, ['remote', 'set-url', 'origin', url])
@@ -268,7 +279,7 @@ export async function syncRepo(dir, { url, branch, token, username, authorName, 
   }
 
   let pushed = false
-  if (after) {
+  if (after && push) {
     const needPush = !remoteHead || (await must(dir, ['rev-list', '--count', `${remoteRef}..HEAD`])).stdout.trim() !== '0'
     if (needPush) {
       const p = await runGit(dir, ['push', '-q', 'origin', `HEAD:refs/heads/${branch}`], { ...auth, timeout: 180000 })

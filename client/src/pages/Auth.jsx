@@ -472,4 +472,4 @@ export function SignupPage({ search }) {
   )
 }
 
-export { PasswordInput }
+export { PasswordInput, CodeStep }

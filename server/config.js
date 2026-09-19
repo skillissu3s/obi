@@ -7,7 +7,9 @@ const env = process.env
 export const DATA_DIR = path.resolve(env.DATA_DIR || './data')
 export const WORKSPACES_DIR = path.join(DATA_DIR, 'workspaces')
 export const PORT = Number(env.PORT || 3000)
-export const HOST = env.HOST || '0.0.0.0'
+// the desktop app runs this server privately for one person
+export const DESKTOP = env.OBI_DESKTOP === '1'
+export const HOST = env.HOST || (DESKTOP ? '127.0.0.1' : '0.0.0.0')
 export const IS_PROD = env.NODE_ENV === 'production'
 export const ALLOW_FILE_REMOTES = env.ALLOW_FILE_REMOTES === '1'
 export const SESSION_DAYS = Number(env.SESSION_DAYS || 30)

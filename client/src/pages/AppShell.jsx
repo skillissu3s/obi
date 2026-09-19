@@ -28,6 +28,8 @@ import { ConnectionBanner } from '../components/ConnectionBanner.jsx'
 import { EdgeToggles } from '../components/EdgeToggles.jsx'
 import { userMenu } from '../lib/userMenu.js'
 import { basename, stripExt } from '@shared/paths.js'
+import { isDesktop } from '../lib/desktop.js'
+import { DesktopWelcome, NewVaultModal } from '../components/Desktop.jsx'
 
 export default function AppShell() {
   const { path: url } = useLocation()
@@ -124,6 +126,9 @@ export default function AppShell() {
       </div>
     )
   }
+
+  // the desktop app's first run: pick a folder, or bring notes from the cloud
+  if (!workspaces.length && isDesktop) return <DesktopWelcome />
 
   if (!workspaces.length) {
     return (
@@ -224,7 +229,7 @@ function Modals() {
     case 'settings':
       return <SettingsModal {...p} />
     case 'new-workspace':
-      return <NewWorkspaceModal />
+      return isDesktop ? <NewVaultModal /> : <NewWorkspaceModal />
     case 'share':
       return <ShareModal {...p} />
     case 'history':

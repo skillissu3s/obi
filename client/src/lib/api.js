@@ -5,7 +5,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request(method, url, body, { raw = false, signal } = {}) {
+export async function request(method, url, body, { raw = false, signal } = {}) {
   const headers = { 'x-obi': '1' }
   let payload
   if (body !== undefined) {
@@ -94,7 +94,7 @@ export const api = {
   history: (id, path) => request('GET', `${W(id)}/history${q({ path })}`),
   version: (id, path, vid, vpath) => request('GET', `${W(id)}/history/version${q({ path, id: vid, vpath })}`),
   restoreVersion: (id, path, vid, vpath) => request('POST', `${W(id)}/history/restore`, { path, id: vid, vpath }),
-  sync: (id) => request('POST', `${W(id)}/sync`, {}),
+  sync: (id, message) => request('POST', `${W(id)}/sync`, message ? { message } : {}),
   members: (id) => request('GET', `${W(id)}/members`),
   addMember: (id, username, role) => request('POST', `${W(id)}/members`, { username, role }),
   setMemberRole: (id, userId, role) => request('PATCH', `${W(id)}/members/${userId}`, { role }),

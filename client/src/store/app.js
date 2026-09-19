@@ -209,6 +209,10 @@ export function bindConnectionEvents() {
     if (m.ws === useApp.getState().wsId) useApp.getState().refreshIndex()
   })
   conn.on('sync', (m) => useApp.getState().setWorkspaceSync(m.ws, m.status))
+  // desktop: a vault's cloud sync moved along
+  conn.on('cloud', (m) =>
+    useApp.setState((s) => ({ workspaces: s.workspaces.map((w) => (w.id === m.ws && w.cloud ? { ...w, cloud: { ...w.cloud, status: m.status } } : w)) })),
+  )
   conn.on('subbed', (m) => {
     if (m.ws !== useApp.getState().wsId) return
     useApp.setState({ presence: m.presence || {} })

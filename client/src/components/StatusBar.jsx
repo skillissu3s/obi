@@ -7,6 +7,30 @@ import { syncNow } from '../lib/actions.js'
 import { conn } from '../lib/socket.js'
 import { timeAgo, readingTime } from '../lib/util.js'
 import { AvatarStack } from './ui.jsx'
+import { HardDrive } from 'lucide-react'
+import { dapi } from '../lib/desktop.js'
+import { cloudStatusText } from './Desktop.jsx'
+import { toast } from '../store/ui.js'
+
+// Desktop: how this vault stands with the cloud. Offline is shown, never an
+// error: everything is kept here and goes up when the connection is back.
+function CloudChip({ ws }) {
+  const s = ws.cloud.status
+  const state = s?.state || 'idle'
+  const icon =
+    state === 'syncing' ? <RefreshCw className="spin" /> : state === 'offline' ? <CloudOff /> : state === 'error' || state === 'signedout' ? <AlertTriangle style={{ color: 'var(--danger)' }} /> : <Cloud />
+  const label = state === 'syncing' ? 'Syncing…' : state === 'offline' ? 'Offline' : state === 'signedout' ? 'Signed out' : state === 'error' ? 'Sync failed' : 'Synced'
+  return (
+    <button
+      className={`status-item ${state === 'offline' ? 'status-offline' : ''}`}
+      title={`${cloudStatusText(s)}\nClick to sync now`}
+      onClick={() => dapi.cloudSyncNow(ws.id).catch((e) => toast.error(e))}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
 
 export function StatusBar() {
   const connection = useApp((s) => s.connection)
@@ -65,7 +89,8 @@ export function StatusBar() {
     if (sync.state === 'syncing' || sync.state === 'cloning') return <RefreshCw className="spin" />
     if (sync.state === 'error') return <AlertTriangle style={{ color: 'var(--danger)' }} />
     if (sync.state === 'dirty' || sync.pending) return <Cloud />
-    return <Check />
+    // a desktop vault can show cloud sync too: say which one this is
+    return ws?.dir ? <GitBranch /> : <Check />
   }
   const syncLabel = () => {
     if (!sync) return ''
@@ -73,6 +98,7 @@ export function StatusBar() {
     if (sync.state === 'syncing') return 'Syncing…'
     if (sync.state === 'error') return 'Sync failed'
     if (sync.pending) return `${sync.pending} change${sync.pending === 1 ? '' : 's'} pending`
+    if (ws?.dir) return sync.lastSync ? `Pushed ${timeAgo(sync.lastSync)}` : 'Not pushed yet'
     return sync.lastSync ? `Synced ${timeAgo(sync.lastSync)}` : 'Not synced yet'
   }
 
@@ -84,13 +110,22 @@ export function StatusBar() {
           {syncLabel()}
         </button>
       )}
+      {ws?.cloud && <CloudChip ws={ws} />}
       {ws?.type === 'online' &&
         (saveState === 'idle' ? (
-          <span className="status-item desktop-only" title="Notes are stored on this server">
-            <Cloud /> Online workspace
-          </span>
+          ws.dir ? (
+            !ws.cloud && (
+              <span className="status-item desktop-only" title={ws.dir}>
+                <HardDrive /> On this computer
+              </span>
+            )
+          ) : (
+            <span className="status-item desktop-only" title="Notes are stored on this server">
+              <Cloud /> Online workspace
+            </span>
+          )
         ) : (
-          <span className="status-item" title={saveState === 'saving' ? 'Your changes are on their way to the server' : 'Every change is saved'}>
+          <span className="status-item" title={saveState === 'saving' ? (ws.dir ? 'Saving to the folder' : 'Your changes are on their way to the server') : 'Every change is saved'}>
             {saveState === 'saving' ? <Loader2 className="spin" /> : <Check />}
             {saveState === 'saving' ? 'Saving…' : 'Saved'}
           </span>

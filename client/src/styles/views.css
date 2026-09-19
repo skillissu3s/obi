@@ -1742,3 +1742,139 @@
   gap: 10px;
   min-width: 0;
 }
+
+/* ---------- desktop app ---------- */
+.auth-card.dk-wide {
+  max-width: 560px;
+}
+.dk-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 4px 0 8px;
+}
+@media (max-width: 560px) {
+  .dk-choices {
+    grid-template-columns: 1fr;
+  }
+}
+.dk-choices .type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  color: inherit;
+  font: inherit;
+}
+.dk-list {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0;
+  max-height: 46vh;
+  overflow: auto;
+}
+.dk-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-hover);
+}
+.dk-item-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 16px;
+}
+.dk-item-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.dk-item-text {
+  flex: 1;
+  min-width: 0;
+}
+.dk-item-name {
+  font-weight: 600;
+}
+.dk-item-meta {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.dk-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+.dk-embedded-auth {
+  max-width: 372px;
+  margin: 8px auto;
+}
+.dk-embedded-auth h1 {
+  font-size: 21px;
+  margin: 0 0 4px;
+  letter-spacing: -0.03em;
+}
+.dk-embedded-auth p.sub {
+  margin: 0 0 22px;
+  color: var(--text-2);
+}
+.dk-status {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-hover);
+  margin: 6px 0 4px;
+}
+.dk-status > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-2);
+}
+.dk-status > svg.danger {
+  color: var(--danger);
+}
+.dk-status-title {
+  font-weight: 600;
+}
+.dk-status-desc {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.dk-radio {
+  display: grid;
+  gap: 6px;
+}
+.dk-radio label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.dk-inline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dk-inline .input {
+  flex: 1;
+  min-width: 180px;
+}
+.status-item.status-offline {
+  color: var(--text-2);
+}
+.setting.stacked .setting-control > .input {
+  width: 100%;
+  max-width: 520px;
+}
+.setting.stacked .setting-control > .dk-inline {
+  width: 100%;
+}

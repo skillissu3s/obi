@@ -4,13 +4,14 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import compression from 'compression'
-import { PORT, HOST, DATA_DIR, IS_PROD, APP_NAME } from './config.js'
+import { PORT, HOST, DATA_DIR, IS_PROD, APP_NAME, DESKTOP } from './config.js'
 import { one, all, run, now } from './db.js'
 import { authRouter, csrfGuard } from './auth.js'
 import { adminRouter } from './admin.js'
 import { wsRouter, miscRouter } from './workspaces.js'
 import { publicRouter } from './public.js'
 import { syncRouter } from './syncapi.js'
+import { desktopRouter, startDesktop, DESKTOP_WEB, desktopWebRouter } from './desktop.js'
 import { attachWebSocket } from './wsserver.js'
 import { shutdownAll, workspaceDir, trashCompanions } from './runtime.js'
 import { createUser } from './users.js'
@@ -44,6 +45,8 @@ app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/workspaces', wsRouter)
 app.use('/api/sync', syncRouter)
+if (DESKTOP) app.use('/api/desktop', desktopRouter)
+if (DESKTOP && DESKTOP_WEB) app.use(desktopWebRouter)
 app.use('/api', miscRouter)
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }))
 app.use('/p', publicRouter)
@@ -62,6 +65,9 @@ if (fs.existsSync(DIST)) {
   app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next()
     res.setHeader('Cache-Control', 'no-cache')
+    if (DESKTOP && DESKTOP_WEB) {
+      return res.type('html').send(fs.readFileSync(indexHtml, 'utf8').replace('<head>', '<head><script src="/desktop-web.js"></script>'))
+    }
     res.sendFile(indexHtml)
   })
 } else {
@@ -105,28 +111,41 @@ function housekeeping() {
   }
 }
 
-await bootstrapAdmin()
-dataCreatedAt()
-warnIfEphemeral(DATA_DIR)
+if (DESKTOP) await startDesktop()
+else {
+  await bootstrapAdmin()
+  dataCreatedAt()
+  warnIfEphemeral(DATA_DIR)
+}
 housekeeping()
 setInterval(housekeeping, 6 * 3600 * 1000).unref()
 
 const server = http.createServer(app)
 server.keepAliveTimeout = 65000
 attachWebSocket(server)
-server.listen(PORT, HOST, () => {
-  console.log(`[${APP_NAME}] listening on http://${HOST}:${PORT} (data: ${DATA_DIR})`)
+/** Resolves to the port once listening (the desktop app asks for any free one) */
+export const listening = new Promise((resolve) => {
+  server.listen(PORT, HOST, () => {
+    const port = server.address().port
+    console.log(`[${APP_NAME}] listening on http://${HOST}:${port} (data: ${DATA_DIR})`)
+    resolve(port)
+  })
 })
+
+/** Saves everything and stops; the desktop app calls this before quitting */
+export async function stopServer() {
+  server.close()
+  await shutdownAll()
+}
 
 let shuttingDown = false
 async function shutdown(signal) {
   if (shuttingDown) return
   shuttingDown = true
   console.log(`[${APP_NAME}] ${signal} received, saving and shutting down…`)
-  server.close()
   const force = setTimeout(() => process.exit(0), 15000)
   try {
-    await shutdownAll()
+    await stopServer()
   } catch (e) {
     console.error(e)
   }

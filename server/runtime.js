@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import os from 'node:os'
 import { WORKSPACES_DIR } from './config.js'
 import { one, run, all, now, parseJSON } from './db.js'
-import { decrypt, newId } from './security.js'
+import { decrypt, newId, sha256 } from './security.js'
 import { LiveDoc } from './livedocs.js'
 import { atomicWrite, absPath, scanDir, mapLimit, Mutex, HttpError, exists } from './fsutil.js'
 import * as git from './git.js'
@@ -56,7 +57,7 @@ export async function shutdownAll() {
 setInterval(() => {
   const t = Date.now()
   for (const [id, rt] of runtimes) {
-    if (rt.subscribers.size === 0 && rt.docs.size === 0 && t - rt.lastUsed > 30 * 60 * 1000 && !rt.syncState.dirty) {
+    if (!rt.keepAlive && rt.subscribers.size === 0 && rt.docs.size === 0 && t - rt.lastUsed > 30 * 60 * 1000 && !rt.syncState.dirty) {
       runtimes.delete(id)
       rt.shutdown({ save: true }).catch(() => {})
     }
@@ -86,6 +87,9 @@ class WorkspaceRuntime {
     this.rev = 0
     this.bootId = newId(6) // revs restart with the process; this tells them apart
     this.changeListeners = new Set()
+    // what we last wrote to each file (hash, or null once deleted), so a folder
+    // watcher can tell our own writes from edits made by other apps
+    this.written = new Map()
     this.syncTimer = null
     this.pullTimer = null
     this.presenceTimer = null
@@ -303,6 +307,7 @@ class WorkspaceRuntime {
   async _writeLayer(notePath, text) {
     const rel = layerPathFor(notePath)
     const abs = absPath(this.dir, rel)
+    this.written.set(rel, text == null ? null : sha256(text))
     if (text == null) {
       if (!(await exists(abs))) return
       await fs.rm(abs, { force: true })
@@ -364,6 +369,7 @@ class WorkspaceRuntime {
       if (doc) doc.applyExternal(text)
     }
     if (prev === text && !isNew) return
+    this.written.set(p, sha256(text))
     await atomicWrite(abs, text)
     const st = await fs.stat(abs)
     const existed = this.tree.has(p)
@@ -431,6 +437,7 @@ class WorkspaceRuntime {
   writeFile(p, buffer) {
     return this.lock.run(async () => {
       const abs = absPath(this.dir, p)
+      this.written.set(p, sha256(buffer))
       await atomicWrite(abs, buffer)
       const st = await fs.stat(abs)
       await this._ensureParents(p)
@@ -834,9 +841,23 @@ class WorkspaceRuntime {
     if (p) this.dirtyPaths.add(p)
     this.syncState.dirty = true
     this.setSync({ state: this.syncState.syncing ? 'syncing' : 'dirty' })
-    const delay = Math.max(5, Number(this.settings.autoSyncSeconds ?? 30)) * 1000
+    const s = this.settings
+    const mode = s.syncMode || (s.autoSync === false ? 'manual' : 'save')
+    if (mode === 'manual') return
+    // on save: shortly after you stop typing. On a timer: every N minutes,
+    // however much is going on.
+    if (mode === 'interval') {
+      if (this.syncTimer) return
+      const every = Math.max(60, Number(s.intervalMinutes ?? 15) * 60) * 1000
+      this.syncTimer = setTimeout(() => {
+        this.syncTimer = null
+        this.requestSync()
+      }, every)
+      return
+    }
+    const delay = Math.max(5, Number(s.autoSyncSeconds ?? 30)) * 1000
     clearTimeout(this.syncTimer)
-    if (this.settings.autoSync !== false) this.syncTimer = setTimeout(() => this.requestSync(), delay)
+    this.syncTimer = setTimeout(() => this.requestSync(), delay)
   }
 
   startPullLoop() {
@@ -844,12 +865,17 @@ class WorkspaceRuntime {
     const every = Math.max(30, Number(this.settings.pullIntervalSeconds ?? 120)) * 1000
     this.pullTimer = setInterval(() => {
       if (this.closed) return
-      if ((this.subscribers.size || this.docs.size) && this.settings.autoSync !== false) this.requestSync()
+      const s = this.settings
+      const mode = s.syncMode || (s.autoSync === false ? 'manual' : 'save')
+      // manual mode still fetches others' changes unless that is off too
+      if (s.autoPull === false || (mode === 'manual' && s.autoPull !== true)) return
+      if (this.subscribers.size || this.docs.size || this.keepAlive) this.requestSync({ push: mode !== 'manual' })
     }, every)
     this.pullTimer.unref?.()
   }
 
-  requestSync() {
+  // push: false only commits and pulls. message: this commit's message.
+  requestSync({ push = true, message } = {}) {
     if (this.type !== 'github' || this.closed) return Promise.resolve(this.syncStatus())
     if (this.syncPromise) {
       this.syncAgain = true
@@ -859,7 +885,9 @@ class WorkspaceRuntime {
       try {
         do {
           this.syncAgain = false
-          await this.lock.run(() => this.doSync())
+          await this.lock.run(() => this.doSync({ push, message }))
+          push = true
+          message = undefined
         } while (this.syncAgain && !this.closed)
       } finally {
         this.syncPromise = null
@@ -869,7 +897,7 @@ class WorkspaceRuntime {
     return this.syncPromise
   }
 
-  async doSync({ initial = false } = {}) {
+  async doSync({ initial = false, push = true, message: custom } = {}) {
     if (this.initError && !initial) {
       // try again from scratch
       try {
@@ -881,18 +909,20 @@ class WorkspaceRuntime {
       }
     }
     clearTimeout(this.syncTimer)
+    this.syncTimer = null
     this.syncState.syncing = true
     this.setSync({ state: initial ? 'cloning' : 'syncing' })
     try {
       await this.flushDocs()
       const opts = this.gitOpts()
       const files = [...this.dirtyPaths]
-      const message = files.length
+      const summary = files.length
         ? `${files.length === 1 ? 'Update' : `Update ${files.length} files:`} ${files.slice(0, 3).map(commitLabel).join(', ')}${files.length > 3 ? ` +${files.length - 3} more` : ''}`
         : 'Update notes'
+      const message = String(custom || '').trim() || commitMessage(this.settings.commitMessage, { summary, files })
       const dirtyBefore = new Set(this.dirtyPaths)
-      let result = await git.syncRepo(this.dir, { ...opts, message })
-      if (result.retry) result = await git.syncRepo(this.dir, { ...opts, message })
+      let result = await git.syncRepo(this.dir, { ...opts, message, push })
+      if (result.retry) result = await git.syncRepo(this.dir, { ...opts, message, push })
       if (result.retry) throw new Error('Push was rejected, will retry shortly')
       for (const f of dirtyBefore) this.dirtyPaths.delete(f)
       if (!initial) await this.applyRemoteChanges(result.changed)
@@ -998,6 +1028,26 @@ class WorkspaceRuntime {
 }
 
 export const layerDocKey = (wsId, notePath) => `${wsId}:${notePath}\u0000layer`
+
+/**
+ * The commit message from the workspace's template. Placeholders:
+ * {summary} (the automatic one), {files}, {count}, {date}, {time}, {device}.
+ */
+function commitMessage(template, { summary, files }) {
+  const t = String(template || '').trim()
+  if (!t) return summary
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const vars = {
+    summary,
+    files: files.slice(0, 5).map(commitLabel).join(', ') + (files.length > 5 ? ` +${files.length - 5} more` : ''),
+    count: String(files.length),
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    device: os.hostname(),
+  }
+  return t.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)).slice(0, 500) || summary
+}
 
 function commitLabel(p) {
   const note = notePathForLayer(p)

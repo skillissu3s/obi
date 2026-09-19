@@ -11,6 +11,7 @@ import { createOnlineWorkspace } from './users.js'
 import { notifyUser } from './hub.js'
 import * as git from './git.js'
 import { MAX_UPLOAD_MB } from './config.js'
+import { cloudStatus } from './cloudsync.js'
 import { extname, isNote, basename, dirname, safeName, joinPath } from '../shared/paths.js'
 import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
 import { scanDir } from './fsutil.js'
@@ -37,6 +38,8 @@ function serializeWorkspace(w, role, userId) {
     owner: { id: w.owner_id, username: owner?.username, name: owner?.display_name },
     github: w.type === 'github' ? { repo: w.github_repo, label: git.repoLabel(w.github_repo), branch: w.github_branch, hasToken: !!w.github_token } : null,
     settings,
+    dir: w.dir || null,
+    cloud: settings.cloud ? { ...settings.cloud, status: cloudStatus(w.id) } : null,
     memberCount: one('SELECT COUNT(*) AS n FROM members WHERE workspace_id = ?', w.id).n,
     sync: rt ? rt.syncStatus() : w.type === 'github' ? { state: w.sync_error ? 'error' : 'idle', lastSync: w.last_sync_at, error: w.sync_error } : null,
     createdAt: w.created_at,
@@ -84,6 +87,7 @@ async function boardAccess(req, p) {
 const settingsKeys = new Set([
   'dailyFolder', 'dailyFormat', 'dailyTemplate', 'templatesFolder', 'attachmentsFolder', 'newNoteFolder',
   'autoSync', 'autoSyncSeconds', 'pullIntervalSeconds', 'authorName', 'authorEmail', 'gitUsername', 'description',
+  'syncMode', 'intervalMinutes', 'autoPull', 'commitMessage',
 ])
 
 // ---------------- list / create ----------------
@@ -387,7 +391,7 @@ wsRouter.get('/:id/sync', access('viewer'), async (req, res) => {
 wsRouter.post('/:id/sync', access('editor'), async (req, res) => {
   if (req.ws.type !== 'github') throw new HttpError(400, 'Not a GitHub workspace')
   const rt = await getRuntime(req.ws.id)
-  const status = await rt.requestSync()
+  const status = await rt.requestSync({ message: req.body?.message })
   res.json({ sync: status })
 })
 

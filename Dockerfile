@@ -3,7 +3,8 @@ FROM node:24-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# the desktop app's Electron isn't needed to build the web client
+RUN ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci
 
 COPY vite.config.js ./
 COPY shared ./shared

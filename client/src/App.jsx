@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { useLocation, navigate } from './lib/router.js'
 import { useApp, bindConnectionEvents } from './store/app.js'
+import { isDesktop, desktop } from './lib/desktop.js'
 import { api } from './lib/api.js'
 import { conn } from './lib/socket.js'
 import { LoginPage, RegisterPage, SetupPage, SignupPage } from './pages/Auth.jsx'
@@ -30,7 +31,15 @@ export function App() {
   useEffect(() => {
     ;(async () => {
       try {
-        const { user } = await api.me()
+        let me
+        try {
+          me = await api.me()
+        } catch (e) {
+          // the desktop app is never signed out: it asks the app for a new session
+          if (!(isDesktop && desktop.reauth && (await desktop.reauth()))) throw e
+          me = await api.me()
+        }
+        const { user } = me
         useApp.getState().setUser(user)
         conn.start(user)
       } catch {
@@ -44,6 +53,7 @@ export function App() {
     })()
     const onUnauthorized = () => {
       if (!useApp.getState().user) return
+      if (isDesktop && desktop.reauth) return void desktop.reauth().then(() => location.reload())
       conn.stop()
       useApp.setState({ user: null })
       navigate(`/login?next=${encodeURIComponent(location.pathname)}`, { replace: true })

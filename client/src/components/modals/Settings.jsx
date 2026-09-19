@@ -14,6 +14,8 @@ import { conn } from '../../lib/socket.js'
 import { timeAgo, formatBytes, copyText, modKey } from '../../lib/util.js'
 import { PasswordInput } from '../../pages/Auth.jsx'
 import { basename, stripExt } from '@shared/paths.js'
+import { isDesktop, wsWhere } from '../../lib/desktop.js'
+import { VaultSyncSection, DesktopAccountSection } from '../Desktop.jsx'
 
 // `stacked` puts wide controls (pickers, multi-input rows) under the label instead of beside it
 function Setting({ name, desc, children, status, stacked = false }) {
@@ -65,8 +67,10 @@ export function SettingsModal({ section: initial }) {
     { id: 'editor', label: 'Editor', icon: Pencil },
     { group: 'Workspace' },
     { id: 'workspace', label: 'General', icon: Layers },
-    ws?.type === 'github' && { id: 'github', label: 'GitHub sync', icon: FolderGit2 },
-    ws?.type === 'online' && { id: 'members', label: 'Members', icon: Users },
+    // on the desktop every workspace is a folder, synced (or not) from one place
+    isDesktop && ws?.dir && { id: 'sync', label: 'Sync', icon: RefreshCw },
+    !isDesktop && ws?.type === 'github' && { id: 'github', label: 'GitHub sync', icon: FolderGit2 },
+    !isDesktop && ws?.type === 'online' && { id: 'members', label: 'Members', icon: Users },
     { id: 'notes-settings', label: 'Notes & daily', icon: CalendarDays },
     { id: 'data', label: 'Import & export', icon: Download },
     ws?.type === 'online' && { id: 'trash', label: 'Trash', icon: Trash2 },
@@ -92,7 +96,8 @@ export function SettingsModal({ section: initial }) {
           )}
         </div>
         <div className="settings-body">
-          {section === 'account' && <AccountSection user={user} />}
+          {section === 'account' && (isDesktop ? <DesktopAccountSection /> : <AccountSection user={user} />)}
+          {section === 'sync' && <VaultSyncSection ws={ws} />}
           {section === 'appearance' && <AppearanceSection />}
           {section === 'editor' && <EditorSection />}
           {section === 'workspace' && <WorkspaceSection ws={ws} isOwner={isOwner} />}
@@ -539,7 +544,7 @@ function WorkspaceSection({ ws, isOwner }) {
               </span>
             ) : (
               <span className="badge accent">
-                <Cloud /> Online
+                <Cloud /> {ws.dir ? wsWhere(ws) : 'Online'}
               </span>
             )}
             <span className="faint">owned by {ws.owner?.name}</span>
@@ -1045,7 +1050,7 @@ function WorkspacesSection() {
           <div className="grow">
             <div style={{ fontWeight: 550 }}>{w.name}</div>
             <div className="faint" style={{ fontSize: 12 }}>
-              {w.type === 'github' ? `GitHub · ${w.github?.label}` : `Online${w.memberCount > 1 ? ` · ${w.memberCount} members` : ''}`} · {w.role}
+              {wsWhere(w)} · {w.role}
             </div>
           </div>
           {w.id === wsId && <Check size={16} />}

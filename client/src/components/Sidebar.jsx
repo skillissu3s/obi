@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
-  ChevronRight, FileText, Folder, FolderOpen, FilePlus, FolderPlus, Search, Hash, Star, Share2, Users, ChevronDown,
+  HardDrive, ChevronRight, FileText, Folder, FolderOpen, FilePlus, FolderPlus, Search, Hash, Star, Share2, Users, ChevronDown,
   MoreHorizontal, Pencil, Trash2, Copy, FolderInput, SplitSquareHorizontal, Link2, History, ListFilter, X, Image, File,
   SortAsc, PanelLeftClose, Layers, Plus, Settings2, Cloud, FolderGit2, LogOut, CheckCircle2, Globe, Shapes, ChevronsDownUp,
   Network, ListChecks, CalendarDays, Settings,
 } from 'lucide-react'
 import { userMenu } from '../lib/userMenu.js'
+import { wsWhere } from '../lib/desktop.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
@@ -725,15 +726,8 @@ export function Sidebar({ user, closed }) {
           <div className="grow" style={{ minWidth: 0 }}>
             <div className="ws-name truncate">{ws?.name || 'Workspace'}</div>
             <div className="ws-sub truncate">
-              {ws?.type === 'github' ? (
-                <>
-                  <FolderGit2 size={11} /> {ws.github?.label}
-                </>
-              ) : (
-                <>
-                  <Cloud size={11} /> Online{ws?.memberCount > 1 ? ` · ${ws.memberCount} members` : ''}
-                </>
-              )}
+              {ws?.dir && !ws.cloud && ws.type !== 'github' ? <HardDrive size={11} /> : ws?.type === 'github' && !ws.cloud ? <FolderGit2 size={11} /> : <Cloud size={11} />}{' '}
+              {ws?.type === 'github' && !ws.dir ? ws.github?.label : wsWhere(ws)}
             </div>
           </div>
           <ChevronDown size={14} style={{ color: 'var(--text-3)' }} />

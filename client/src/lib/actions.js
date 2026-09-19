@@ -1,3 +1,4 @@
+import { dapi } from './desktop.js'
 import { api } from './api.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
@@ -427,6 +428,8 @@ export function isBookmarked(path, ws = app().wsId) {
 export async function syncNow() {
   const s = app()
   const w = s.workspaces.find((x) => x.id === s.wsId)
+  // desktop vault synced with the cloud
+  if (w?.cloud) dapi.cloudSyncNow(w.id).catch((e) => toast.error(e))
   if (w?.type !== 'github') return
   try {
     useApp.setState({ sync: { ...(s.sync || {}), state: 'syncing' } })

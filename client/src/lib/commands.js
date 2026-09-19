@@ -13,6 +13,7 @@ import { useLayout } from '../store/layout.js'
 import { usePrefs, PALETTES } from '../store/prefs.js'
 import { useUI, toast, confirmDialog } from '../store/ui.js'
 import { navigate } from './router.js'
+import { isDesktop } from './desktop.js'
 import { api } from './api.js'
 import { conn } from './socket.js'
 import * as A from './actions.js'
@@ -131,7 +132,7 @@ export function buildCommands() {
     })),
     { id: 'settings', name: 'Open settings', icon: Settings, hotkey: 'Mod+,', group: 'App', run: () => ui.openModal('settings') },
     { id: 'workspace-settings', name: 'Workspace settings', icon: Layers, group: 'App', run: () => ui.openModal('settings', { section: 'workspace' }) },
-    { id: 'new-workspace', name: 'Create new workspace', icon: Plus, group: 'App', run: () => ui.openModal('new-workspace') },
+    { id: 'new-workspace', name: isDesktop ? 'Add a vault' : 'Create new workspace', icon: Plus, group: 'App', run: () => ui.openModal('new-workspace') },
     { id: 'switch-workspace', name: 'Switch workspace…', icon: Layers, hotkey: 'Mod+Shift+O', group: 'App', run: () => ui.openPalette('workspaces') },
     { id: 'shortcuts', name: 'Keyboard shortcuts', icon: Keyboard, group: 'App', run: () => ui.openModal('shortcuts') },
     { id: 'export', name: 'Export workspace as .zip', icon: Download, group: 'App', run: () => A.exportWorkspace() },
