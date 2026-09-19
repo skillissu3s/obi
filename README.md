@@ -160,6 +160,14 @@ Redeploy (or `docker compose up -d --build`). The server saves open documents an
 | `MAX_UPLOAD_MB` | `50` | Per-file upload limit. |
 | `APP_NAME` | `Obi` | Shown on public pages. |
 | `ALLOW_FILE_REMOTES` | `0` | Allows `file://`/local-path git remotes (testing only). |
+| `PUBLIC_URL` | — | This server's public address, e.g. `https://notes.example.com`. Used in emails. |
+| `REGISTRATION` | `open` | `open`: anyone can create an account (confirmed by an emailed code). `invite`: only through admin invite links. `closed`: admins create accounts. `open` needs email to be configured; without it the server behaves as `invite`. |
+| `LOGIN_CODE` | `either` | `either`: sign in with a password **or** an emailed code. `always`: password, then an emailed code (two-step). `off`: password only. Codes need email to be configured. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` | — / `587` / auto | Mail server for sign-up and sign-in codes. `SMTP_SECURE=1` for implicit TLS (port 465, chosen automatically on 465). |
+| `SMTP_USER` / `SMTP_PASS` | — | Mail server login. |
+| `SMTP_URL` | — | Alternative to the above in one line, e.g. `smtps://user:pass@smtp.example.com`. |
+| `MAIL_FROM` | `SMTP_USER` | Sender, e.g. `Obi <no-reply@example.com>`. |
+| `MAIL_LOG_CODES` | `0` | Development only: with no SMTP configured, print emails (and their codes) to the server log instead of sending them. |
 
 ---
 

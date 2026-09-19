@@ -3,7 +3,7 @@ import { useLocation, navigate } from './lib/router.js'
 import { useApp, bindConnectionEvents } from './store/app.js'
 import { api } from './lib/api.js'
 import { conn } from './lib/socket.js'
-import { LoginPage, SetupPage, SignupPage } from './pages/Auth.jsx'
+import { LoginPage, RegisterPage, SetupPage, SignupPage } from './pages/Auth.jsx'
 import { Toasts, Dialogs, ContextMenu } from './components/ui.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
 
@@ -57,11 +57,13 @@ export function App() {
   let page
   if (path.startsWith('/signup')) {
     page = <SignupPage search={search} />
+  } else if (!user && path.startsWith('/register')) {
+    page = <RegisterPage search={search} />
   } else if (!user) {
     page = needsSetup ? <SetupPage onDone={() => setNeedsSetup(false)} /> : <LoginPage search={search} />
   } else if (path.startsWith('/admin')) {
     page = <AdminPage />
-  } else if (path === '/login') {
+  } else if (path === '/login' || path === '/register') {
     const next = new URLSearchParams(search).get('next')
     setTimeout(() => navigate(next && next.startsWith('/') ? next : '/', { replace: true }))
     page = <Splash />

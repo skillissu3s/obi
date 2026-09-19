@@ -21,6 +21,7 @@
     "fflate": "^0.8.3",
     "lib0": "^0.2.117",
     "markdown-it": "^15.0.2",
+    "nodemailer": "^10.0.10",
     "perfect-freehand": "^1.2.3",
     "roughjs": "^4.6.6",
     "ws": "^8.21.3",

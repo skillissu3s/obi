@@ -109,6 +109,106 @@ export function SettingsModal({ section: initial }) {
   )
 }
 
+// The account's email: where sign-in codes go. Changing it is confirmed by a
+// code sent to the new address.
+function EmailSetting({ user }) {
+  const [step, setStep] = useState(null) // null | 'edit' | { ticket, sentTo }
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const reset = () => {
+    setStep(null)
+    setEmail('')
+    setPassword('')
+    setCode('')
+  }
+  const send = async () => {
+    setBusy(true)
+    try {
+      setStep(await api.changeEmail(email, password))
+    } catch (e) {
+      toast.error(e)
+    }
+    setBusy(false)
+  }
+  const verify = async () => {
+    setBusy(true)
+    try {
+      const { user: u } = await api.verifyEmail(step.ticket, code)
+      useApp.getState().setUser(u)
+      toast.success('Email confirmed')
+      reset()
+    } catch (e) {
+      toast.error(e)
+    }
+    setBusy(false)
+  }
+
+  if (step === 'edit') {
+    return (
+      <Setting name={user.email ? 'New email' : 'Email'} desc="Enter your password to confirm it’s you. We’ll send a code to the new address." stacked>
+        <div className="setting-form">
+          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoFocus autoCapitalize="none" spellCheck={false} />
+          <PasswordInput value={password} onChange={setPassword} placeholder="Current password" />
+          <div className="setting-actions">
+            <button className="btn" onClick={reset}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" disabled={busy || !email || !password} onClick={send}>
+              {busy ? <Spinner size="sm" /> : 'Send code'}
+            </button>
+          </div>
+        </div>
+      </Setting>
+    )
+  }
+  if (step) {
+    return (
+      <Setting name="Enter the code" desc={`We sent a 6-digit code to ${step.sentTo}.`} stacked>
+        <div className="setting-form">
+          <input
+            className="input"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+          />
+          <div className="setting-actions">
+            <button className="btn" onClick={reset}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" disabled={busy || code.length !== 6} onClick={verify}>
+              {busy ? <Spinner size="sm" /> : 'Confirm'}
+            </button>
+          </div>
+        </div>
+      </Setting>
+    )
+  }
+  return (
+    <Setting
+      name="Email"
+      desc={
+        user.email
+          ? user.emailVerified
+            ? 'Sign-in codes are sent here.'
+            : 'Not confirmed yet — confirm it to sign in with emailed codes.'
+          : 'Add an email to sign in with emailed codes.'
+      }
+    >
+      <div className="setting-inline">
+        {user.email && <span className="truncate faint">{user.email}</span>}
+        <button className="btn" onClick={() => setStep('edit')}>
+          {user.email ? (user.emailVerified ? 'Change' : 'Confirm') : 'Add email'}
+        </button>
+      </div>
+    </Setting>
+  )
+}
+
 function AccountSection({ user }) {
   const [name, setName] = useState(user?.displayName || '')
   const [pw, setPw] = useState({ current: '', next: '' })
@@ -156,6 +256,7 @@ function AccountSection({ user }) {
       <Setting name="Display name" desc="Shown to collaborators on shared notes." status={status.name}>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} />
       </Setting>
+      <EmailSetting user={user} />
       <Setting name="Cursor colour" desc="Your colour in shared documents." status={status.color} stacked>
         <div className="accent-swatches">
           {['#2f9e78', '#d1703f', '#b8604f', '#c0913a', '#2a93a3', '#5566cf', '#96549e', '#7f9a44', '#c26a8a', '#7c776d'].map((c) => (

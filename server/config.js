@@ -29,3 +29,12 @@ function loadSecret() {
 }
 
 export const APP_SECRET = loadSecret()
+
+// Who may create an account: 'open' (anyone, confirmed by an emailed code),
+// 'invite' (invite links from an admin only) or 'closed'.
+export const REGISTRATION = ['open', 'invite', 'closed'].includes(env.REGISTRATION) ? env.REGISTRATION : 'open'
+// How a code fits into signing in: 'either' (password or an emailed code),
+// 'always' (password, then a code) or 'off' (password only).
+export const LOGIN_CODE = ['either', 'always', 'off'].includes(env.LOGIN_CODE) ? env.LOGIN_CODE : 'either'
+// Public address of this server, used in emails
+export const PUBLIC_URL = (env.PUBLIC_URL || '').replace(/\/+$/, '')

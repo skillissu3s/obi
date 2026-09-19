@@ -125,6 +125,37 @@ function addColumn(table, column, decl) {
   if (!has) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`)
 }
 addColumn('published', 'theme', 'TEXT')
+addColumn('users', 'email', 'TEXT')
+addColumn('users', 'email_verified_at', 'INTEGER')
+
+db.exec(`
+CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL;
+
+-- A registration waiting for its emailed code. Kept apart from users so an
+-- unconfirmed sign-up never becomes an account.
+CREATE TABLE IF NOT EXISTS pending_signups (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL COLLATE NOCASE,
+  username TEXT NOT NULL COLLATE NOCASE,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+-- One-time codes sent by email. Only a hash is stored; a code dies after a few
+-- wrong guesses or when it expires.
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id TEXT PRIMARY KEY,
+  purpose TEXT NOT NULL,
+  subject TEXT,
+  email TEXT,
+  code_hash TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+`)
 
 export const now = () => Date.now()
 

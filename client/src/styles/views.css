@@ -86,6 +86,56 @@
   font-size: 12px;
   color: var(--text-3);
 }
+.auth-foot-row {
+  display: flex;
+  justify-content: space-between;
+}
+.auth-alt {
+  margin-top: 8px;
+  color: var(--text-2);
+}
+/* the one-time code: big, spaced digits */
+.auth-card .input.auth-code {
+  height: 52px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  letter-spacing: 0.4em;
+  padding-left: 0.4em;
+}
+.auth-code-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: var(--accent-soft, color-mix(in srgb, var(--accent) 14%, transparent));
+  color: var(--accent);
+}
+.auth-code-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+}
+.link-btn:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.link-btn svg {
+  width: 13px;
+  height: 13px;
+}
 
 /* ---------- Admin ---------- */
 .admin {
@@ -1673,4 +1723,22 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* small forms inside a settings row (email change) */
+.setting-form {
+  display: grid;
+  gap: 8px;
+  max-width: 340px;
+}
+.setting-form .setting-actions {
+  margin: 0;
+  padding-top: 4px;
+  justify-content: flex-end;
+}
+.setting-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }

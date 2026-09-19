@@ -18,6 +18,17 @@ services:
       DATA_DIR: /data
       SESSION_DAYS: ${SESSION_DAYS:-30}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      # Accounts: anyone may register (open), invite links only, or closed.
+      # Open registration and emailed sign-in codes need the SMTP settings below.
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      REGISTRATION: ${REGISTRATION:-open}
+      LOGIN_CODE: ${LOGIN_CODE:-either}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     ports:
       - "${PORT:-3000}:3000"
     volumes:

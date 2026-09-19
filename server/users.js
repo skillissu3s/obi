@@ -13,6 +13,8 @@ export function publicUser(u) {
   return {
     id: u.id,
     username: u.username,
+    email: u.email || null,
+    emailVerified: !!u.email_verified_at,
     displayName: u.display_name,
     color: u.color,
     isAdmin: !!u.is_admin,
@@ -29,18 +31,25 @@ export function validatePassword(pw) {
   if (pw.length > 256) throw new HttpError(400, 'Password is too long')
 }
 
-export async function createUser({ username, displayName, password, isAdmin = false, mustChangePassword = false }) {
+export function checkUsername(username) {
   username = String(username || '').trim()
   if (!USERNAME_RE.test(username)) throw new HttpError(400, 'Username must be 2–32 characters: letters, numbers, dot, dash, underscore')
-  validatePassword(password)
   if (one('SELECT id FROM users WHERE username = ?', username)) throw new HttpError(409, 'That username is taken')
+  return username
+}
+
+export async function createUser({ username, displayName, password, passwordHash, email = null, emailVerified = false, isAdmin = false, mustChangePassword = false }) {
+  username = checkUsername(username)
+  if (!passwordHash) validatePassword(password)
+  if (email && one('SELECT id FROM users WHERE email = ?', email)) throw new HttpError(409, 'An account with that email already exists')
   const id = newId()
-  const hash = await hashPassword(password)
+  const hash = passwordHash || (await hashPassword(password))
   const t = now()
   tx(() => {
     run(
-      'INSERT INTO users (id, username, display_name, password_hash, is_admin, must_change_password, color, created_at) VALUES (?,?,?,?,?,?,?,?)',
+      'INSERT INTO users (id, username, display_name, password_hash, is_admin, must_change_password, color, created_at, email, email_verified_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
       id, username, String(displayName || username).trim().slice(0, 64) || username, hash, isAdmin ? 1 : 0, mustChangePassword ? 1 : 0, randomColor(), t,
+      email || null, email && emailVerified ? t : null,
     )
   })
   await createOnlineWorkspace({ ownerId: id, name: 'Personal', icon: '🌱', isDefault: true, welcome: true })
