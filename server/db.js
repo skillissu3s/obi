@@ -127,6 +127,9 @@ function addColumn(table, column, decl) {
 addColumn('published', 'theme', 'TEXT')
 addColumn('users', 'email', 'TEXT')
 addColumn('users', 'email_verified_at', 'INTEGER')
+// A workspace's files live in WORKSPACES_DIR/<id> unless `dir` says where:
+// in the desktop app, each workspace is a folder (vault) the user chose.
+addColumn('workspaces', 'dir', 'TEXT')
 
 db.exec(`
 CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL;
@@ -154,6 +157,37 @@ CREATE TABLE IF NOT EXISTS otp_codes (
   attempts INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
+);
+
+-- Long-lived sign-ins for apps (the desktop app syncing a vault). Sent as
+-- "Authorization: Bearer <token>"; only a hash is stored.
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER NOT NULL,
+  ip TEXT
+);
+CREATE INDEX IF NOT EXISTS api_tokens_user ON api_tokens(user_id);
+
+-- Desktop app only: the cloud accounts this device is signed in to
+CREATE TABLE IF NOT EXISTS cloud_accounts (
+  id TEXT PRIMARY KEY,
+  url TEXT NOT NULL UNIQUE,
+  user TEXT NOT NULL,
+  token TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+-- Desktop app only: for each synced file, the version both sides last agreed
+-- on. It is the base of three-way merges when both sides changed.
+CREATE TABLE IF NOT EXISTS sync_base (
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  path TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  content BLOB,
+  PRIMARY KEY (workspace_id, path)
 );
 `)
 

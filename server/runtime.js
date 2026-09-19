@@ -14,7 +14,9 @@ const MAX_INDEX_BYTES = 2 * 1024 * 1024
 const VERSION_INTERVAL = 10 * 60 * 1000
 const runtimes = new Map()
 
-export const workspaceDir = (id) => path.join(WORKSPACES_DIR, id)
+export const workspaceDir = (id) => one('SELECT dir FROM workspaces WHERE id = ?', id)?.dir || path.join(WORKSPACES_DIR, id)
+// a folder the user picked (desktop vault) is theirs: never deleted by us
+const isOwnFolder = (id) => !!one('SELECT dir FROM workspaces WHERE id = ?', id)?.dir
 
 // canvas layers of trashed notes travel with them
 export const trashCompanions = (trashName) => [`${trashName}.layer.json`, `${trashName}.layers`]
@@ -43,7 +45,7 @@ export async function disposeRuntime(id, { removeFiles = false } = {}) {
     runtimes.delete(id)
     await rt.shutdown({ save: !removeFiles })
   }
-  if (removeFiles) await fs.rm(workspaceDir(id), { recursive: true, force: true })
+  if (removeFiles && !isOwnFolder(id)) await fs.rm(workspaceDir(id), { recursive: true, force: true })
 }
 
 export async function shutdownAll() {
@@ -80,6 +82,10 @@ class WorkspaceRuntime {
     this.initError = null
     this.syncState = { state: 'idle', dirty: false, lastSync: row.last_sync_at, error: row.sync_error, syncing: false }
     this.dirtyPaths = new Set()
+    // bumps on every change to the files; sync clients compare it to skip work
+    this.rev = 0
+    this.bootId = newId(6) // revs restart with the process; this tells them apart
+    this.changeListeners = new Set()
     this.syncTimer = null
     this.pullTimer = null
     this.presenceTimer = null
@@ -349,7 +355,8 @@ class WorkspaceRuntime {
   }
 
   // ---------- write ----------
-  async _writeNote(p, text, { userId = null, fromDoc = false, isNew = false } = {}) {
+  // snapshotEvery: how close together versions may be (sync writes keep more)
+  async _writeNote(p, text, { userId = null, fromDoc = false, isNew = false, snapshotEvery = VERSION_INTERVAL } = {}) {
     const abs = absPath(this.dir, p)
     const prev = this.contents.get(p)
     if (!fromDoc) {
@@ -367,7 +374,7 @@ class WorkspaceRuntime {
       this.emitTree()
     }
     if (isNote(p)) {
-      if (this.type === 'online' && prev != null && prev !== text) this._maybeSnapshot(p, prev, userId)
+      if (this.type === 'online' && prev != null && prev !== text) this._maybeSnapshot(p, prev, userId, false, snapshotEvery)
       this.setContent(p, text)
       this.emitIndex(p)
     }
@@ -386,9 +393,9 @@ class WorkspaceRuntime {
     if (added.length) this.emitTree()
   }
 
-  _maybeSnapshot(p, prevContent, userId, force = false) {
+  _maybeSnapshot(p, prevContent, userId, force = false, every = VERSION_INTERVAL) {
     const last = one('SELECT created_at FROM versions WHERE workspace_id = ? AND path = ? ORDER BY created_at DESC LIMIT 1', this.id, p)
-    if (!force && last && Date.now() - last.created_at < VERSION_INTERVAL) return
+    if (!force && last && Date.now() - last.created_at < every) return
     run('INSERT INTO versions (workspace_id, path, content, user_id, created_at) VALUES (?,?,?,?,?)', this.id, p, prevContent, userId, now())
     run(
       `DELETE FROM versions WHERE workspace_id = ? AND path = ? AND id NOT IN (
@@ -434,6 +441,8 @@ class WorkspaceRuntime {
         this.setContent(p, buffer.toString('utf8'))
         this.docs.get(p)?.applyExternal(buffer.toString('utf8'))
         this.emitIndex(p)
+      } else if (isBoardPath(p)) {
+        this.docs.get(p)?.applyExternal(buffer.toString('utf8'))
       }
       this.emitTree()
       this.markDirty(p)
@@ -819,6 +828,8 @@ class WorkspaceRuntime {
 
   // ---------- git sync ----------
   markDirty(p) {
+    this.rev++
+    for (const fn of this.changeListeners) fn(p)
     if (this.type !== 'github') return
     if (p) this.dirtyPaths.add(p)
     this.syncState.dirty = true
@@ -905,6 +916,7 @@ class WorkspaceRuntime {
 
   async applyRemoteChanges(changed) {
     if (changed && changed.length === 0) return
+    this.rev++
     if (changed === null) {
       await this.scan()
       for (const doc of this.docs.values()) {

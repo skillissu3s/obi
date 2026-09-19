@@ -213,7 +213,7 @@ export async function syncRepo(dir, { url, branch, token, username, authorName, 
         if (ahead === 0) {
           await must(dir, ['merge', '--ff-only', '-q', remoteRef])
         } else {
-          const m = await runGit(dir, [...ident, 'merge', '--no-edit', '-q', '-m', 'Merge remote changes', remoteRef])
+          const m = await runGit(dir, [...ident, 'merge', '--no-edit', '-q', '--allow-unrelated-histories', '-m', 'Merge remote changes', remoteRef])
           if (m.code !== 0) {
             const u = await runGit(dir, ['diff', '--name-only', '--diff-filter=U', '-z'])
             const files = u.stdout.split('\0').filter(Boolean)

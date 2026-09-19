@@ -297,10 +297,10 @@ function AccountSection({ user }) {
         <div className="setting" key={s.id}>
           <div className="setting-text">
             <div className="setting-name">
-              {s.current ? 'This device' : 'Other device'} {s.current && <span className="badge accent">current</span>}
+              {s.current ? 'This device' : s.app ? s.app : 'Other device'} {s.current && <span className="badge accent">current</span>}
             </div>
             <div className="setting-desc truncate">
-              {s.user_agent || 'Unknown'} · {timeAgo(s.last_seen_at)} · {s.ip}
+              {s.app ? 'Desktop app' : s.user_agent || 'Unknown'} · {timeAgo(s.last_seen_at)} · {s.ip}
             </div>
           </div>
         </div>

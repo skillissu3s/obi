@@ -64,8 +64,41 @@ export async function startSession(req, res, userId) {
   setSessionCookie(req, res, token)
 }
 
+// ---- app tokens: the desktop app signs in once per device and keeps a token
+const TOKEN_PREFIX = 'obi_'
+
+export function issueApiToken(req, userId, name) {
+  const token = TOKEN_PREFIX + randomToken()
+  const t = now()
+  run('INSERT INTO api_tokens (id, user_id, name, created_at, last_used_at, ip) VALUES (?,?,?,?,?,?)', sha256(token), userId, String(name || 'App').slice(0, 80), t, t, req.ip)
+  run('UPDATE users SET last_login_at = ? WHERE id = ?', t, userId)
+  return token
+}
+
+function bearerToken(req) {
+  const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '')
+  return m && m[1].startsWith(TOKEN_PREFIX) ? m[1] : null
+}
+
+export function userFromToken(token) {
+  const id = sha256(token)
+  const row = one('SELECT * FROM api_tokens WHERE id = ?', id)
+  if (!row) return null
+  const user = one('SELECT * FROM users WHERE id = ?', row.user_id)
+  if (!user || user.disabled) return null
+  const t = now()
+  if (t - row.last_used_at > 5 * 60 * 1000) run('UPDATE api_tokens SET last_used_at = ? WHERE id = ?', t, id)
+  user.tokenId = id
+  return user
+}
+
+export function userFromRequest(req) {
+  const token = bearerToken(req)
+  return token ? userFromToken(token) : userFromCookieHeader(req.headers.cookie)
+}
+
 export function requireAuth(req, res, next) {
-  const user = userFromCookieHeader(req.headers.cookie)
+  const user = userFromRequest(req)
   if (!user) return res.status(401).json({ error: 'Not signed in' })
   req.user = user
   next()
@@ -81,6 +114,8 @@ export function requireAdmin(req, res, next) {
 // Mutating API calls must carry a custom header (blocks cross-site form posts)
 export function csrfGuard(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next()
+  // a bearer token is never sent by a browser on its own, so it can't be forged cross-site
+  if (bearerToken(req)) return next()
   if (req.headers['x-obi'] !== '1') return res.status(403).json({ error: 'Missing request header' })
   next()
 }
@@ -144,12 +179,23 @@ export async function passwordStep(req, identifier, password) {
   return { user }
 }
 
+/**
+ * Every sign-in ends here. A browser gets a session cookie; an app that says
+ * which device it is (body.device) gets a token to keep instead.
+ */
+async function signedIn(req, res, userId) {
+  const user = publicUser(one('SELECT * FROM users WHERE id = ?', userId))
+  const device = typeof req.body?.device === 'string' && req.body.device.trim()
+  if (device) return res.json({ user, token: issueApiToken(req, userId, device) })
+  await startSession(req, res, userId)
+  res.json({ user })
+}
+
 authRouter.post('/login', async (req, res) => {
   const { identifier, username, password } = req.body || {}
   const r = await passwordStep(req, identifier ?? username, password)
   if (r.ticket) return res.json({ needsCode: true, ticket: r.ticket, sentTo: maskEmail(r.user.email) })
-  await startSession(req, res, r.user.id)
-  res.json({ user: publicUser(one('SELECT * FROM users WHERE id = ?', r.user.id)) })
+  await signedIn(req, res, r.user.id)
 })
 
 // Signing in with a code instead of a password. The answer is the same whether
@@ -181,8 +227,7 @@ export function codeStep(req, ticket, code) {
 
 authRouter.post('/login/code/verify', async (req, res) => {
   const user = codeStep(req, req.body?.ticket, req.body?.code)
-  await startSession(req, res, user.id)
-  res.json({ user: publicUser(one('SELECT * FROM users WHERE id = ?', user.id)) })
+  await signedIn(req, res, user.id)
 })
 
 // ---- Open registration: email + username + password, then an emailed code.
@@ -228,8 +273,7 @@ export async function registerStep(req, ticket, code) {
 
 authRouter.post('/register/verify', async (req, res) => {
   const user = await registerStep(req, req.body?.ticket, req.body?.code)
-  await startSession(req, res, user.id)
-  res.json({ user: publicUser(user) })
+  await signedIn(req, res, user.id)
 })
 
 // A fresh code for a sign-up, a code sign-in or an email change
@@ -264,7 +308,11 @@ authRouter.post('/signup', async (req, res) => {
 })
 
 authRouter.post('/logout', (req, res) => {
-  const user = userFromCookieHeader(req.headers.cookie)
+  const user = userFromRequest(req)
+  if (user?.tokenId) {
+    run('DELETE FROM api_tokens WHERE id = ?', user.tokenId)
+    return res.json({ ok: true })
+  }
   if (user) run('DELETE FROM sessions WHERE id = ?', user.sessionId)
   res.clearCookie(COOKIE, { path: '/' })
   res.json({ ok: true })
@@ -296,7 +344,8 @@ authRouter.post('/password', requireAuth, async (req, res) => {
   if (!(await verifyPassword(String(current || ''), req.user.password_hash))) throw new HttpError(400, 'Current password is incorrect')
   validatePassword(next)
   run('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?', await hashPassword(next), req.user.id)
-  run('DELETE FROM sessions WHERE user_id = ? AND id != ?', req.user.id, req.user.sessionId)
+  run('DELETE FROM sessions WHERE user_id = ? AND id != ?', req.user.id, req.user.sessionId || '')
+  run('DELETE FROM api_tokens WHERE user_id = ? AND id != ?', req.user.id, req.user.tokenId || '')
   res.json({ ok: true })
 })
 
@@ -324,15 +373,23 @@ authRouter.post('/email/verify', requireAuth, (req, res) => {
 
 authRouter.get('/sessions', requireAuth, (req, res) => {
   const rows = all('SELECT id, created_at, last_seen_at, user_agent, ip FROM sessions WHERE user_id = ? ORDER BY last_seen_at DESC', req.user.id)
-  res.json({ sessions: rows.map((r) => ({ ...r, id: r.id.slice(0, 12), current: r.id === req.user.sessionId })) })
+  const apps = all('SELECT id, name, created_at, last_used_at, ip FROM api_tokens WHERE user_id = ? ORDER BY last_used_at DESC', req.user.id)
+  res.json({
+    sessions: [
+      ...rows.map((r) => ({ ...r, id: r.id.slice(0, 12), current: r.id === req.user.sessionId })),
+      ...apps.map((a) => ({ id: a.id.slice(0, 12), app: a.name, created_at: a.created_at, last_seen_at: a.last_used_at, ip: a.ip, current: a.id === req.user.tokenId })),
+    ],
+  })
 })
 
 authRouter.post('/sessions/revoke-others', requireAuth, (req, res) => {
-  run('DELETE FROM sessions WHERE user_id = ? AND id != ?', req.user.id, req.user.sessionId)
+  run('DELETE FROM sessions WHERE user_id = ? AND id != ?', req.user.id, req.user.sessionId || '')
+  run('DELETE FROM api_tokens WHERE user_id = ? AND id != ?', req.user.id, req.user.tokenId || '')
   res.json({ ok: true })
 })
 
 export function revokeUserSessions(userId) {
   run('DELETE FROM sessions WHERE user_id = ?', userId)
+  run('DELETE FROM api_tokens WHERE user_id = ?', userId)
   disconnectUser(userId)
 }

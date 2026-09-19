@@ -10,6 +10,7 @@ import { authRouter, csrfGuard } from './auth.js'
 import { adminRouter } from './admin.js'
 import { wsRouter, miscRouter } from './workspaces.js'
 import { publicRouter } from './public.js'
+import { syncRouter } from './syncapi.js'
 import { attachWebSocket } from './wsserver.js'
 import { shutdownAll, workspaceDir, trashCompanions } from './runtime.js'
 import { createUser } from './users.js'
@@ -42,6 +43,7 @@ app.use('/api', express.json({ limit: '20mb' }), csrfGuard)
 app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/workspaces', wsRouter)
+app.use('/api/sync', syncRouter)
 app.use('/api', miscRouter)
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }))
 app.use('/p', publicRouter)
@@ -71,7 +73,7 @@ app.use((err, req, res, next) => {
   if (status >= 500) console.error('[error]', req.method, req.originalUrl, err)
   if (res.headersSent) return res.end()
   const message = err.type === 'entity.too.large' ? 'That file is too large' : status >= 500 && IS_PROD ? 'Something went wrong' : err.message
-  res.status(status).json({ error: message })
+  res.status(status).json({ error: message, ...(err.body || {}) })
 })
 
 async function bootstrapAdmin() {
