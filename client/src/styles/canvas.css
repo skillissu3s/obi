@@ -902,6 +902,7 @@ svg.cv-el {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  container-type: inline-size;
 }
 .cv-viewport.grid {
   background-image: radial-gradient(circle, var(--cv-grid) calc(1.1px * var(--zoom, 1)), transparent 0);
@@ -1205,24 +1206,104 @@ svg.cv-el {
   }
 }
 
-/* whiteboards: the tool dock sits on the bottom edge, exactly where a note's
-   canvas bar does — tool settings and the style menu then open the same way.
-   Zoom & undo stay top-left, clear of the dock at every pane width. The
-   embedded board's edit bar keeps the top-right corner, likewise clear. */
-.cv-viewport > .cv-hud {
-  left: 12px;
-  top: 12px;
-  bottom: auto;
+/* Whiteboard-only controls. Wide panes keep the tools centred and the HUD in
+   the bottom-right. When they would collide, one compact bar owns the corner;
+   its Canvas button opens the horizontally scrollable tool row above it. */
+.board-controls {
+  display: contents;
 }
-.board-embed .cv-viewport > .cv-hud {
-  left: 10px;
-  top: 10px;
-  bottom: auto;
+.board-controls > .cv-hud {
+  left: auto;
+  right: 12px;
+  top: auto;
+  bottom: 14px;
+}
+.board-tools-toggle,
+.board-tools-sep {
+  display: none;
+}
+.board-embed .board-controls > .cv-hud {
+  left: auto;
+  right: 10px;
+  top: auto;
+  bottom: 10px;
 }
 .board-embed .board-embed-bar {
   top: 8px;
   right: 8px;
   bottom: auto;
+}
+@container (max-width: 1285px) {
+  .board-controls {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .board-controls:not(.tools-open) > .cv-dock {
+    display: none;
+  }
+  .board-controls > .cv-dock {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    align-items: flex-end;
+    transform: none;
+  }
+  .board-controls > .cv-hud {
+    position: static;
+    max-width: 100%;
+    padding: 3px;
+    gap: 1px;
+    overflow-x: auto;
+    border-radius: var(--radius);
+    background: var(--bg-elev);
+    box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-strong);
+    pointer-events: auto;
+    scrollbar-width: none;
+  }
+  .board-controls > .cv-hud::-webkit-scrollbar {
+    display: none;
+  }
+  .board-controls > .cv-hud .cv-hud-group {
+    flex-shrink: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .board-controls > .cv-hud .cv-hud-group + .cv-hud-group {
+    padding-left: 2px;
+    border-left: 1px solid var(--border-strong);
+    border-radius: 0;
+  }
+  .board-controls .board-tools-toggle {
+    width: auto;
+    padding: 0 8px;
+    display: flex;
+    gap: 5px;
+  }
+  .board-tools-toggle span {
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .board-tools-sep {
+    display: block;
+  }
+}
+@container (max-width: 350px) {
+  .board-controls .board-tools-toggle {
+    width: 30px;
+    padding: 0;
+  }
+  .board-tools-toggle span {
+    display: none;
+  }
 }
 .hp-board {
   display: flex;

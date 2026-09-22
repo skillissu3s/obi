@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Minus, Plus, Maximize, Undo2, Redo2, Grid3x3, Eye, Copy, Trash2, ClipboardPaste, BringToFront, SendToBack, Group, Lock, Download, Image as ImageIcon, MousePointerSquareDashed } from 'lucide-react'
+import { Minus, Plus, Maximize, Undo2, Redo2, Grid3x3, Eye, Copy, Trash2, ClipboardPaste, BringToFront, SendToBack, Group, Lock, Download, Image as ImageIcon, MousePointerSquareDashed, PencilRuler } from 'lucide-react'
 import { unionBounds } from '@shared/boardgeom.js'
 import { boardToSvg } from '@shared/boardsvg.js'
 import { IMAGE_EXT, extname, isNote, basename, stripExt } from '@shared/paths.js'
@@ -92,6 +92,7 @@ export function pickImageFiles() {
 
 const MIN_Z = 0.1
 const MAX_Z = 5
+const COMPACT_CONTROLS_WIDTH = 1285
 
 /**
  * A full whiteboard surface.
@@ -102,6 +103,8 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
   const vpRef = useRef(null)
   const viewRef = useRef({ x: 0, y: 0, z: 1 })
   const [view, setViewState] = useState(viewRef.current)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [compactControls, setCompactControls] = useState(false)
   const pointerRef = useRef(null)
   const ctlRef = useRef(null)
   const viewKey = `obi:boardView:${ws}:${path}`
@@ -184,6 +187,23 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
 
   const state = useControllerSafe(ctl)
 
+  useLayoutEffect(() => {
+    const el = vpRef.current
+    if (!ctl || !el) return
+    let wasCompact = null
+    const update = (width) => {
+      const compact = width <= COMPACT_CONTROLS_WIDTH
+      if (compact === wasCompact) return
+      wasCompact = compact
+      if (compact) setToolsOpen(false)
+      setCompactControls(compact)
+    }
+    update(el.getBoundingClientRect().width)
+    const observer = new ResizeObserver(([entry]) => update(entry.contentRect.width))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ctl])
+
   // share selection & clear trails with collaborators
   useEffect(() => {
     if (!ctl) return
@@ -248,6 +268,7 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
     if (!el || !ctl) return
     const onWheel = (e) => {
       if (e.target.closest?.('.cv-dock, .cv-hud, .cv-edit')) return
+      setToolsOpen(false)
       e.preventDefault()
       if (e.ctrlKey || e.metaKey) {
         zoomAt(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0025)), e.clientX, e.clientY)
@@ -274,6 +295,8 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
   const pinch = useRef(null)
   const onPointerDown = (e) => {
     if (!ctl) return
+    if (e.target.closest('.cv-dock, .cv-hud, .board-embed-bar')) return
+    setToolsOpen(false)
     if (e.pointerType === 'touch') {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (touches.current.size === 2) {
@@ -284,7 +307,6 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
         return
       }
     }
-    if (e.target.closest('.cv-dock, .cv-hud, .board-embed-bar')) return
     vpRef.current.focus({ preventScroll: true })
     if (ctl.onPointerDown(e.nativeEvent)) e.preventDefault()
   }
@@ -335,17 +357,20 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
 
   const onPaste = (e) => {
     if (e.target.closest?.('.cv-edit, .cv-edit-frame')) return
+    setToolsOpen(false)
     ctl?.paste(e.nativeEvent)
   }
 
   const onDrop = async (e) => {
-    if (!ctl || ctl.readOnly) return
-    const p = toWorld(e.clientX, e.clientY)
+    if (!ctl) return
     const files = [...(e.dataTransfer?.files || [])].filter((f) => f.type.startsWith('image/'))
     const dragged = e.dataTransfer?.getData('text/obi-path')
     if (!files.length && !dragged) return
+    setToolsOpen(false)
     e.preventDefault()
     e.stopPropagation()
+    if (ctl.readOnly) return
+    const p = toWorld(e.clientX, e.clientY)
     if (files.length) return ctl.insertImages(files, p)
     if (IMAGE_EXT.has(extname(dragged))) {
       ctl.addElement(ctl.base('image', { x: p.x - 150, y: p.y - 100, w: 300, h: 200, src: dragged }))
@@ -451,40 +476,55 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
           <Eye size={12} /> View only
         </span>
       )}
-      <div className="cv-dock">
-        <StyleBar ctl={ctl} mode="board" />
-        <Toolbar ctl={ctl} mode="board" />
-      </div>
-      <div className="cv-hud" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="cv-hud-group">
-          <button className="cv-tool" title="Zoom out (Ctrl −)" onClick={() => zoomAt(1 / 1.2)}>
-            <Minus />
-          </button>
-          <button className="cv-zoom-label" title="Reset zoom (Ctrl 0)" onClick={() => zoomAt(1 / viewRef.current.z)}>
-            {Math.round(view.z * 100)}%
-          </button>
-          <button className="cv-tool" title="Zoom in (Ctrl +)" onClick={() => zoomAt(1.2)}>
-            <Plus />
-          </button>
-          <button className="cv-tool" title="Zoom to fit (Shift 1)" onClick={() => fit(2)}>
-            <Maximize />
-          </button>
-        </div>
-        {!ctl.readOnly && (
-          <div className="cv-hud-group">
-            <button className="cv-tool" title="Undo (Ctrl Z)" onClick={() => ctl.undo()}>
-              <Undo2 />
-            </button>
-            <button className="cv-tool" title="Redo (Ctrl Shift Z)" onClick={() => ctl.redo()}>
-              <Redo2 />
-            </button>
-            {!embedded && (
-              <button className={`cv-tool ${state.grid ? 'active' : ''}`} title="Grid & snapping (G)" onClick={() => ctl.toggleGrid()}>
-                <Grid3x3 />
-              </button>
-            )}
+      <div className={`board-controls ${toolsOpen ? 'tools-open' : ''}`}>
+        {(!compactControls || toolsOpen) && (
+          <div className="cv-dock">
+            <StyleBar ctl={ctl} mode="board" />
+            <Toolbar ctl={ctl} mode="board" />
           </div>
         )}
+        <div className="cv-hud" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="cv-hud-group">
+            <button
+              className={`cv-tool board-tools-toggle ${toolsOpen ? 'active' : ''}`}
+              title={toolsOpen ? 'Hide canvas tools' : 'Show canvas tools'}
+              aria-label={toolsOpen ? 'Hide canvas tools' : 'Show canvas tools'}
+              aria-expanded={toolsOpen}
+              onClick={() => setToolsOpen((open) => !open)}
+            >
+              <PencilRuler />
+              <span>Canvas</span>
+            </button>
+            <div className="cv-sep board-tools-sep" />
+            <button className="cv-tool" title="Zoom out (Ctrl −)" onClick={() => zoomAt(1 / 1.2)}>
+              <Minus />
+            </button>
+            <button className="cv-zoom-label" title="Reset zoom (Ctrl 0)" onClick={() => zoomAt(1 / viewRef.current.z)}>
+              {Math.round(view.z * 100)}%
+            </button>
+            <button className="cv-tool" title="Zoom in (Ctrl +)" onClick={() => zoomAt(1.2)}>
+              <Plus />
+            </button>
+            <button className="cv-tool" title="Zoom to fit (Shift 1)" onClick={() => fit(2)}>
+              <Maximize />
+            </button>
+          </div>
+          {!ctl.readOnly && (
+            <div className="cv-hud-group">
+              <button className="cv-tool" title="Undo (Ctrl Z)" onClick={() => ctl.undo()}>
+                <Undo2 />
+              </button>
+              <button className="cv-tool" title="Redo (Ctrl Shift Z)" onClick={() => ctl.redo()}>
+                <Redo2 />
+              </button>
+              {!embedded && (
+                <button className={`cv-tool ${state.grid ? 'active' : ''}`} title="Grid & snapping (G)" onClick={() => ctl.toggleGrid()}>
+                  <Grid3x3 />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
