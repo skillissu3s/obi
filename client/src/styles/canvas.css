@@ -1207,19 +1207,33 @@ svg.cv-el {
 
 /* whiteboards: the tool dock sits on the bottom edge, exactly where a note's
    canvas bar does — tool settings and the style menu then open the same way.
-   Zoom & undo stay out of the dock's way in the top-left corner, clear of the
-   note header above the viewport. */
+   Zoom & undo keep to their own bottom-right corner; the bar stops short of
+   them, so the two never overlap at any pane width. */
+.cv-viewport > .cv-dock {
+  left: 12px;
+  right: 270px;
+  transform: none;
+}
 .cv-viewport > .cv-hud {
-  top: 12px;
-  bottom: auto;
+  left: auto;
+  right: 12px;
+  top: auto;
+  bottom: 14px;
+}
+.board-embed .cv-viewport > .cv-dock {
+  left: 10px;
+  right: 268px;
 }
 .board-embed .cv-viewport > .cv-hud {
-  top: 10px;
-}
-.board-embed.editing .board-embed-bar {
+  left: auto;
+  right: 10px;
   top: auto;
   bottom: 10px;
-  right: 10px;
+}
+.board-embed .board-embed-bar {
+  top: 8px;
+  right: 8px;
+  bottom: auto;
 }
 .hp-board {
   display: flex;
