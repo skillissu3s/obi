@@ -1209,9 +1209,11 @@ svg.cv-el {
 
 /* whiteboards: the tool dock sits on the bottom edge, exactly where a note's
    canvas bar does — tool settings and the style menu then open the same way.
-   Zoom & undo hold the bottom-right corner on their own row. While the pane
-   has room the bar stays centred; once the HUD would collide with it, the bar
-   stops short of the corner instead. */
+   Zoom & undo hold the bottom-right corner on their own row. Wide panes fit
+   both side by side with the bar centred; medium panes stop the bar short of
+   the HUD's corner (300px: the 280px HUD plus its margin and a gap); thin
+   panes and phones get a full-width centred strip lifted clear above the HUD,
+   the same treatment a note's canvas bar gets on mobile. */
 .cv-viewport > .cv-hud {
   left: auto;
   right: 12px;
@@ -1232,13 +1234,26 @@ svg.cv-el {
 @container (max-width: 1285px) {
   .cv-viewport > .cv-dock {
     left: 12px;
-    right: 270px;
+    right: 300px;
+    transform: none;
+  }
+  .board-embed .cv-viewport > .cv-dock {
+    left: 10px;
+    right: 268px;
     transform: none;
   }
 }
-.board-embed .cv-viewport > .cv-dock {
-  left: 10px;
-  right: 268px;
+@container (max-width: 640px) {
+  .cv-viewport > .cv-dock,
+  .board-embed .cv-viewport > .cv-dock {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    bottom: 64px;
+  }
+  .board-embed .cv-viewport > .cv-dock {
+    bottom: 60px;
+  }
 }
 .hp-board {
   display: flex;
