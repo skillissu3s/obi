@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Eye, EyeOff, MailCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, MailCheck } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { useApp } from '../store/app.js'
 import { conn } from '../lib/socket.js'
@@ -55,6 +55,65 @@ function useAuthOptions() {
 }
 
 const RESEND_WAIT = 30
+
+/**
+ * The end of "I forgot my password": the emailed code and the new password on
+ * one screen, so the code is still fresh when it is used.
+ */
+function ResetStep({ ticket, identifier, onDone, onBack }) {
+  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      await onDone(code, password)
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
+  return (
+    <>
+      <div className="auth-code-icon">
+        <KeyRound />
+      </div>
+      <h1>Choose a new password</h1>
+      <p className="sub">
+        If an account matches <b>{identifier}</b>, a 6-digit code is on its way to its email. It expires in 10 minutes.
+      </p>
+      <form onSubmit={submit}>
+        <div className="field">
+          <input
+            className="input auth-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
+            aria-label="6-digit code"
+          />
+        </div>
+        <div className="field">
+          <PasswordInput value={password} onChange={setPassword} placeholder="New password (8+ characters)" autoComplete="new-password" />
+        </div>
+        {error && <p className="error-text" style={{ margin: '0 0 12px' }}>{error}</p>}
+        <button className="btn btn-primary btn-lg btn-block" disabled={busy || code.length !== 6 || password.length < 8}>
+          {busy ? <Spinner size="sm" /> : 'Set password and sign in'}
+        </button>
+      </form>
+      <div className="auth-foot">
+        <button type="button" className="link-btn" onClick={onBack}>
+          <ArrowLeft /> Back to sign in
+        </button>
+      </div>
+    </>
+  )
+}
 
 /**
  * "Check your email": six digits, pasted or typed. Submits by itself once all
@@ -158,6 +217,7 @@ export function LoginPage({ search }) {
   const [password, setPassword] = useState('')
   const [withCode, setWithCode] = useState(false) // sign in by email code instead of password
   const [code, setCode] = useState(null) // { ticket, sentTo } while waiting for a code
+  const [reset, setReset] = useState(null) // { ticket } while resetting a forgotten password
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const next = new URLSearchParams(search).get('next') || (location.pathname !== '/login' ? location.pathname : '/')
@@ -181,6 +241,19 @@ export function LoginPage({ search }) {
       setError(err.message)
     }
     setBusy(false)
+  }
+
+  if (reset) {
+    return (
+      <AuthShell>
+        <ResetStep
+          ticket={reset.ticket}
+          identifier={identifier}
+          onDone={async (c, pw) => finishAuth((await api.resetPasswordVerify(reset.ticket, c, pw)).user, next)}
+          onBack={() => setReset(null)}
+        />
+      </AuthShell>
+    )
   }
 
   if (code) {
@@ -211,7 +284,7 @@ export function LoginPage({ search }) {
             className="input"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder={codesOn || withCode ? 'Email or username' : 'Username or email'}
+            placeholder="Email or username"
             autoComplete="username"
             autoFocus
             autoCapitalize="none"
@@ -221,6 +294,27 @@ export function LoginPage({ search }) {
         {!withCode && (
           <div className="field">
             <PasswordInput value={password} onChange={setPassword} />
+          </div>
+        )}
+        {opts?.canReset && !withCode && (
+          <div className="auth-aside">
+            <button
+              type="button"
+              className="link-btn"
+              onClick={async () => {
+                if (!identifier.trim()) return setError('Enter your email or username first, then we’ll send you a code')
+                setBusy(true)
+                setError('')
+                try {
+                  setReset(await api.resetPassword(identifier))
+                } catch (err) {
+                  setError(err.message)
+                }
+                setBusy(false)
+              }}
+            >
+              Forgot your password?
+            </button>
           </div>
         )}
         {error && <p className="error-text" style={{ margin: '0 0 12px' }}>{error}</p>}

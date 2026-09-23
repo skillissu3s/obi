@@ -43,6 +43,7 @@ const WHY = {
   signup: 'to confirm your email and finish creating your account',
   login: 'to sign in',
   email: 'to confirm your new email address',
+  reset: 'to choose a new password',
 }
 
 export async function sendCode(to, code, purpose) {

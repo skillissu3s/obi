@@ -1878,3 +1878,11 @@
 .setting.stacked .setting-control > .dk-inline {
   width: 100%;
 }
+
+/* a quiet line under a field: "Forgot your password?" */
+.auth-aside {
+  display: flex;
+  justify-content: flex-end;
+  margin: -6px 0 12px;
+  font-size: 12px;
+}

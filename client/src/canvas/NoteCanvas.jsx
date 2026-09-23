@@ -4,7 +4,7 @@ import { EditorView } from '@codemirror/view'
 import { ySyncAnnotation } from 'y-codemirror.next'
 import {
   PencilRuler, Highlighter, StickyNote, Link2, MoveUpRight, X, LocateFixed, Copy, Trash2, BringToFront, SendToBack, Lock,
-  ClipboardPaste, Bold, Italic, Strikethrough, Code, Link as LinkIcon,
+  ClipboardPaste, Bold, Italic, Strikethrough, Code, Link as LinkIcon, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { toggleWrap, insertLink } from '../editor/commands.js'
 import { HIGHLIGHT_COLORS, highlightCss } from '@shared/boardsvg.js'
@@ -283,6 +283,32 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
 
   const state = useController(ctl || DUMMY)
 
+  // Drawings can sit well beside the text — off the screen on a phone, or
+  // after panning. A tab on that edge says how many and brings them over.
+  const offEdge = () => {
+    const g = geomRef.current
+    if (!ctl || !scrollEl || !g) return null
+    const r = scrollEl.getBoundingClientRect()
+    const left = r.left - g.ox
+    const right = r.right - g.ox
+    let before = 0
+    let after = 0
+    let nearestLeft = null
+    let nearestRight = null
+    for (const el of ctl.layout().list) {
+      if (el.type === 'highlight') continue
+      const b = visualBounds(el)
+      if (b.x + b.w < left + 8) {
+        before++
+        if (!nearestLeft || b.x + b.w > nearestLeft.x + nearestLeft.w) nearestLeft = b
+      } else if (b.x > right - 8) {
+        after++
+        if (!nearestRight || b.x < nearestRight.x) nearestRight = b
+      }
+    }
+    return { before, after, nearestLeft, nearestRight }
+  }
+
   // ----- editor hooks: follow text edits, re-measure on layout changes -----
   const bumpRef = useRef(0)
   const bump = useCallback(() => {
@@ -489,7 +515,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     // page's own scrolling (the scroll area is touch-action: pan-y)
     let swipe = null
     const onPointerDown = (e) => {
-      if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .cv-pop, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
+      if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .nc-edge, .cv-pop, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
       if (e.target.closest?.('.cv-edit, .cv-edit-frame')) return
       measure()
       const handled = ctl.onPointerDown(e)
@@ -815,6 +841,29 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         </>,
         portalHost,
       )}
+      {(() => {
+        const off = offEdge()
+        if (!off) return null
+        const tab = (side, n, b) =>
+          n > 0 && (
+            <button
+              key={side}
+              className={`nc-edge ${side}`}
+              title={`${n} drawing${n === 1 ? '' : 's'} over here — click to look`}
+              aria-label={`Show ${n} drawing${n === 1 ? '' : 's'} to the ${side}`}
+              onClick={() => revealX(b.x - 16, b.x + b.w + 16)}
+            >
+              {side === 'left' ? <ChevronLeft /> : <ChevronRight />}
+              <span>{n}</span>
+            </button>
+          )
+        return (
+          <>
+            {tab('left', off.before, off.nearestLeft)}
+            {tab('right', off.after, off.nearestRight)}
+          </>
+        )
+      })()}
       {Math.abs(pan) > 2 && (
         <button className="btn btn-sm nc-recenter" onClick={() => animatePan(0)} title="Move the note back to the centre">
           <LocateFixed /> Re-center

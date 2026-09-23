@@ -1197,6 +1197,21 @@ svg.cv-el {
   .note-view .cv-dock {
     bottom: 64px;
   }
+  /* Every tool within reach: the row wraps onto a second line rather than
+     hiding half the tools behind a sideways scroll nobody can see. */
+  .note-view .cv-dock {
+    width: calc(100% - 24px);
+  }
+  .note-view .cv-toolbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    row-gap: 2px;
+    overflow-x: visible;
+  }
+  .note-view .cv-toolbar .cv-sep {
+    display: none;
+  }
   .cv-tool kbd {
     display: none;
   }
@@ -1405,4 +1420,48 @@ h3.shortcut-group {
   .cv-pill {
     animation: none;
   }
+}
+
+/* A drawing sitting outside the view (a phone's narrow window, or after
+   panning): a quiet tab on that edge, with how many are over there. */
+.nc-edge {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 0 5px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border);
+  backdrop-filter: blur(6px);
+  opacity: 0.85;
+  transition: opacity var(--t), color var(--t);
+}
+.nc-edge:hover {
+  opacity: 1;
+  color: var(--text);
+}
+.nc-edge svg {
+  width: 15px;
+  height: 15px;
+}
+.nc-edge.left {
+  left: 0;
+  padding-left: 2px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.nc-edge.right {
+  right: 0;
+  padding-right: 2px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  flex-direction: row-reverse;
 }

@@ -4,6 +4,7 @@ import {
   RotateCcw, FileText, Folder, Search, Upload, Info, Share2, Eye, Pencil,
 } from 'lucide-react'
 import { Modal, Spinner, Avatar, Switch, EmojiPicker } from '../ui.jsx'
+import { isDesktop, useDesktop } from '../../lib/desktop.js'
 import { api } from '../../lib/api.js'
 import { themeSnapshot } from '../../lib/themesnapshot.js'
 import { useApp } from '../../store/app.js'
@@ -180,10 +181,62 @@ export function NewWorkspaceModal() {
 
 // ---------------- Share & publish ----------------
 
+function DesktopShare({ ws, path, onClose }) {
+  const info = useDesktop((s) => s.info)
+  useEffect(() => {
+    useDesktop.getState().refresh()
+  }, [])
+  const account = ws.cloud && info?.accounts?.find((a) => a.id === ws.cloud.account)
+  const host = account?.url.replace(/^https?:\/\//, '')
+  const url = account && `${account.url}/w/${ws.cloud.remoteId}/${path.split('/').map(encodeURIComponent).join('/')}`
+  return (
+    <Modal title={`Share “${stripExt(basename(path))}”`} center onClose={onClose} icon={<Share2 size={18} />}>
+      {ws.cloud ? (
+        <>
+          <div className="hint">
+            This vault syncs with <b>{ws.cloud.remoteName}</b>{host ? ` on ${host}` : ''}. Sharing with people and publishing a read-only link happen there, so the link keeps working when this computer is off.
+          </div>
+          <div className="setting-actions">
+            <button
+              className="btn btn-primary"
+              disabled={!url}
+              onClick={() => {
+                window.open(url, '_blank', 'noopener')
+                onClose()
+              }}
+            >
+              <ExternalLink /> Open this note on {host || 'your server'}
+            </button>
+          </div>
+          {!account && <div className="hint">Sign in to that account again first — Settings → Accounts.</div>}
+        </>
+      ) : (
+        <>
+          <div className="hint">
+            This vault lives only on this computer, so there is nothing for other people to open. Sync it with your Obi account and you can share notes and publish links from there.
+          </div>
+          <div className="setting-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                onClose()
+                useUI.getState().openModal('settings', { section: 'sync' })
+              }}
+            >
+              <Cloud /> Set up syncing
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
+  )
+}
+
 export function ShareModal({ ws: wsId, path }) {
   const close = useUI((s) => s.closeModal)
   const workspaces = useApp((s) => s.workspaces)
   const ws = workspaces.find((w) => w.id === wsId)
+  if (isDesktop && ws) return <DesktopShare ws={ws} path={path} onClose={close} />
   const [data, setData] = useState(null)
   const [users, setUsers] = useState([])
   const [username, setUsername] = useState('')

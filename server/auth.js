@@ -128,6 +128,9 @@ export const authRouter = express.Router()
 export const authOptions = () => ({
   registration: REGISTRATION === 'open' && !mailEnabled ? 'invite' : REGISTRATION,
   loginCode: mailEnabled ? LOGIN_CODE : 'off',
+  // a forgotten password can be reset by email wherever email works, even if
+  // signing in with a code is switched off
+  canReset: mailEnabled,
 })
 
 authRouter.get('/setup', (req, res) => {
@@ -227,6 +230,35 @@ export function codeStep(req, ticket, code) {
 
 authRouter.post('/login/code/verify', async (req, res) => {
   const user = codeStep(req, req.body?.ticket, req.body?.code)
+  await signedIn(req, res, user.id)
+})
+
+// ---- a forgotten password. The answer never says whether the account
+// exists; the code goes to the address on file.
+
+authRouter.post('/password/reset', async (req, res) => {
+  if (!mailEnabled) throw new HttpError(400, 'This server cannot send email — ask an administrator to reset your password')
+  const identifier = req.body?.identifier
+  loginLimit(req, `reset:${identifier}`)
+  const user = findUser(identifier)
+  const ticket =
+    user && !user.disabled && user.email_verified_at
+      ? await issueCode({ purpose: 'reset', subject: user.id, email: user.email, background: true })
+      : newId(24)
+  res.json({ ticket })
+})
+
+authRouter.post('/password/reset/verify', async (req, res) => {
+  if (!rateLimit(`code-ip:${req.ip}`, 30, 15 * 60 * 1000)) throw new HttpError(429, 'Too many attempts. Please wait a few minutes.')
+  const password = req.body?.password
+  validatePassword(password)
+  const row = checkCode(req.body?.ticket, req.body?.code, ['reset'])
+  const user = one('SELECT * FROM users WHERE id = ?', row.subject)
+  if (!user) throw new HttpError(400, 'That code is wrong or has expired')
+  if (user.disabled) throw new HttpError(403, 'This account is disabled')
+  run('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?', await hashPassword(password), user.id)
+  // whoever knew the old password (or was signed in with it) is signed out
+  revokeUserSessions(user.id)
   await signedIn(req, res, user.id)
 })
 
