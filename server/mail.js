@@ -28,6 +28,29 @@ const FROM = env.MAIL_FROM || env.SMTP_USER || `no-reply@localhost`
 /** Whether this server can send email at all */
 export const mailEnabled = !!transport || LOG_ONLY
 
+/** What the server will do with email, for the log and the test script */
+export const mailInfo = () => ({
+  enabled: mailEnabled,
+  logOnly: LOG_ONLY,
+  from: FROM,
+  host: env.SMTP_URL ? env.SMTP_URL.replace(/\/\/[^@]*@/, '//***@') : env.SMTP_HOST || null,
+  port: env.SMTP_HOST ? Number(env.SMTP_PORT || 587) : null,
+  user: env.SMTP_USER || null,
+})
+
+/** Asks the mail server whether it would accept us (host, TLS, credentials) */
+export async function verifyMail() {
+  if (!transport) throw new Error(LOG_ONLY ? 'MAIL_LOG_CODES=1: mail is only printed to the log' : 'No SMTP settings — set SMTP_HOST, SMTP_USER and SMTP_PASS')
+  await transport.verify()
+}
+
+if (transport) {
+  console.log(`[mail] sending through ${env.SMTP_URL ? 'SMTP_URL' : `${env.SMTP_HOST}:${env.SMTP_PORT || 587}`} as ${FROM}`)
+  // Brevo and friends hand out a login like 9xxxxx@smtp-brevo.com. Sending
+  // *from* that address is not what anyone wants, and some relays refuse it.
+  if (!env.MAIL_FROM) console.warn('[mail] MAIL_FROM is not set, so email will come from the SMTP login. Set MAIL_FROM="Obi <no-reply@your.domain>".')
+}
+
 export async function sendMail({ to, subject, text, html }) {
   if (LOG_ONLY) {
     console.log(`[mail] to ${to} — ${subject}\n${text}\n`)

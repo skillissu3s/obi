@@ -171,6 +171,66 @@ Redeploy (or `docker compose up -d --build`). The server saves open documents an
 
 ---
 
+## Email — sign-up and sign-in codes
+
+Obi sends one kind of email: a 6-digit code, for confirming a new account,
+signing in without a password, changing your email address, or resetting a
+forgotten password. Without email configured the server quietly falls back to
+invite-only sign-up and password-only sign-in, and says so on the sign-in page.
+
+Use a sending service rather than your own SMTP server: a fresh IP has no
+reputation, most hosts block outbound port 25, and a sign-in code in someone's
+spam folder means they cannot get in. Any provider with an SMTP relay works —
+Brevo, Resend, Amazon SES, Postmark.
+
+**1. Authenticate your domain** with the provider (they give you DKIM records
+and usually a verification record). Send from a subdomain, e.g.
+`obi.example.com`, so the app's mail keeps its own reputation:
+
+| Record | Where | What it does |
+|---|---|---|
+| DKIM (from the provider) | `obi.example.com` | signs the mail as yours |
+| SPF `TXT` (from the provider) | `obi.example.com` | says the provider may send for you |
+| DMARC `TXT` `v=DMARC1; p=none; rua=mailto:you@example.com` | `_dmarc.example.com` | asks for reports; tighten to `p=quarantine` once reports look clean |
+
+No `MX` record is needed to *send*. Add one only if you want to receive mail at
+that address (Cloudflare Email Routing forwards it for free).
+
+**2. Point Obi at the relay** (Brevo's values shown; the user is the login the
+provider gives you, not your own address):
+
+```bash
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587                      # 587 is STARTTLS; for 465 also set SMTP_SECURE=1
+SMTP_USER=9xxxxx001@smtp-brevo.com
+SMTP_PASS=<the SMTP key>
+MAIL_FROM="Obi <no-reply@obi.example.com>"
+PUBLIC_URL=https://obi.example.com
+```
+
+`MAIL_FROM` must be on the domain you authenticated. If you leave it out, mail
+goes out as the SMTP login, which looks broken and some relays refuse.
+
+**3. Check it before anyone else does.** From the app directory (on Docker:
+`docker exec -it obi node scripts/send-test-mail.mjs you@example.com`):
+
+```bash
+npm run mail:test you@example.com
+```
+
+It prints the settings in use, asks the relay whether it accepts the
+credentials, then sends one message. In Gmail, open it and use *Show original*:
+SPF, DKIM and DMARC should all say PASS. Send to an Outlook address too — it is
+the fussier of the two. The startup log also prints one `[mail]` line saying
+where mail goes.
+
+Free plans have a daily cap (Brevo's is 300/day). Every registration and every
+"send a new code" spends one; Obi's rate limits (10 registrations an hour and 6
+resends per 15 minutes, per IP) keep that in check, and `REGISTRATION=invite`
+removes the exposure altogether if the server is only for you.
+
+---
+
 ## Connecting a GitHub repository
 
 1. In Obi: workspace switcher → **New workspace** → **GitHub repository**.

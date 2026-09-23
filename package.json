@@ -16,7 +16,8 @@
     "desktop": "vite build && electron .",
     "desktop:dev": "electron .",
     "desktop:build": "vite build && electron-builder",
-    "desktop:icon": "electron scripts/make-icon.cjs"
+    "desktop:icon": "electron scripts/make-icon.cjs",
+    "mail:test": "node scripts/send-test-mail.mjs"
   },
   "dependencies": {
     "compression": "^1.8.2",
