@@ -1,11 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Obi">
   <!-- Two rings of the same size: the second one sits behind the first and a
        little to the right, like a page stacked under another. The mask cuts a
-       clear gap out of the one behind, so the two never touch. No background —
-       the mark has to work on a dark theme, a light theme and a browser tab. -->
-  <mask id="obi-gap">
+       thin gap out of the one behind, so the two never touch. No background —
+       the mark has to work on a dark theme, a light theme and a browser tab.
+       maskUnits: without it the mask covers only the ring's box *without* its
+       stroke, which slices the far right off the ring behind. -->
+  <mask id="obi-gap" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
     <rect width="64" height="64" fill="#fff"/>
-    <circle cx="24.5" cy="32" r="22.5" fill="#000"/>
+    <circle cx="24.5" cy="32" r="21" fill="#000"/>
   </mask>
   <circle cx="39.5" cy="32" r="15" fill="none" stroke="#2f9e78" stroke-width="7" opacity=".45" mask="url(#obi-gap)"/>
   <circle cx="24.5" cy="32" r="15" fill="none" stroke="#2f9e78" stroke-width="7"/>
