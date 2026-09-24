@@ -17,7 +17,8 @@
     "desktop:dev": "electron .",
     "desktop:build": "vite build && electron-builder",
     "desktop:icon": "electron scripts/make-icon.cjs",
-    "mail:test": "node scripts/send-test-mail.mjs"
+    "mail:test": "node scripts/send-test-mail.mjs",
+    "desktop:publish": "vite build && electron-builder --publish always"
   },
   "dependencies": {
     "compression": "^1.8.2",
@@ -105,6 +106,13 @@
       ],
       "category": "Office",
       "maintainer": "Obi"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "skillissu3s",
+        "repo": "obi"
+      }
+    ]
   }
 }

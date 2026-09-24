@@ -11,6 +11,7 @@ import { adminRouter } from './admin.js'
 import { wsRouter, miscRouter } from './workspaces.js'
 import { publicRouter } from './public.js'
 import { syncRouter } from './syncapi.js'
+import { downloadRouter } from './download.js'
 import { desktopRouter, startDesktop, DESKTOP_WEB, desktopWebRouter } from './desktop.js'
 import { attachWebSocket } from './wsserver.js'
 import { shutdownAll, workspaceDir, trashCompanions } from './runtime.js'
@@ -50,6 +51,7 @@ if (DESKTOP && DESKTOP_WEB) app.use(desktopWebRouter)
 app.use('/api', miscRouter)
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }))
 app.use('/p', publicRouter)
+app.use('/download', downloadRouter)
 
 if (fs.existsSync(DIST)) {
   app.use(

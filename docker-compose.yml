@@ -29,6 +29,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      # where the desktop app's installers are published (owner/repo on GitHub);
+      # /download/windows and friends redirect to the latest release
+      DOWNLOAD_REPO: ${DOWNLOAD_REPO:-}
     ports:
       - "${PORT:-3000}:3000"
     volumes:

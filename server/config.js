@@ -38,5 +38,8 @@ export const REGISTRATION = ['open', 'invite', 'closed'].includes(env.REGISTRATI
 // How a code fits into signing in: 'either' (password or an emailed code),
 // 'always' (password, then a code) or 'off' (password only).
 export const LOGIN_CODE = ['either', 'always', 'off'].includes(env.LOGIN_CODE) ? env.LOGIN_CODE : 'either'
+// Where the desktop app's installers are published, as owner/repo on GitHub.
+// /download/<platform> sends people to the latest release's asset.
+export const DOWNLOAD_REPO = (env.DOWNLOAD_REPO || '').trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/+$/, '')
 // Public address of this server, used in emails
 export const PUBLIC_URL = (env.PUBLIC_URL || '').replace(/\/+$/, '')
