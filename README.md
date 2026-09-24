@@ -285,6 +285,21 @@ Gatekeeper warn on first launch until signing is set up in `package.json → bui
 
 ---
 
+## The intro page
+
+Someone who is not signed in lands on an intro page (`client/landing/`) rather
+than a bare sign-in box; `/welcome` always shows it, and `/login` and
+`/register` go straight to the app. It is plain HTML and CSS built by Vite —
+none of the app's JavaScript — so it paints immediately.
+
+The pictures on it are real screenshots of a running Obi, taken with
+`scripts/screenshot.cjs`: write a small JSON config (url, out, width, height,
+an `obi_session` cookie for signed-in views, an optional `js` snippet to run
+first) and take the shot with `npx electron scripts/screenshot.cjs shot.json`.
+Replace the PNGs in `client/landing/` the same way when the UI changes.
+
+---
+
 ## Local development
 
 ```bash

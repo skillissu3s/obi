@@ -349,6 +349,10 @@ export function LoginPage({ search }) {
             <button type="button" className="link-btn" onClick={() => navigate('/register' + (search || ''))}>
               Create an account
             </button>
+            {' · '}
+            <a className="link-btn" href="/welcome">
+              What is Obi?
+            </a>
           </>
         ) : opts ? (
           'Accounts are created by your administrator.'

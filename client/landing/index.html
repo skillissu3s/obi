@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Obi — notes that stay yours</title>
+    <meta
+      name="description"
+      content="A calm, fast home for your markdown notes: plain files you own, a canvas you can draw on beside the words, real-time editing, GitHub sync and a desktop app that works offline."
+    />
+    <meta name="theme-color" content="#161513" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta property="og:title" content="Obi — notes that stay yours" />
+    <meta property="og:description" content="Plain markdown files, with a canvas pinned to the words. Self-hosted, real-time, offline on the desktop." />
+    <meta property="og:type" content="website" />
+    <link rel="stylesheet" href="./landing.css" />
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <a class="brand" href="/welcome"><img src="/favicon.svg" alt="" /> Obi</a>
+        <nav>
+          <a href="#writing">Writing</a>
+          <a href="#canvas">Canvas</a>
+          <a href="#together">Together</a>
+          <a href="#desktop">Desktop</a>
+          <a href="#host">Self-hosting</a>
+        </nav>
+        <span class="spacer"></span>
+        <a class="btn" href="/login">Sign in</a>
+        <a class="btn btn-primary" href="/register">Create an account</a>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap hero">
+        <h1>Your notes are <em>files</em>, not a database.</h1>
+        <p>
+          Obi keeps every note as plain markdown in your own folders — and lets you draw on them: sticky notes, arrows and
+          highlights that stay pinned to the words they belong to, without touching a character of the text.
+        </p>
+        <div class="cta">
+          <a class="btn btn-primary btn-lg" href="/register">Create an account</a>
+          <a class="btn btn-lg" href="/login">Sign in</a>
+        </div>
+        <p class="note">Runs on this server · Works offline in the desktop app · Your notes stay markdown</p>
+        <div class="shot">
+          <img src="./shot-editor.png" width="1500" height="900" alt="A note in Obi with a table, a task list and a sticky note joined to a line of text by a dashed arrow" />
+        </div>
+      </div>
+
+      <section id="writing">
+        <div class="wrap">
+          <h2>Writing that gets out of the way</h2>
+          <p class="lede">Markdown, rendered as you type. No preview pane to keep in sync, no proprietary blocks to export out of later.</p>
+          <div class="grid">
+            <div class="card">
+              <div class="mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              </div>
+              <h3>Plain files, your folders</h3>
+              <p>One note, one <code>.md</code> file. Open the same folder in any other editor; nothing is locked in.</p>
+            </div>
+            <div class="card">
+              <div class="mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </div>
+              <h3>Live preview</h3>
+              <p>Headings, tables, code, maths and diagrams take shape while you write, with the markdown still there underneath.</p>
+            </div>
+            <div class="card">
+              <div class="mark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              </div>
+              <h3>Links, tags and a graph</h3>
+              <p>Wiki links with backlinks, tags, daily notes, tasks across the whole workspace, and search that keeps up.</p>
+            </div>
+          </div>
+          <div class="shot" style="margin-top: 34px">
+            <img src="./shot-board.png" width="1500" height="620" alt="A markdown file shown as a kanban board with four lists of cards" />
+          </div>
+          <p class="caption">A markdown file with <code>## headings</code> and task lists, seen as a board. Drag a card and the file changes — nothing else does.</p>
+        </div>
+      </section>
+
+      <section id="canvas">
+        <div class="wrap split">
+          <div>
+            <h2>A canvas over the page</h2>
+            <p class="lede">Drawings are pinned to lines of text, not to pixels — so when you add a paragraph above, the sticky note comes with it.</p>
+            <ul>
+              <li>Sticky notes, shapes, arrows, freehand pen and highlights</li>
+              <li>Arrows that point at a phrase and follow it as you edit</li>
+              <li>Markdown blocks on the canvas, with their own live preview</li>
+              <li>Whole whiteboards too, on their own or embedded in a note</li>
+              <li>Publish a note and the drawings come along, exactly as placed</li>
+            </ul>
+          </div>
+          <div class="shot">
+            <img src="./shot-whiteboard.png" width="1500" height="700" alt="A whiteboard in Obi with three labelled boxes joined by arrows and a sticky note" />
+          </div>
+        </div>
+      </section>
+
+      <section id="together">
+        <div class="wrap">
+          <h2>Alone, or with other people</h2>
+          <p class="lede">The same notes, shared as far as you want them to go — and no further.</p>
+          <div class="grid">
+            <div class="card">
+              <h3>Live, together</h3>
+              <p>Share a note or a whole workspace. Edits and cursors arrive as they happen, and the file on disk stays plain markdown.</p>
+            </div>
+            <div class="card">
+              <h3>Publish a link</h3>
+              <p>Turn a note into a read-only page that looks exactly like it does here — drawings, tables and all — and updates when you edit.</p>
+            </div>
+            <div class="card">
+              <h3>Version history and trash</h3>
+              <p>Earlier versions are kept as you write, and deleted notes wait in the trash rather than disappearing.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="desktop">
+        <div class="wrap split">
+          <div>
+            <h2>The desktop app works offline</h2>
+            <p class="lede">Every workspace is a folder you choose — new, or one that already holds your notes. An Obsidian vault works as it is.</p>
+            <ul>
+              <li>Write with no connection; it syncs when you're back</li>
+              <li>Changes on both sides are merged, and colliding edits keep both copies</li>
+              <li>Optional GitHub sync: commit and push on save, on a timer, or by hand</li>
+              <li>Edit the same folder in another app; Obi notices</li>
+            </ul>
+          </div>
+          <div>
+            <div class="shot" style="margin: 0">
+              <img src="./shot-desktop.png" width="1100" height="700" alt="The desktop app asking where your notes should live: sync with an Obi account, or keep everything on this computer" />
+            </div>
+            <p class="caption">Installers are built from the repository, one per platform: <code>npm run desktop:build</code>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="host">
+        <div class="wrap">
+          <h2>Self-hosted, by design</h2>
+          <p class="lede">
+            One container, one folder of data. Your notes sit on your own disk as markdown; the database only keeps who you are
+            and what you shared.
+          </p>
+          <pre>services:
+  obi:
+    image: obi
+    environment:
+      APP_SECRET: &lt;a long random string&gt;
+      PUBLIC_URL: https://notes.example.com
+    volumes:
+      - obi-data:/data
+    ports:
+      - "3000:3000"</pre>
+        </div>
+      </section>
+
+      <section class="end">
+        <div class="wrap">
+          <h2>Start with one note</h2>
+          <p class="lede" style="margin: 0 auto">You can move them all out again whenever you like — they were only ever files.</p>
+          <div class="cta">
+            <a class="btn btn-primary btn-lg" href="/register">Create an account</a>
+            <a class="btn btn-lg" href="/login">Sign in</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span>Obi — your notes, your files.</span>
+        <span class="spacer"></span>
+        <a href="/login">Sign in</a>
+        <a href="/register">Create an account</a>
+      </div>
+    </footer>
+  </body>
+</html>

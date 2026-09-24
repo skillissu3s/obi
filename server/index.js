@@ -6,7 +6,7 @@ import express from 'express'
 import compression from 'compression'
 import { PORT, HOST, DATA_DIR, IS_PROD, APP_NAME, DESKTOP } from './config.js'
 import { one, all, run, now } from './db.js'
-import { authRouter, csrfGuard } from './auth.js'
+import { authRouter, csrfGuard, userFromCookieHeader } from './auth.js'
 import { adminRouter } from './admin.js'
 import { wsRouter, miscRouter } from './workspaces.js'
 import { publicRouter } from './public.js'
@@ -62,6 +62,24 @@ if (fs.existsSync(DIST)) {
     }),
   )
   const indexHtml = path.join(DIST, 'index.html')
+  // Someone who is not signed in meets the intro page rather than a bare login
+  // box. /welcome always shows it; /login and /register go straight to the app.
+  const landingHtml = path.join(DIST, 'landing', 'index.html')
+  const hasLanding = fs.existsSync(landingHtml)
+  const sendLanding = (res) => {
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Vary', 'Cookie')
+    res.sendFile(landingHtml)
+  }
+  app.get('/welcome', (req, res, next) => (hasLanding ? sendLanding(res) : next()))
+  app.get('/', (req, res, next) => {
+    if (DESKTOP || !hasLanding) return next()
+    if (userFromCookieHeader(req.headers.cookie)) {
+      res.setHeader('Vary', 'Cookie')
+      return next()
+    }
+    sendLanding(res)
+  })
   app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next()
     res.setHeader('Cache-Control', 'no-cache')

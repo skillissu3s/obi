@@ -1,0 +1,342 @@
+/* The page a visitor sees before they sign in. Self-contained: it shares the
+   app's palette and fonts but none of its JavaScript, so it paints at once. */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+:root {
+  --bg: #161513;
+  --bg-2: #1c1b18;
+  --bg-elev: #201f1c;
+  --text: #ebe7df;
+  --text-2: #b9b3a8;
+  --text-3: #8d8578;
+  --border: #2a2823;
+  --border-strong: #37342d;
+  --accent: #2f9e78;
+  --accent-text: #6cc9a7;
+  --accent-soft: rgba(47, 158, 120, 0.14);
+  --radius: 10px;
+  --radius-lg: 16px;
+  --font: 'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fcfbf7;
+    --bg-2: #f6f4ed;
+    --bg-elev: #fffefb;
+    --text: #201d18;
+    --text-2: #4a453c;
+    --text-3: #6d675b;
+    --border: #e8e4d9;
+    --border-strong: #dcd7ca;
+    --accent: #217a5c;
+    --accent-text: #1d6b51;
+    --accent-soft: rgba(33, 122, 92, 0.1);
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+}
+.wrap {
+  width: min(1120px, calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+/* ---------- top bar ---------- */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+header .wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 62px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 750;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+.brand img {
+  width: 30px;
+  height: 30px;
+}
+nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 18px;
+}
+nav a {
+  padding: 7px 11px;
+  border-radius: var(--radius);
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 14px;
+}
+nav a:hover {
+  background: var(--bg-elev);
+  color: var(--text);
+}
+.spacer {
+  flex: 1;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 120ms, border-color 120ms, transform 120ms;
+}
+.btn:hover {
+  background: var(--bg-elev);
+}
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #fff);
+  transform: translateY(-1px);
+}
+.btn-lg {
+  padding: 12px 22px;
+  font-size: 15px;
+}
+@media (max-width: 720px) {
+  nav {
+    display: none;
+  }
+}
+
+/* ---------- hero ---------- */
+.hero {
+  padding: 84px 0 40px;
+  text-align: center;
+}
+.hero h1 {
+  margin: 0 0 18px;
+  font-size: clamp(34px, 6vw, 58px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  font-weight: 780;
+}
+.hero h1 em {
+  font-style: normal;
+  color: var(--accent-text);
+}
+.hero p {
+  margin: 0 auto 28px;
+  max-width: 620px;
+  font-size: clamp(16px, 2.2vw, 19px);
+  color: var(--text-2);
+}
+.cta {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.hero .note {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.shot {
+  margin: 44px auto 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.6);
+  background: var(--bg-2);
+}
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------- sections ---------- */
+section {
+  padding: 72px 0;
+}
+section + section {
+  border-top: 1px solid var(--border);
+}
+h2 {
+  margin: 0 0 10px;
+  font-size: clamp(24px, 3.4vw, 34px);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.lede {
+  margin: 0 0 34px;
+  max-width: 640px;
+  color: var(--text-2);
+  font-size: 17px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+  gap: 16px;
+}
+.card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-2);
+}
+.card h3 {
+  margin: 0 0 8px;
+  font-size: 16.5px;
+  letter-spacing: -0.01em;
+}
+.card p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14.5px;
+}
+.card .mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 14px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.card .mark svg {
+  width: 18px;
+  height: 18px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 40px;
+  align-items: center;
+}
+@media (max-width: 860px) {
+  .split {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+}
+.split ul {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+  font-size: 15px;
+}
+.split li {
+  padding: 7px 0 7px 26px;
+  position: relative;
+}
+.split li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 16px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+}
+
+pre {
+  margin: 20px 0 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.end {
+  text-align: center;
+}
+.end h2 {
+  margin-bottom: 14px;
+}
+.end .cta {
+  margin-top: 26px;
+}
+
+footer {
+  padding: 28px 0 40px;
+  border-top: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+footer .wrap {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+footer a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+footer a:hover {
+  color: var(--text);
+}
+
+.caption {
+  margin: 14px 2px 0;
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--bg-elev);
+  color: var(--text-2);
+}

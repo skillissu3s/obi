@@ -27,6 +27,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(import.meta.dirname, 'client/index.html'),
+        // what a visitor sees before signing in; plain HTML, none of the app's JS
+        landing: path.resolve(import.meta.dirname, 'client/landing/index.html'),
         // the runtime for published notes; the server links it by these fixed
         // names (publish.js / publish.css), so they must not be hashed
         publish: path.resolve(import.meta.dirname, 'client/src/publish/main.js'),
