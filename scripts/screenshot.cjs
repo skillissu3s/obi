@@ -34,7 +34,8 @@ app.whenReady().then(async () => {
   await new Promise((r) => setTimeout(r, cfg.waitMs || 5000))
   if (cfg.js) {
     try {
-      await win.webContents.executeJavaScript(cfg.js)
+      const value = await win.webContents.executeJavaScript(cfg.js)
+      if (value !== undefined) console.log('js:', JSON.stringify(value))
       await new Promise((r) => setTimeout(r, cfg.afterJsMs || 1500))
     } catch (e) {
       console.error('script:', e.message)

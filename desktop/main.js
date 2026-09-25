@@ -63,6 +63,21 @@ function createWindow() {
   }
 }
 
+/** The first of Obi's usual ports that nothing else is listening on */
+async function freePort(from = 7717, tries = 12) {
+  const net = await import('node:net')
+  for (let port = from; port < from + tries; port++) {
+    const free = await new Promise((resolve) => {
+      const probe = net.createServer()
+      probe.once('error', () => resolve(false))
+      probe.once('listening', () => probe.close(() => resolve(true)))
+      probe.listen(port, '127.0.0.1')
+    })
+    if (free) return port
+  }
+  return 0 // everything taken: let the system choose
+}
+
 app.on('second-instance', () => {
   if (!win) return
   if (win.isMinimized()) win.restore()
@@ -101,7 +116,10 @@ app.whenReady().then(async () => {
   process.env.NODE_ENV = 'production'
   process.env.DATA_DIR = process.env.OBI_DATA_DIR || path.join(app.getPath('userData'), 'data')
   process.env.HOST = '127.0.0.1'
-  process.env.PORT = process.env.OBI_PORT || '0'
+  // A steady port matters: the page's own storage (open tabs, panel widths,
+  // the last workspace) belongs to the origin, so a new port every launch
+  // would forget all of it. Take the first free one from a small range.
+  process.env.PORT = process.env.OBI_PORT || String(await freePort())
   try {
     server = await import('../server/index.js')
     const port = await server.listening
