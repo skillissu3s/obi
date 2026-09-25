@@ -76,5 +76,21 @@ async function handle(req, res) {
     .send(page(`No ${wanted} build in the latest release`, `<p>The other platforms may be there.</p><p><a href="${release?.html_url || releasesPage}">See all downloads</a></p>`))
 }
 
+// What the intro page shows on its download button: the version and size of
+// the latest Windows build, straight from the cached release.
+downloadRouter.get('/info', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300')
+  if (!DOWNLOAD_REPO) return res.json({ available: false })
+  const release = await latestRelease()
+  const exe = release?.assets?.find((a) => PLATFORMS.windows.some((re) => re.test(a.name)))
+  if (!exe) return res.json({ available: false })
+  res.json({
+    available: true,
+    version: String(release.tag_name || '').replace(/^v/, ''),
+    publishedAt: release.published_at,
+    windows: { size: exe.size, name: exe.name },
+  })
+})
+
 downloadRouter.get('/', handle)
 downloadRouter.get('/:platform', handle)

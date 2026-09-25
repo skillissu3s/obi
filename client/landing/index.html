@@ -20,19 +20,21 @@
     <div class="aura"></div>
     <div class="grid-lines"></div>
 
-    <header id="top">
-      <div class="wrap">
+    <header class="topbar" id="top">
+      <div class="island">
         <a class="brand" href="/welcome"><img src="/favicon.svg" alt="" /> Obi</a>
-        <nav>
-          <a href="#canvas">Canvas</a>
-          <a href="#writing">Writing</a>
-          <a href="#together">Sharing</a>
-          <a href="#desktop">Desktop</a>
-          <a href="#host">Self-hosting</a>
+        <nav class="links" id="links">
+          <span class="links-glow" aria-hidden="true"></span>
+          <a href="#canvas" data-section="canvas">Canvas</a>
+          <a href="#writing" data-section="writing">Writing</a>
+          <a href="#together" data-section="together">Sharing</a>
+          <a href="#desktop" data-section="desktop">Desktop</a>
+          <a href="#host" data-section="host">Self-hosting</a>
         </nav>
-        <span class="spacer"></span>
-        <a class="btn" href="/login">Sign in</a>
-        <a class="btn btn-primary" href="/register">Create an account</a>
+        <div class="actions">
+          <a class="quiet" href="/login">Sign in</a>
+          <a class="btn btn-primary btn-sm" href="/register">Get started <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
+        </div>
       </div>
     </header>
 
@@ -45,8 +47,8 @@
           pinned to the words they belong to, without changing a character of the text.
         </p>
         <div class="cta">
-          <a class="btn btn-primary btn-lg" href="/register">Create an account</a>
-          <a class="btn btn-lg" href="/login">Sign in</a>
+          <a class="btn btn-primary btn-lg" href="/register">Create a free account <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
+          <a class="btn btn-glass btn-lg" href="#desktop"><svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.2 10.2 4.2v7.1H3zM11.2 4.05 21 2.7v8.6h-9.8zM3 12.3h7.2v7.1L3 18.4zM11.2 12.3H21v8.6l-9.8-1.35z"/></svg> Get the Windows app</a>
         </div>
         <p class="fine">Runs on this server · Works offline in the desktop app · Every note stays a <code>.md</code> file</p>
         <div class="stage reveal">
@@ -164,19 +166,28 @@
               <li>Optional GitHub sync: commit and push on save, on a timer, or by hand</li>
               <li>Edit the same folder in another app — Obi notices</li>
             </ul>
-            <div class="downloads" id="downloads">
-              <a class="btn btn-lg" href="/download/windows" data-os="windows">Windows</a>
-              <a class="btn btn-lg" href="/download/mac" data-os="mac">macOS</a>
-              <a class="btn btn-lg" href="/download/linux" data-os="linux">Linux</a>
+            <div class="dl">
+              <a class="dl-main" href="/download/windows">
+                <span class="dl-os"><svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.2 10.2 4.2v7.1H3zM11.2 4.05 21 2.7v8.6h-9.8zM3 12.3h7.2v7.1L3 18.4zM11.2 12.3H21v8.6l-9.8-1.35z"/></svg></span>
+                <span class="dl-text">
+                  <b>Download for Windows</b>
+                  <small id="dl-meta">Windows 10 and 11 · 64-bit</small>
+                </span>
+                <span class="dl-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+              </a>
+              <div class="dl-soon">
+                <span class="chip">macOS <em>Upcoming</em></span>
+                <span class="chip">Linux <em>Upcoming</em></span>
+              </div>
+              <p class="caption">
+                Not code-signed yet: if Windows says it “protected your PC”, choose <b>More info → Run anyway</b>.
+                <a href="/download">Release notes</a>
+              </p>
             </div>
-            <p class="caption">
-              The builds aren't signed yet, so Windows may warn you the first time and macOS wants right-click → Open.
-              <a href="/download">All downloads</a>
-            </p>
           </div>
           <div class="reveal">
             <div class="frame flat">
-              <img src="./shot-desktop.png" width="1100" height="700" alt="The desktop app asking where your notes should live: sync with an Obi account, or keep everything on this computer" loading="lazy" />
+              <img src="./shot-desktop.png" width="720" height="520" alt="The desktop app asking where your notes should live: sync with an Obi account, or keep everything on this computer" loading="lazy" />
             </div>
           </div>
         </div>
@@ -218,8 +229,8 @@
             <h2>Start with one note</h2>
             <p class="lede">You can take them all out again whenever you like. They were only ever files.</p>
             <div class="cta">
-              <a class="btn btn-primary btn-lg" href="/register">Create an account</a>
-              <a class="btn btn-lg" href="/login">Sign in</a>
+              <a class="btn btn-primary btn-lg" href="/register">Create a free account <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
+              <a class="btn btn-glass btn-lg" href="/login">Sign in</a>
             </div>
           </div>
         </div>
@@ -230,49 +241,81 @@
       <div class="wrap">
         <span>Obi — your notes, your files.</span>
         <span class="spacer"></span>
-        <a href="/download">Download</a>
+        <a href="/download/windows">Download for Windows</a>
         <a href="/login">Sign in</a>
         <a href="/register">Create an account</a>
       </div>
     </footer>
 
     <script>
-      // Put the visitor's platform first and make it the obvious button.
       ;(function () {
-        const ua = navigator.userAgent
-        const os = /Windows/i.test(ua) ? 'windows' : /Mac|iPhone|iPad/i.test(ua) ? 'mac' : /Linux|Android/i.test(ua) ? 'linux' : null
-        const row = document.getElementById('downloads')
-        const mine = os && row && row.querySelector('[data-os="' + os + '"]')
-        if (!mine) return
-        mine.classList.add('btn-primary')
-        mine.textContent = 'Download for ' + { windows: 'Windows', mac: 'macOS', linux: 'Linux' }[os]
-        row.prepend(mine)
-      })()
+        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
 
-      // Sections arrive as they scroll in; the top bar gains a line once the
-      // page has moved.
-      ;(function () {
-        const header = document.getElementById('top')
-        const onScroll = () => header.classList.toggle('stuck', window.scrollY > 8)
+        // the island firms up once the page has moved
+        const bar = document.getElementById('top')
+        const onScroll = () => bar.classList.toggle('stuck', scrollY > 12)
         onScroll()
         addEventListener('scroll', onScroll, { passive: true })
 
-        const items = document.querySelectorAll('.reveal')
-        if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-          items.forEach((el) => el.classList.add('in'))
-          return
+        // a highlight that slides to whichever link the pointer is on
+        const nav = document.getElementById('links')
+        const glow = nav.querySelector('.links-glow')
+        const moveTo = (a) => {
+          if (!a) return nav.classList.remove('hovering')
+          const n = nav.getBoundingClientRect()
+          const r = a.getBoundingClientRect()
+          glow.style.width = r.width + 'px'
+          glow.style.transform = 'translateX(' + (r.left - n.left) + 'px)'
+          nav.classList.add('hovering')
         }
-        const seen = new IntersectionObserver(
+        nav.addEventListener('pointerover', (e) => moveTo(e.target.closest('a')))
+        nav.addEventListener('pointerleave', () => moveTo(null))
+
+        // the link for the section on screen stays lit
+        const links = [...nav.querySelectorAll('a[data-section]')]
+        const bySection = new Map(links.map((a) => [a.dataset.section, a]))
+        if ('IntersectionObserver' in window) {
+          const seen = new IntersectionObserver(
+            (entries) => {
+              for (const e of entries) {
+                const a = bySection.get(e.target.id)
+                if (a && e.isIntersecting) {
+                  links.forEach((l) => l.classList.toggle('on', l === a))
+                }
+              }
+            },
+            { rootMargin: '-45% 0px -50% 0px' },
+          )
+          bySection.forEach((_, id) => {
+            const el = document.getElementById(id)
+            if (el) seen.observe(el)
+          })
+        }
+
+        // the download button names the build it hands out
+        fetch('/download/info')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((info) => {
+            if (!info || !info.available) return
+            const mb = Math.round(info.windows.size / 1048576)
+            document.getElementById('dl-meta').textContent = 'Version ' + info.version + ' · ' + mb + ' MB · Windows 10 and 11'
+          })
+          .catch(() => {})
+
+        // sections arrive as they come into view
+        const items = document.querySelectorAll('.reveal')
+        if (reduce || !('IntersectionObserver' in window)) return items.forEach((el) => el.classList.add('in'))
+        const arrive = new IntersectionObserver(
           (entries) => {
             for (const e of entries) {
               if (!e.isIntersecting) continue
               e.target.classList.add('in')
-              seen.unobserve(e.target)
+              arrive.unobserve(e.target)
             }
           },
           { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
         )
-        items.forEach((el) => seen.observe(el))
+        items.forEach((el) => arrive.observe(el))
       })()
     </script>
   </body>
