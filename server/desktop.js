@@ -83,9 +83,16 @@ export function watchVault(wsId) {
     if (!rt) return // opened later, it reads the folder fresh anyway
     const changed = []
     for (const rel of paths) {
+      const abs = path.join(rt.dir, ...rel.split('/'))
+      // a folder: only news when it is new to the tree (or was mistaken for a file)
+      const st = await fsp.stat(abs).catch(() => null)
+      if (st?.isDirectory()) {
+        if (rt.tree.get(rel)?.type !== 'folder') changed.push(rel)
+        continue
+      }
       let buf = null
       try {
-        buf = await fsp.readFile(path.join(rt.dir, ...rel.split('/')))
+        buf = await fsp.readFile(abs)
       } catch {}
       const hash = buf ? sha256(buf) : null
       // our own write coming back, or nothing new

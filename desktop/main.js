@@ -12,6 +12,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 if (!app.requestSingleInstanceLock()) app.quit()
 
+const TITLEBAR = process.platform === 'win32'
+const TITLEBAR_H = 34 // matches --titlebar-h in client/src/styles/layout.css
+const overlayColors = (dark) => (dark ? { color: '#161513', symbolColor: '#a49e93' } : { color: '#f6f4ed', symbolColor: '#5d5749' })
+
 let win = null
 let base = null
 let server = null
@@ -28,6 +32,15 @@ function createWindow() {
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#161615' : '#fbfaf8',
     autoHideMenuBar: true,
     icon: path.join(__dirname, 'icon.png'),
+    // Windows: the page draws the title bar and the system buttons sit on it at
+    // a steady height. The native caption shrinks when the window is maximized,
+    // which squeezed the buttons.
+    ...(TITLEBAR
+      ? {
+          titleBarStyle: 'hidden',
+          titleBarOverlay: { height: TITLEBAR_H, ...overlayColors(nativeTheme.shouldUseDarkColors) },
+        }
+      : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -95,6 +108,13 @@ ipcMain.handle('obi:pick-folder', async (e, opts = {}) => {
 })
 ipcMain.handle('obi:reveal', (e, dir) => (typeof dir === 'string' && dir ? shell.openPath(dir) : null))
 ipcMain.handle('obi:documents', () => app.getPath('documents'))
+// the page's theme changed: the system buttons take its colours
+const HEX = /^#[0-9a-f]{6}$/i
+ipcMain.on('obi:titlebar', (e, c) => {
+  const w = BrowserWindow.fromWebContents(e.sender)
+  if (!TITLEBAR || !w || !HEX.test(c?.color) || !HEX.test(c?.symbolColor)) return
+  w.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: TITLEBAR_H })
+})
 // the page lost its session (expired, or signed out elsewhere): a fresh one
 ipcMain.handle('obi:reauth', () => signIn().then(() => true))
 

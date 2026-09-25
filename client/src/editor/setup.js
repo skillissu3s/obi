@@ -8,7 +8,7 @@ import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } 
 import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search'
 import { tags as t } from '@lezer/highlight'
 import { classHighlighter } from '@lezer/highlight'
-import { yCollab } from 'y-codemirror.next'
+import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import { obiMarkdownExtensions, obiTags } from './markdownExt.js'
 import { livePreview, blockWidgets, linkHandlers, editorCtx, editorFocusField, setEditorFocus } from './livePreview.js'
 import { wikiCompletion, tagCompletion, slashCompletion, emojiCompletion } from './completions.js'
@@ -109,7 +109,12 @@ export function prefsExtensions(prefs) {
 
 export function collabExtensions(handle) {
   if (!handle) return []
-  return [yCollab(handle.ytext, handle.awareness, { undoManager: handle.undoManager })]
+  // a shared note keeps its undo history in Yjs, not CodeMirror's history(), so
+  // Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z have to be bound to the Yjs undo manager
+  return [
+    yCollab(handle.ytext, handle.awareness, { undoManager: handle.undoManager }),
+    Prec.high(keymap.of(yUndoManagerKeymap)),
+  ]
 }
 
 export function modeExtensions(mode) {

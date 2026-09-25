@@ -10,6 +10,8 @@ import './styles/views.css'
 import './styles/canvas.css'
 import { App } from './App.jsx'
 import { applyPrefs } from './store/prefs.js'
+import { mountTitleBar } from './lib/titlebar.js'
 
 applyPrefs()
+mountTitleBar()
 createRoot(document.getElementById('root')).render(<App />)

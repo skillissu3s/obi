@@ -1,3 +1,43 @@
+/* ---------- desktop title bar (Windows) ----------
+   The window has no native caption: this strip replaces it, and the system
+   buttons are drawn over its right end at the same height (desktop/main.js). */
+:root {
+  --titlebar-h: 0px;
+}
+.has-titlebar {
+  --titlebar-h: 34px;
+}
+.titlebar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--titlebar-h);
+  /* keep clear of the system buttons */
+  padding: 0 calc(100vw - env(titlebar-area-width, 100vw) + 12px) 0 12px;
+  background: var(--bg-sidebar);
+  color: var(--text-2);
+  font-size: 12px;
+  user-select: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.titlebar img {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.titlebar-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text-3);
+}
+.has-titlebar #root {
+  height: calc(100% - var(--titlebar-h));
+}
+
 .app {
   height: 100%;
   display: flex;
@@ -825,7 +865,7 @@ button.status-item:hover {
   }
   .sidebar {
     position: fixed !important;
-    top: 0;
+    top: var(--titlebar-h);
     bottom: 0;
     z-index: 150;
     width: min(86vw, 340px) !important;
@@ -932,7 +972,7 @@ button.status-item:hover {
 }
 .focus-exit {
   position: fixed;
-  top: 12px;
+  top: calc(var(--titlebar-h) + 12px);
   right: 14px;
   z-index: 50;
   opacity: 0.25;

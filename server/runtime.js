@@ -971,8 +971,35 @@ class WorkspaceRuntime {
         continue
       }
       if (rel.split('/').some((s) => s.startsWith('.'))) continue
+      // Windows reports a folder as changed whenever something inside it is
+      // saved; a folder is only ever a folder, never a file entry
+      if (st?.isDirectory()) {
+        if (this.tree.get(rel)?.type !== 'folder') {
+          if (this.tree.has(rel)) this.resolver.remove(rel)
+          this.tree.set(rel, { path: rel, type: 'folder', size: 0, mtime: Math.round(st.mtimeMs) })
+          await this._ensureParents(rel)
+          treeChanged = true
+        }
+        continue
+      }
       if (!st) {
-        if (this.tree.has(rel)) {
+        if (this.tree.get(rel)?.type === 'folder') {
+          // a folder removed from outside takes everything under it along
+          for (const p of [...this.tree.keys()]) {
+            if (p !== rel && !p.startsWith(rel + '/')) continue
+            const e = this.tree.get(p)
+            this.tree.delete(p)
+            if (e.type === 'file') {
+              this.resolver.remove(p)
+              this.docs.get(p)?.evict('deleted')
+              if (this.meta.has(p)) {
+                this.dropContent(p)
+                this.emitIndex(p)
+              }
+            }
+          }
+          treeChanged = true
+        } else if (this.tree.has(rel)) {
           this.tree.delete(rel)
           this.resolver.remove(rel)
           treeChanged = true
