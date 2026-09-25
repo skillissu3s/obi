@@ -29,6 +29,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY server ./server
 COPY shared ./shared
+# maintenance commands run with `docker exec` (mail test, pruning accounts)
+COPY scripts ./scripts
 COPY --from=build /app/dist ./dist
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
