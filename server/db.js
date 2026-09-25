@@ -130,7 +130,6 @@ addColumn('users', 'email_verified_at', 'INTEGER')
 // A workspace's files live in WORKSPACES_DIR/<id> unless `dir` says where:
 // in the desktop app, each workspace is a folder (vault) the user chose.
 addColumn('workspaces', 'dir', 'TEXT')
-
 db.exec(`
 CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email COLLATE NOCASE) WHERE email IS NOT NULL;
 
@@ -190,6 +189,9 @@ CREATE TABLE IF NOT EXISTS sync_base (
   PRIMARY KEY (workspace_id, path)
 );
 `)
+
+// a registration that came from an invite link spends it once confirmed
+addColumn('pending_signups', 'invite_hash', 'TEXT')
 
 export const now = () => Date.now()
 

@@ -143,17 +143,22 @@ authRouter.post('/setup', async (req, res) => {
   if (count > 0) throw new HttpError(403, 'Setup already completed')
   const { username, password, displayName } = req.body || {}
   const email = normEmail(req.body?.email)
-  if (email && !EMAIL_RE.test(email)) throw new HttpError(400, 'That email address doesn’t look right')
-  const user = await createUser({ username, password, displayName, email: email || null, isAdmin: true })
+  // an administrator signs in with email, password and a code, so the address
+  // is part of creating the account, not an afterthought
+  if (!EMAIL_RE.test(email)) throw new HttpError(400, 'An email address is required — it is how you will sign in')
+  const user = await createUser({ username, password, displayName, email, emailVerified: true, isAdmin: true })
   await startSession(req, res, user.id)
   res.json({ user: publicUser(user) })
 })
 
-/** A user by username or email address */
+/**
+ * The account with this email address. Signing in is by email only: a username
+ * is a handle other people see, not a way in.
+ */
 export function findUser(identifier) {
-  const id = String(identifier || '').trim()
-  if (!id) return null
-  return id.includes('@') ? one('SELECT * FROM users WHERE email = ?', normEmail(id)) : one('SELECT * FROM users WHERE username = ?', id)
+  const email = normEmail(identifier)
+  if (!email || !email.includes('@')) return null
+  return one('SELECT * FROM users WHERE email = ?', email)
 }
 
 function loginLimit(req, identifier) {
@@ -172,13 +177,19 @@ export async function passwordStep(req, identifier, password) {
   const key = loginLimit(req, identifier)
   const user = findUser(identifier)
   const ok = user && (await verifyPassword(String(password || ''), user.password_hash))
-  if (!ok) throw new HttpError(401, 'Incorrect username, email or password')
+  if (!ok) throw new HttpError(401, 'Incorrect email or password')
   if (user.disabled) throw new HttpError(403, 'This account is disabled')
   resetRateLimit(key)
-  if (authOptions().loginCode === 'always' && user.email_verified_at) {
+  // An administrator always finishes with a code: the password alone opens the
+  // admin console. (Their address is on file even if never confirmed —
+  // receiving the code is what confirms it.)
+  const mustCode = user.is_admin || authOptions().loginCode === 'always'
+  if (mustCode && user.email) {
+    if (!mailEnabled) throw new HttpError(503, 'This server cannot send the sign-in code it needs. Configure email and try again.')
     const ticket = await issueCode({ purpose: 'login2', subject: user.id, email: user.email })
     return { user, ticket }
   }
+  if (user.is_admin) throw new HttpError(403, 'This administrator account has no email address, so it cannot sign in. Set ADMIN_EMAIL and restart.')
   return { user }
 }
 
@@ -207,7 +218,8 @@ export async function sendLoginCode(req, identifier) {
   if (authOptions().loginCode !== 'either') throw new HttpError(400, 'Sign-in codes are not enabled on this server')
   loginLimit(req, `code:${identifier}`)
   const user = findUser(identifier)
-  if (user && !user.disabled && user.email_verified_at) {
+  // administrators need their password too, so no code is sent for them
+  if (user && !user.disabled && user.email_verified_at && !user.is_admin) {
     return issueCode({ purpose: 'login', subject: user.id, email: user.email, background: true })
   }
   return newId(24)
@@ -225,6 +237,8 @@ export function codeStep(req, ticket, code) {
   const user = one('SELECT * FROM users WHERE id = ?', row.subject)
   if (!user) throw new HttpError(400, 'That code is wrong or has expired')
   if (user.disabled) throw new HttpError(403, 'This account is disabled')
+  // reading the code proves the address works
+  if (!user.email_verified_at && row.email && row.email === user.email) run('UPDATE users SET email_verified_at = ? WHERE id = ?', now(), user.id)
   return user
 }
 
@@ -267,13 +281,11 @@ authRouter.post('/password/reset/verify', async (req, res) => {
 
 const PENDING_TTL = 60 * 60 * 1000
 
-authRouter.post('/register', async (req, res) => {
-  if (authOptions().registration !== 'open') throw new HttpError(403, 'Registration is closed on this server')
-  if (!rateLimit(`register:${req.ip}`, 10, 60 * 60 * 1000)) throw new HttpError(429, 'Too many attempts. Please wait a while.')
-  const { password, displayName } = req.body || {}
-  const email = normEmail(req.body?.email)
+/** Checks a new account over, parks it, and emails the code that confirms it */
+export async function startRegistration(req, { email: rawEmail, username: rawUsername, password, displayName, inviteHash = null }) {
+  const email = normEmail(rawEmail)
   if (!EMAIL_RE.test(email)) throw new HttpError(400, 'That email address doesn’t look right')
-  const username = checkUsername(req.body?.username)
+  const username = checkUsername(rawUsername)
   validatePassword(password)
   if (one('SELECT id FROM users WHERE email = ?', email)) throw new HttpError(409, 'An account with that email already exists — sign in instead')
   const t = now()
@@ -281,16 +293,21 @@ authRouter.post('/register', async (req, res) => {
   if (one('SELECT id FROM pending_signups WHERE username = ?', username)) throw new HttpError(409, 'That username is taken')
   const id = newId(24)
   run(
-    'INSERT INTO pending_signups (id, email, username, display_name, password_hash, created_at, expires_at) VALUES (?,?,?,?,?,?,?)',
-    id, email, username, String(displayName || username).trim().slice(0, 64) || username, await hashPassword(password), t, t + PENDING_TTL,
+    'INSERT INTO pending_signups (id, email, username, display_name, password_hash, created_at, expires_at, invite_hash) VALUES (?,?,?,?,?,?,?,?)',
+    id, email, username, String(displayName || username).trim().slice(0, 64) || username, await hashPassword(password), t, t + PENDING_TTL, inviteHash,
   )
   try {
-    const ticket = await issueCode({ purpose: 'signup', subject: id, email })
-    res.json({ ticket, sentTo: maskEmail(email) })
+    return { ticket: await issueCode({ purpose: 'signup', subject: id, email }), sentTo: maskEmail(email) }
   } catch (e) {
     run('DELETE FROM pending_signups WHERE id = ?', id)
     throw e
   }
+}
+
+authRouter.post('/register', async (req, res) => {
+  if (authOptions().registration !== 'open') throw new HttpError(403, 'Registration is closed on this server')
+  if (!rateLimit(`register:${req.ip}`, 10, 60 * 60 * 1000)) throw new HttpError(429, 'Too many attempts. Please wait a while.')
+  res.json(await startRegistration(req, req.body || {}))
 })
 
 /** Turns a confirmed sign-up into an account */
@@ -300,7 +317,11 @@ export async function registerStep(req, ticket, code) {
   const p = one('SELECT * FROM pending_signups WHERE id = ?', row.subject)
   if (!p || p.expires_at < now()) throw new HttpError(400, 'This sign-up has expired. Please start again.')
   run('DELETE FROM pending_signups WHERE id = ?', p.id)
-  return createUser({ username: p.username, displayName: p.display_name, passwordHash: p.password_hash, email: p.email, emailVerified: true })
+  const invite = p.invite_hash && one('SELECT * FROM invites WHERE token_hash = ?', p.invite_hash)
+  if (p.invite_hash && (!invite || invite.used_by || invite.expires_at < now())) throw new HttpError(403, 'This invite link is invalid or has expired')
+  const user = await createUser({ username: p.username, displayName: p.display_name, passwordHash: p.password_hash, email: p.email, emailVerified: true })
+  if (invite) run('UPDATE invites SET used_by = ?, used_at = ? WHERE token_hash = ?', user.id, now(), invite.token_hash)
+  return user
 }
 
 authRouter.post('/register/verify', async (req, res) => {
@@ -327,16 +348,17 @@ authRouter.get('/invite/:token', (req, res) => {
   res.json({ ok: true, note: inv.note })
 })
 
+// An invite is a pre-approved registration: same email, password and code as
+// everyone else, with the invite spent once the code comes back.
 authRouter.post('/signup', async (req, res) => {
-  const { invite, username, password, displayName } = req.body || {}
+  const { invite, password, displayName } = req.body || {}
   if (!rateLimit(`signup:${req.ip}`, 10, 60 * 60 * 1000)) throw new HttpError(429, 'Too many attempts')
+  if (!mailEnabled) throw new HttpError(503, 'This server cannot send the confirmation email it needs')
   const hash = sha256(String(invite || ''))
   const inv = one('SELECT * FROM invites WHERE token_hash = ?', hash)
   if (!inv || inv.used_by || inv.expires_at < now()) throw new HttpError(403, 'This invite link is invalid or has expired')
-  const user = await createUser({ username, password, displayName })
-  run('UPDATE invites SET used_by = ?, used_at = ? WHERE token_hash = ?', user.id, now(), hash)
-  await startSession(req, res, user.id)
-  res.json({ user: publicUser(user) })
+  const { ticket, sentTo } = await startRegistration(req, { ...(req.body || {}), inviteHash: hash })
+  res.json({ ticket, sentTo })
 })
 
 authRouter.post('/logout', (req, res) => {

@@ -104,16 +104,28 @@ app.use((err, req, res, next) => {
 
 async function bootstrapAdmin() {
   const { ADMIN_USERNAME, ADMIN_PASSWORD, ADMIN_RESET_PASSWORD } = process.env
+  const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase()
   if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
     if (!one('SELECT id FROM users LIMIT 1')) console.log('[setup] No users yet — open the app and visit /admin to create the admin account.')
     return
   }
+  // Signing in is by email address, and an admin also needs a code, so the
+  // address is what makes the account usable at all.
+  if (!adminEmail) console.warn('[setup] ADMIN_EMAIL is not set. Signing in needs an email address, so this admin cannot sign in until it is.')
   const existing = one('SELECT * FROM users WHERE username = ?', ADMIN_USERNAME)
   if (!existing) {
-    await createUser({ username: ADMIN_USERNAME, password: ADMIN_PASSWORD, displayName: ADMIN_USERNAME, isAdmin: true })
-    console.log(`[setup] Created admin user "${ADMIN_USERNAME}"`)
+    await createUser({ username: ADMIN_USERNAME, password: ADMIN_PASSWORD, displayName: ADMIN_USERNAME, email: adminEmail || null, emailVerified: !!adminEmail, isAdmin: true })
+    console.log(`[setup] Created admin "${ADMIN_USERNAME}"${adminEmail ? ` <${adminEmail}>` : ''}`)
   } else {
     if (!existing.is_admin) run('UPDATE users SET is_admin = 1 WHERE id = ?', existing.id)
+    if (adminEmail && existing.email !== adminEmail) {
+      const clash = one('SELECT id FROM users WHERE email = ? AND id != ?', adminEmail, existing.id)
+      if (clash) console.error(`[setup] ADMIN_EMAIL ${adminEmail} already belongs to another account; leaving "${ADMIN_USERNAME}" as it was.`)
+      else {
+        run('UPDATE users SET email = ?, email_verified_at = ? WHERE id = ?', adminEmail, now(), existing.id)
+        console.log(`[setup] Admin "${ADMIN_USERNAME}" now signs in as ${adminEmail}`)
+      }
+    }
     if (ADMIN_RESET_PASSWORD === '1') {
       run('UPDATE users SET password_hash = ?, disabled = 0 WHERE id = ?', await hashPassword(ADMIN_PASSWORD), existing.id)
       console.log(`[setup] Reset password for admin "${ADMIN_USERNAME}"`)

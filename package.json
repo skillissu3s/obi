@@ -18,7 +18,8 @@
     "desktop:build": "vite build && electron-builder",
     "desktop:icon": "electron scripts/make-icon.cjs",
     "mail:test": "node scripts/send-test-mail.mjs",
-    "desktop:publish": "vite build && electron-builder --publish always"
+    "desktop:publish": "vite build && electron-builder --publish always",
+    "users:prune": "node scripts/prune-emailless-users.mjs"
   },
   "dependencies": {
     "compression": "^1.8.2",
@@ -113,6 +114,7 @@
         "owner": "skillissu3s",
         "repo": "obi"
       }
-    ]
+    ],
+    "artifactName": "${productName}-Setup-${version}.${ext}"
   }
 }

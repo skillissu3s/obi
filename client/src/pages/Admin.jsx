@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Users, FolderGit2, Globe, Activity, UserPlus, HardDrive, Link2, MoreHorizontal, ShieldCheck, Trash2, KeyRound, Ban, CheckCircle2, ArrowLeft, RefreshCw, Copy, Cloud, Cpu, Radio } from 'lucide-react'
+import { Laptop, Users, FolderGit2, Globe, Activity, UserPlus, HardDrive, Link2, MoreHorizontal, ShieldCheck, Trash2, KeyRound, Ban, CheckCircle2, ArrowLeft, RefreshCw, Copy, Cloud, Cpu, Radio } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { useApp } from '../store/app.js'
 import { navigate } from '../lib/router.js'
@@ -158,11 +158,12 @@ export default function AdminPage() {
           <>
             <StorageWarning storage={data.storage} />
             <div className="stats">
-              <Stat icon={Users} label="Users" value={s.users} />
-              <Stat icon={Radio} label="Online now" value={s.online} />
+              <Stat icon={Users} label="Users" value={s.users} sub={s.newUsers7 ? `+${s.newUsers7} this week` : 'none joined this week'} />
+              <Stat icon={Radio} label="Online now" value={s.online} sub={`${s.active7} active this week`} />
               <Stat icon={Cloud} label="Workspaces" value={s.workspaces} />
               <Stat icon={FolderGit2} label="GitHub synced" value={s.github} />
               <Stat icon={Globe} label="Published notes" value={s.publishedNotes} />
+              <Stat icon={Laptop} label="Desktop apps" value={s.devices} sub={s.pendingSignups ? `${s.pendingSignups} sign-up(s) unconfirmed` : undefined} />
               <Stat icon={Cpu} label="Memory" value={formatBytes(s.memory)} />
               <Stat
                 icon={HardDrive}
@@ -179,14 +180,17 @@ export default function AdminPage() {
                 <h3>Users</h3>
                 <span className="badge">{data.users.length}</span>
               </div>
+              {data.trend?.some((d) => d.signups || d.active) && <Trend days={data.trend} />}
               <div className="table-wrap">
                 <table className="table">
                   <thead>
                     <tr>
                       <th>User</th>
+                      <th>Signs in with</th>
                       <th>Role</th>
                       <th>Status</th>
                       <th>Workspaces</th>
+                      <th>Devices</th>
                       <th>Last sign in</th>
                       <th />
                     </tr>
@@ -207,6 +211,16 @@ export default function AdminPage() {
                             </div>
                           </div>
                         </td>
+                        <td>
+                          {u.email ? (
+                            <div>
+                              <div className="truncate" style={{ maxWidth: 220 }}>{u.email}</div>
+                              {!u.emailVerified && <span className="badge warning">not confirmed</span>}
+                            </div>
+                          ) : (
+                            <span className="badge danger" title="Signing in needs an email address">no email — cannot sign in</span>
+                          )}
+                        </td>
                         <td>{u.isAdmin ? <span className="badge accent"><ShieldCheck /> Admin</span> : <span className="badge">Member</span>}</td>
                         <td>
                           {u.disabled ? (
@@ -221,6 +235,15 @@ export default function AdminPage() {
                           {u.mustChangePassword && <span className="badge warning" style={{ marginLeft: 6 }}>Password reset pending</span>}
                         </td>
                         <td>{u.workspaceCount}</td>
+                        <td>
+                          {u.devices?.length ? (
+                            <span className="badge" title={u.devices.map((d) => `${d.name} — last used ${timeAgo(d.lastUsedAt)}`).join('\n')}>
+                              <Laptop /> {u.devices.length}
+                            </span>
+                          ) : (
+                            <span className="faint">—</span>
+                          )}
+                        </td>
                         <td className="faint">{u.lastLoginAt ? timeAgo(u.lastLoginAt) : 'Never'}</td>
                         <td style={{ textAlign: 'right' }}>
                           {busyRow === u.id ? (
@@ -252,6 +275,7 @@ export default function AdminPage() {
                       <th>Type</th>
                       <th>Owner</th>
                       <th>Members</th>
+                      <th>Size</th>
                       <th>Sync</th>
                       <th>Created</th>
                       <th />
@@ -269,6 +293,7 @@ export default function AdminPage() {
                         <td>{w.type === 'github' ? <span className="badge"><FolderGit2 /> {w.repo}</span> : <span className="badge accent"><Cloud /> Online</span>}</td>
                         <td>@{w.owner.username}</td>
                         <td>{w.memberCount}</td>
+                        <td className="faint">{formatBytes(w.bytes || 0)}</td>
                         <td>{w.type !== 'github' ? <span className="faint">—</span> : w.syncError ? <span className="badge danger" title={w.syncError}>Error</span> : <span className="faint">{w.lastSync ? timeAgo(w.lastSync) : 'Never'}</span>}</td>
                         <td className="faint">{timeAgo(w.createdAt)}</td>
                         <td style={{ textAlign: 'right' }}>
@@ -373,6 +398,29 @@ export default function AdminPage() {
   )
 }
 
+/** Thirty days of sign-ups and sign-ins, as two rows of bars */
+function Trend({ days }) {
+  const peak = Math.max(1, ...days.map((d) => Math.max(d.signups, d.active)))
+  return (
+    <div className="trend">
+      <div className="trend-head">
+        <span>Last 30 days</span>
+        <span className="faint">
+          <i className="trend-key signups" /> new accounts <i className="trend-key active" /> people signing in
+        </span>
+      </div>
+      <div className="trend-bars">
+        {days.map((d) => (
+          <div className="trend-day" key={d.day} title={`${d.day}: ${d.signups} new, ${d.active} signed in`}>
+            <div className="trend-bar active" style={{ height: `${(d.active / peak) * 100}%` }} />
+            <div className="trend-bar signups" style={{ height: `${(d.signups / peak) * 100}%` }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Stat({ icon: Icon, label, value, sub, tone }) {
   return (
     <div className={`stat ${tone ? `stat-${tone}` : ''}`}>
@@ -386,7 +434,7 @@ function Stat({ icon: Icon, label, value, sub, tone }) {
 }
 
 function CreateUserModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ displayName: '', username: '', password: '', isAdmin: false, mustChangePassword: true })
+  const [form, setForm] = useState({ displayName: '', username: '', email: '', password: '', isAdmin: false, mustChangePassword: true })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
@@ -417,7 +465,7 @@ function CreateUserModal({ onClose, onCreated }) {
           <button className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={submit} disabled={busy || !form.username || !form.password}>
+          <button className="btn btn-primary" onClick={submit} disabled={busy || !form.username || !form.email || !form.password}>
             {busy ? <Spinner size="sm" /> : 'Create user'}
           </button>
         </>
@@ -430,6 +478,11 @@ function CreateUserModal({ onClose, onCreated }) {
       <div className="field">
         <label>Username</label>
         <input className="input" value={form.username} onChange={(e) => set({ username: e.target.value.replace(/\s/g, '') })} placeholder="sam" autoCapitalize="none" spellCheck={false} />
+      </div>
+      <div className="field">
+        <label>Email</label>
+        <input className="input" type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} placeholder="sam@example.com" autoCapitalize="none" spellCheck={false} />
+        <div className="hint">This is how they sign in. Setting it here counts as confirming it.</div>
       </div>
       <div className="field">
         <label className="row" style={{ justifyContent: 'space-between' }}>

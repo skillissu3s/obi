@@ -11,6 +11,8 @@ services:
       # First-run admin account (created automatically if it doesn't exist yet)
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in your .env}
+      # signing in is by email, and an admin also needs an emailed code
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in your .env}
       # Set to 1 once to force-reset the admin password, then remove it again
       ADMIN_RESET_PASSWORD: ${ADMIN_RESET_PASSWORD:-0}
       APP_NAME: ${APP_NAME:-Obi}

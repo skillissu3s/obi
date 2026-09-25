@@ -1886,3 +1886,63 @@
   margin: -6px 0 12px;
   font-size: 12px;
 }
+
+/* ---------- admin: a month of sign-ups and sign-ins ---------- */
+.trend {
+  margin: 0 0 18px;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elev);
+}
+.trend-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.trend-key {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin: 0 4px 0 10px;
+  background: var(--accent);
+}
+.trend-key.active {
+  background: var(--text-faint);
+}
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 64px;
+}
+.trend-day {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  border-radius: 3px;
+}
+.trend-day:hover {
+  background: var(--bg-hover);
+}
+.trend-bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+}
+.trend-bar.signups {
+  background: var(--accent);
+}
+.trend-bar.active {
+  background: var(--text-faint);
+  opacity: 0.55;
+}

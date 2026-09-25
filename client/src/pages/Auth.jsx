@@ -83,7 +83,7 @@ function ResetStep({ ticket, identifier, onDone, onBack }) {
       </div>
       <h1>Choose a new password</h1>
       <p className="sub">
-        If an account matches <b>{identifier}</b>, a 6-digit code is on its way to its email. It expires in 10 minutes.
+        If an account uses <b>{identifier}</b>, a 6-digit code is on its way there. It expires in 10 minutes.
       </p>
       <form onSubmit={submit}>
         <div className="field">
@@ -262,6 +262,7 @@ export function LoginPage({ search }) {
         <CodeStep
           sentTo={code.sentTo}
           title={code.second ? 'One more step' : 'Check your email'}
+          what={code.second ? 'to finish signing in' : 'to sign in'}
           what="to sign in"
           onVerify={async (c) => finishAuth((await api.verifyLoginCode(code.ticket, c)).user, next)}
           onResend={async () => setCode({ ...code, ticket: (await api.resendCode(code.ticket)).ticket })}
@@ -277,15 +278,22 @@ export function LoginPage({ search }) {
   return (
     <AuthShell>
       <h1>{isAdmin ? 'Admin sign in' : 'Welcome back'}</h1>
-      <p className="sub">{isAdmin ? 'Sign in with an administrator account.' : withCode ? 'We\u2019ll email you a code to sign in with.' : 'Sign in to pick up where you left off.'}</p>
+      <p className="sub">
+        {isAdmin
+          ? 'Administrators sign in with a password and a code.'
+          : withCode
+            ? 'We\u2019ll email you a code to sign in with.'
+            : 'Sign in to pick up where you left off.'}
+      </p>
       <form onSubmit={submit}>
         <div className="field">
           <input
             className="input"
+            type="email"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="Email or username"
-            autoComplete="username"
+            placeholder="you@example.com"
+            autoComplete="email"
             autoFocus
             autoCapitalize="none"
             spellCheck={false}
@@ -302,7 +310,7 @@ export function LoginPage({ search }) {
               type="button"
               className="link-btn"
               onClick={async () => {
-                if (!identifier.trim()) return setError('Enter your email or username first, then we’ll send you a code')
+                if (!identifier.trim()) return setError('Enter your email address first, then we’ll send you a code')
                 setBusy(true)
                 setError('')
                 try {
@@ -485,15 +493,16 @@ export function SetupPage() {
           <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="admin" autoCapitalize="none" spellCheck={false} />
         </div>
         <div className="field">
-          <label>Email <span className="faint">(optional)</span></label>
+          <label>Email</label>
           <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoCapitalize="none" spellCheck={false} />
+          <div className="hint">You sign in with this address, and administrators also get a code by email.</div>
         </div>
         <div className="field">
           <label>Password</label>
           <PasswordInput value={password} onChange={setPassword} placeholder="At least 8 characters" autoComplete="new-password" />
         </div>
         {error && <p className="error-text">{error}</p>}
-        <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
+        <button className="btn btn-primary btn-lg btn-block" disabled={busy || !email || !username || password.length < 8}>
           {busy ? <Spinner size="sm" /> : 'Create admin account'}
         </button>
       </form>
@@ -506,7 +515,9 @@ export function SignupPage({ search }) {
   const [state, setState] = useState({ loading: true, valid: false, note: '' })
   const [username, setUsername] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [code, setCode] = useState(null) // { ticket, sentTo } once the invite is spent
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -522,12 +533,25 @@ export function SignupPage({ search }) {
     setBusy(true)
     setError('')
     try {
-      const { user } = await api.signup({ invite, username, password, displayName })
-      finishAuth(user, '/')
+      setCode(await api.signup({ invite, email, username, password, displayName }))
     } catch (err) {
       setError(err.message)
-      setBusy(false)
     }
+    setBusy(false)
+  }
+
+  if (code) {
+    return (
+      <AuthShell>
+        <CodeStep
+          sentTo={code.sentTo}
+          what="to confirm your email"
+          onVerify={async (c) => finishAuth((await api.verifyRegistration(code.ticket, c)).user, '/')}
+          onResend={async () => setCode({ ...code, ticket: (await api.resendCode(code.ticket)).ticket })}
+          onBack={() => setCode(null)}
+        />
+      </AuthShell>
+    )
   }
 
   return (
@@ -545,11 +569,15 @@ export function SignupPage({ search }) {
       ) : (
         <>
           <h1>Create your account</h1>
-          <p className="sub">You've been invited to Obi{state.note ? ` — ${state.note}` : ''}.</p>
+          <p className="sub">You've been invited to Obi{state.note ? ` — ${state.note}` : ''}. We’ll email you a code to confirm it’s you.</p>
           <form onSubmit={submit}>
             <div className="field">
               <label>Your name</label>
               <input className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoFocus />
+            </div>
+            <div className="field">
+              <label>Email</label>
+              <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoCapitalize="none" spellCheck={false} />
             </div>
             <div className="field">
               <label>Username</label>
@@ -560,8 +588,8 @@ export function SignupPage({ search }) {
               <PasswordInput value={password} onChange={setPassword} placeholder="At least 8 characters" autoComplete="new-password" />
             </div>
             {error && <p className="error-text">{error}</p>}
-            <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
-              {busy ? <Spinner size="sm" /> : 'Create account'}
+            <button className="btn btn-primary btn-lg btn-block" disabled={busy || !email || !username || password.length < 8}>
+              {busy ? <Spinner size="sm" /> : 'Continue'}
             </button>
           </form>
         </>

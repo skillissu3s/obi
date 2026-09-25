@@ -153,6 +153,7 @@ Redeploy (or `docker compose up -d --build`). The server saves open documents an
 |---|---|---|
 | `APP_SECRET` | random, stored in `/data/secret.key` | Encrypts GitHub tokens. **Set this in production** — if it changes, stored tokens must be re-entered. |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | — | Creates (or promotes) this admin on start. If unset, the first visit to `/admin` offers a setup screen. |
+| `ADMIN_EMAIL` | — | The address that admin signs in with. **Required in practice**: signing in is by email, and an admin without one cannot get in. Setting it on an existing admin moves them to that address. |
 | `ADMIN_RESET_PASSWORD` | `0` | Set to `1` for one boot to reset the admin password. |
 | `PORT` | `3000` | HTTP port. |
 | `DATA_DIR` | `/data` | Database + workspace files. |
@@ -168,6 +169,29 @@ Redeploy (or `docker compose up -d --build`). The server saves open documents an
 | `SMTP_URL` | — | Alternative to the above in one line, e.g. `smtps://user:pass@smtp.example.com`. |
 | `MAIL_FROM` | `SMTP_USER` | Sender, e.g. `Obi <no-reply@example.com>`. |
 | `MAIL_LOG_CODES` | `0` | Development only: with no SMTP configured, print emails (and their codes) to the server log instead of sending them. |
+
+---
+
+## Signing in
+
+People sign in with an **email address**, never a username — a username is a
+handle other people see, not a way in. Every account therefore needs an
+address, confirmed by a code at sign-up.
+
+**Administrators always need a code as well as their password.** The password
+alone opens the admin console, so it is never enough by itself; the code goes
+to the address on file. An admin cannot sign in with a code alone, either.
+
+Accounts left over from before this rule (no email address) cannot sign in.
+List and remove them with:
+
+```bash
+npm run users:prune          # list them, change nothing
+npm run users:prune -- --yes # delete them, and the workspaces they own
+```
+
+It refuses to run if no administrator has an email address, so you cannot lock
+yourself out; set `ADMIN_EMAIL` and restart first.
 
 ---
 
