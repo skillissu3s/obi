@@ -3,152 +3,134 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Obi — notes that stay yours</title>
+    <title>Obi — markdown you can draw on</title>
     <meta
       name="description"
-      content="A calm, fast home for your markdown notes: plain files you own, a canvas you can draw on beside the words, real-time editing, GitHub sync and a desktop app that works offline."
+      content="Plain markdown files in your own folders, with a canvas around every page for sticky notes, arrows and sketches pinned to the text. Self-hosted, real-time, and a desktop app that works offline."
     />
-    <meta name="theme-color" content="#141311" />
+    <meta name="theme-color" content="#121211" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta property="og:title" content="Obi — notes that stay yours" />
-    <meta property="og:description" content="Plain markdown files, with a canvas pinned to the words. Self-hosted, real-time, offline on the desktop." />
+    <meta property="og:title" content="Obi — markdown you can draw on" />
+    <meta property="og:description" content="Plain .md files with a canvas around every page. Self-hosted, real-time, offline on the desktop." />
     <meta property="og:type" content="website" />
     <link rel="stylesheet" href="./landing.css" />
   </head>
   <body>
-    <div class="aura"></div>
-    <div class="grid-lines"></div>
-
-    <header class="topbar" id="top">
-      <div class="island">
-        <a class="brand" href="/welcome"><img src="/favicon.svg" alt="" /> Obi</a>
-        <nav class="links" id="links">
-          <span class="links-glow" aria-hidden="true"></span>
-          <a href="#canvas" data-section="canvas">Canvas</a>
-          <a href="#writing" data-section="writing">Writing</a>
-          <a href="#together" data-section="together">Sharing</a>
-          <a href="#desktop" data-section="desktop">Desktop</a>
-          <a href="#host" data-section="host">Self-hosting</a>
+    <header class="bar">
+      <div class="wrap bar-in">
+        <a class="brand" href="/welcome"><img src="/favicon.svg" alt="" /> obi</a>
+        <nav class="nav">
+          <a href="#canvas">canvas</a>
+          <a href="#writing">writing</a>
+          <a href="#sharing">sharing</a>
+          <a href="#desktop">desktop</a>
+          <a href="#host">self-host</a>
         </nav>
-        <div class="actions">
-          <a class="quiet" href="/login">Sign in</a>
-          <a class="btn btn-primary btn-sm" href="/register">Get started <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
+        <div class="bar-actions">
+          <a class="link" href="/login">sign in</a>
+          <a class="btn btn-solid" href="/register">get started</a>
         </div>
       </div>
     </header>
 
     <main>
-      <div class="wrap hero">
-        <span class="eyebrow"><b>Self-hosted</b> markdown notes with a canvas on top</span>
-        <h1>Your notes are <em>files</em>, not a database.</h1>
-        <p class="sub">
-          Write in plain markdown, then draw all over it — sticky notes, arrows, shapes, images and highlights that stay
-          pinned to the words they belong to, without changing a character of the text.
-        </p>
-        <div class="cta">
-          <a class="btn btn-primary btn-lg" href="/register">Create a free account <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
-          <a class="btn btn-glass btn-lg" href="#desktop"><svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.2 10.2 4.2v7.1H3zM11.2 4.05 21 2.7v8.6h-9.8zM3 12.3h7.2v7.1L3 18.4zM11.2 12.3H21v8.6l-9.8-1.35z"/></svg> Get the Windows app</a>
+      <section class="hero">
+        <div class="wrap">
+          <p class="kicker"><span class="dot"></span>self-hosted · works offline · plain files</p>
+          <h1>Markdown you can draw on<span class="caret" aria-hidden="true"></span></h1>
+          <p class="sub">
+            Your notes stay plain <code>.md</code> files in your own folders. Around every page there's a canvas — sticky
+            notes, arrows and sketches that stay pinned to the lines they belong to.
+          </p>
+          <div class="cta">
+            <a class="btn btn-solid" href="/register">create an account <span class="arr">→</span></a>
+            <a class="btn" href="#desktop">download for windows</a>
+          </div>
         </div>
-        <p class="fine">Runs on this server · Works offline in the desktop app · Every note stays a <code>.md</code> file</p>
-        <div class="stage reveal">
-          <div class="frame crop">
+        <div class="wrap">
+          <figure class="shot crop">
             <img
               src="./shot-app.webp"
               width="2000"
               height="1041"
               alt="A note in Obi: text with highlights and a code block, a sticky note and shapes joined by arrows on the canvas beside it, an image with a handwritten caption, and a calendar panel"
             />
-          </div>
+          </figure>
         </div>
-      </div>
+      </section>
 
       <section id="canvas">
         <div class="wrap">
-          <p class="label">The canvas</p>
-          <h2>Think beside your words, not in another app</h2>
+          <p class="label"><span>01</span> canvas</p>
+          <h2>Think beside your words</h2>
           <p class="lede">
             Everything you draw is anchored to a line of text. Add a paragraph above and the sticky note moves down with it;
-            reword a sentence and the arrow keeps pointing at it. The markdown file never changes.
+            reword a sentence and the arrow still points at it. The markdown file never changes.
           </p>
-          <div class="bento">
-            <div class="tile half reveal">
-              <div class="mark">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
-              </div>
-              <h3>Pen, shapes, arrows, highlights</h3>
-              <p>Sketch a diagram in the margin, circle a paragraph, or run an arrow from a phrase to a note you left yourself.</p>
+          <div class="cells">
+            <div class="cell">
+              <h3>Pen, shapes, highlights</h3>
+              <p>Sketch in the margin, box a paragraph, highlight a phrase — right next to the text it's about.</p>
             </div>
-            <div class="tile half note-tile reveal">
-              <span class="hand">Yes, you can write like this too —</span>
-              <p>Sticky notes and canvas text use a hand-drawn font when you want one, and markdown blocks with live preview when you don't.</p>
+            <div class="cell">
+              <h3>Arrows that follow the text</h3>
+              <p>Point from a phrase to a note you left yourself. Edit the sentence and the arrow keeps up.</p>
             </div>
-            <div class="tile full reveal">
-              <h3>Whole whiteboards, when a margin isn't enough</h3>
-              <p>Boards are files too: open one on its own, or embed it in a note and keep writing around it.</p>
-              <div class="shot-in crop">
-                <img src="./shot-whiteboard.png" width="1500" height="700" alt="A whiteboard in Obi with three labelled boxes joined by arrows and a sticky note" loading="lazy" />
-              </div>
+            <div class="cell">
+              <h3>Whole whiteboards</h3>
+              <p>When a margin isn't enough: boards are files too, on their own or embedded in a note.</p>
             </div>
           </div>
+          <figure class="shot crop-soft">
+            <img src="./shot-whiteboard.png" width="1500" height="700" alt="A whiteboard in Obi with three labelled boxes joined by arrows and a sticky note" loading="lazy" />
+          </figure>
         </div>
       </section>
 
       <section id="writing">
         <div class="wrap">
-          <p class="label">Writing</p>
-          <h2>Markdown that renders as you type</h2>
-          <p class="lede">No preview pane to keep in sync, no proprietary blocks to export out of later.</p>
-          <div class="bento">
-            <div class="tile reveal">
-              <div class="mark">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-              </div>
-              <h3>Plain files, your folders</h3>
+          <p class="label"><span>02</span> writing</p>
+          <h2>Rendered as you type</h2>
+          <p class="lede">No preview pane to keep in sync, and nothing proprietary to export your way out of later.</p>
+          <div class="cells">
+            <div class="cell">
+              <h3>Plain files</h3>
               <p>One note, one <code>.md</code> file. Open the same folder in any other editor; nothing is locked in.</p>
             </div>
-            <div class="tile reveal">
-              <div class="mark">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-              </div>
-              <h3>Tables, code, maths, diagrams</h3>
-              <p>They take shape while you write, with the markdown still there underneath the moment you need it.</p>
+            <div class="cell">
+              <h3>Tables, code, maths</h3>
+              <p>They take shape while you write, with the markdown still there the moment you need it.</p>
             </div>
-            <div class="tile reveal">
-              <div class="mark">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              </div>
-              <h3>Links, tags, tasks, a graph</h3>
-              <p>Wiki links with backlinks, daily notes, every task in one place, and search that keeps up as you type.</p>
-            </div>
-            <div class="tile full reveal">
-              <h3>A markdown file, seen as a board</h3>
-              <p>Headings become lists and task lines become cards. Drag one and the file changes — nothing else does.</p>
-              <div class="shot-in crop">
-                <img src="./shot-board.png" width="1500" height="620" alt="A markdown file shown as a kanban board with four lists of cards" loading="lazy" />
-              </div>
+            <div class="cell">
+              <h3>Links, tags, tasks</h3>
+              <p>Wiki links and backlinks, daily notes, every task in one place, and a graph of how it all connects.</p>
             </div>
           </div>
+          <figure class="shot crop-soft">
+            <img src="./shot-board.png" width="1500" height="620" alt="A markdown file shown as a kanban board with four lists of cards" loading="lazy" />
+          </figure>
+          <p class="caption">A markdown file seen as a board — headings are lists, task lines are cards. Drag one and the file changes.</p>
         </div>
       </section>
 
-      <section id="together">
+      <section id="sharing">
         <div class="wrap">
-          <p class="label">Sharing</p>
+          <p class="label"><span>03</span> sharing</p>
           <h2>Alone, or with other people</h2>
-          <p class="lede">The same notes, shared as far as you want them to go — and no further.</p>
-          <div class="bento">
-            <div class="tile reveal">
+          <p class="lede">The same notes, shared as far as you want them to go.</p>
+          <div class="cells">
+            <div class="cell">
               <h3>Live, together</h3>
-              <p>Share one note or a whole workspace. Edits and cursors arrive as they happen, and the file on disk stays plain markdown.</p>
+              <p>Share a note or a whole workspace. Edits and cursors arrive as they happen.</p>
             </div>
-            <div class="tile reveal">
+            <div class="cell">
               <h3>Publish a link</h3>
-              <p>A read-only page that looks exactly like your note — drawings, tables and all — and updates when you edit.</p>
+              <p>A read-only page that looks exactly like your note, drawings included, and updates when you edit.</p>
             </div>
-            <div class="tile reveal">
+            <div class="cell">
               <h3>History and trash</h3>
-              <p>Earlier versions are kept as you write, and deleted notes wait in the trash instead of disappearing.</p>
+              <p>Earlier versions are kept as you write; deleted notes wait in the trash.</p>
             </div>
           </div>
         </div>
@@ -156,60 +138,43 @@
 
       <section id="desktop">
         <div class="wrap split">
-          <div class="reveal">
-            <p class="label">Desktop</p>
-            <h2>Works with no connection at all</h2>
-            <p class="lede">Every workspace is a folder you choose — new, or one that already holds your notes. An Obsidian vault works as it is.</p>
-            <ul class="ticks">
+          <div>
+            <p class="label"><span>04</span> desktop</p>
+            <h2>Works with no connection</h2>
+            <p class="lede">Every workspace is a folder you choose — a new one, or one that already holds notes. An Obsidian vault works as it is.</p>
+            <ul class="list">
               <li>Write offline; it catches up when you're back</li>
-              <li>Changes on both sides merge, and colliding edits keep both copies</li>
-              <li>Optional GitHub sync: commit and push on save, on a timer, or by hand</li>
-              <li>Edit the same folder in another app — Obi notices</li>
+              <li>Edits on both sides merge; collisions keep both copies</li>
+              <li>Optional GitHub sync — on save, on a timer, or by hand</li>
             </ul>
-            <div class="dl">
-              <a class="dl-main" href="/download/windows">
-                <span class="dl-os"><svg class="win" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.2 10.2 4.2v7.1H3zM11.2 4.05 21 2.7v8.6h-9.8zM3 12.3h7.2v7.1L3 18.4zM11.2 12.3H21v8.6l-9.8-1.35z"/></svg></span>
-                <span class="dl-text">
-                  <b>Download for Windows</b>
-                  <small id="dl-meta">Windows 10 and 11 · 64-bit</small>
-                </span>
-                <span class="dl-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
-              </a>
-              <div class="dl-soon">
-                <span class="chip">macOS <em>Upcoming</em></span>
-                <span class="chip">Linux <em>Upcoming</em></span>
-              </div>
-              <p class="caption">
-                Not code-signed yet: if Windows says it “protected your PC”, choose <b>More info → Run anyway</b>.
-                <a href="/download">Release notes</a>
-              </p>
-            </div>
+            <a class="dl" href="/download/windows">
+              <span class="dl-name">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.2 10.2 4.2v7.1H3zM11.2 4.05 21 2.7v8.6h-9.8zM3 12.3h7.2v7.1L3 18.4zM11.2 12.3H21v8.6l-9.8-1.35z" /></svg>
+                download for windows
+              </span>
+              <span class="dl-meta" id="dl-meta">windows 10 / 11</span>
+              <span class="dl-arrow" aria-hidden="true">↓</span>
+            </a>
+            <ul class="soon">
+              <li>macos <span>upcoming</span></li>
+              <li>linux <span>upcoming</span></li>
+            </ul>
+            <p class="caption">Not code-signed yet: if Windows says it “protected your PC”, choose More info → Run anyway.</p>
           </div>
-          <div class="reveal">
-            <div class="frame flat">
-              <img src="./shot-desktop.png" width="720" height="520" alt="The desktop app asking where your notes should live: sync with an Obi account, or keep everything on this computer" loading="lazy" />
-            </div>
-          </div>
+          <figure class="shot">
+            <img src="./shot-desktop.png" width="720" height="520" alt="The desktop app asking where your notes should live: sync with an Obi account, or keep everything on this computer" loading="lazy" />
+          </figure>
         </div>
       </section>
 
       <section id="host">
         <div class="wrap split">
-          <div class="reveal">
-            <p class="label">Self-hosting</p>
-            <h2>One container, one folder of data</h2>
-            <p class="lede">
-              Your notes sit on your own disk as markdown. The database only keeps who you are and what you shared — delete it
-              and the notes are still there.
-            </p>
-            <ul class="ticks">
-              <li>Docker, a volume, and an hour on a small box</li>
-              <li>Accounts confirmed by email, or invite-only if you'd rather</li>
-              <li>Keep a workspace in your own GitHub repository</li>
-            </ul>
+          <div>
+            <p class="label"><span>05</span> self-host</p>
+            <h2>One container, one folder</h2>
+            <p class="lede">Your notes sit on your own disk as markdown. The database only remembers who you are and what you shared.</p>
           </div>
-          <div class="reveal">
-            <pre><code>services:
+          <pre><code>services:
   obi:
     image: obi
     environment:
@@ -219,104 +184,40 @@
       - obi-data:/data
     ports:
       - "3000:3000"</code></pre>
-          </div>
         </div>
       </section>
 
       <section class="end">
         <div class="wrap">
-          <div class="end-card reveal">
-            <h2>Start with one note</h2>
-            <p class="lede">You can take them all out again whenever you like. They were only ever files.</p>
-            <div class="cta">
-              <a class="btn btn-primary btn-lg" href="/register">Create a free account <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
-              <a class="btn btn-glass btn-lg" href="/login">Sign in</a>
-            </div>
+          <h2>Start with one note</h2>
+          <p class="lede">You can take them all out again whenever you like. They were only ever files.</p>
+          <div class="cta">
+            <a class="btn btn-solid" href="/register">create an account <span class="arr">→</span></a>
+            <a class="btn" href="/login">sign in</a>
           </div>
         </div>
       </section>
     </main>
 
     <footer>
-      <div class="wrap">
-        <span>Obi — your notes, your files.</span>
+      <div class="wrap foot">
+        <span>obi — your notes, your files</span>
         <span class="spacer"></span>
-        <a href="/download/windows">Download for Windows</a>
-        <a href="/login">Sign in</a>
-        <a href="/register">Create an account</a>
+        <a href="https://github.com/skillissu3s/obi">github</a>
+        <a href="/download/windows">download</a>
+        <a href="/login">sign in</a>
       </div>
     </footer>
 
     <script>
-      ;(function () {
-        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
-
-        // the island firms up once the page has moved
-        const bar = document.getElementById('top')
-        const onScroll = () => bar.classList.toggle('stuck', scrollY > 12)
-        onScroll()
-        addEventListener('scroll', onScroll, { passive: true })
-
-        // a highlight that slides to whichever link the pointer is on
-        const nav = document.getElementById('links')
-        const glow = nav.querySelector('.links-glow')
-        const moveTo = (a) => {
-          if (!a) return nav.classList.remove('hovering')
-          const n = nav.getBoundingClientRect()
-          const r = a.getBoundingClientRect()
-          glow.style.width = r.width + 'px'
-          glow.style.transform = 'translateX(' + (r.left - n.left) + 'px)'
-          nav.classList.add('hovering')
-        }
-        nav.addEventListener('pointerover', (e) => moveTo(e.target.closest('a')))
-        nav.addEventListener('pointerleave', () => moveTo(null))
-
-        // the link for the section on screen stays lit
-        const links = [...nav.querySelectorAll('a[data-section]')]
-        const bySection = new Map(links.map((a) => [a.dataset.section, a]))
-        if ('IntersectionObserver' in window) {
-          const seen = new IntersectionObserver(
-            (entries) => {
-              for (const e of entries) {
-                const a = bySection.get(e.target.id)
-                if (a && e.isIntersecting) {
-                  links.forEach((l) => l.classList.toggle('on', l === a))
-                }
-              }
-            },
-            { rootMargin: '-45% 0px -50% 0px' },
-          )
-          bySection.forEach((_, id) => {
-            const el = document.getElementById(id)
-            if (el) seen.observe(el)
-          })
-        }
-
-        // the download button names the build it hands out
-        fetch('/download/info')
-          .then((r) => (r.ok ? r.json() : null))
-          .then((info) => {
-            if (!info || !info.available) return
-            const mb = Math.round(info.windows.size / 1048576)
-            document.getElementById('dl-meta').textContent = 'Version ' + info.version + ' · ' + mb + ' MB · Windows 10 and 11'
-          })
-          .catch(() => {})
-
-        // sections arrive as they come into view
-        const items = document.querySelectorAll('.reveal')
-        if (reduce || !('IntersectionObserver' in window)) return items.forEach((el) => el.classList.add('in'))
-        const arrive = new IntersectionObserver(
-          (entries) => {
-            for (const e of entries) {
-              if (!e.isIntersecting) continue
-              e.target.classList.add('in')
-              arrive.unobserve(e.target)
-            }
-          },
-          { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
-        )
-        items.forEach((el) => arrive.observe(el))
-      })()
+      // the download names the build it hands out
+      fetch('/download/info')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((info) => {
+          if (!info || !info.available) return
+          document.getElementById('dl-meta').textContent = 'v' + info.version + ' · ' + Math.round(info.windows.size / 1048576) + ' MB'
+        })
+        .catch(() => {})
     </script>
   </body>
 </html>
