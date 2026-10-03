@@ -161,8 +161,9 @@ export function OffscreenCursors({ collab, view, scrollEl }) {
         for (const p of here) {
           if (p.index == null) continue
           const block = view.lineBlockAt(Math.min(p.index, view.state.doc.length))
-          const top = view.documentTop + block.top * view.scaleY
-          if (top + block.height * view.scaleY < s.top + 4) next.up.push(p)
+          // blocks are already in screen pixels, zoom included
+          const top = view.documentTop + block.top
+          if (top + block.height < s.top + 4) next.up.push(p)
           else if (top > s.bottom - 4) next.down.push(p)
         }
       }

@@ -42,6 +42,13 @@ function useLayerHandle(ws, path) {
   return handle
 }
 
+// A line block's top and bottom in world pixels. CodeMirror reports blocks in
+// screen pixels, so on a zoomed note they are `z` times the unzoomed layout's.
+const lineBlock = (view, g, pos) => {
+  const b = view.lineBlockAt(pos)
+  return { top: g.docTop + b.top / g.z, bottom: g.docTop + b.bottom / g.z }
+}
+
 const DRAW_TOOLS = new Set(['rect', 'ellipse', 'diamond', 'arrow', 'line', 'pen', 'marker', 'text', 'sticky', 'eraser', 'laser', 'frame'])
 
 /**
@@ -144,7 +151,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         const e = tracker.get(anchor)
         if (!e) return null
         const pos = Math.min(e.from, view.state.doc.length)
-        return g.docTop + view.lineBlockAt(view.state.doc.lineAt(pos).from).top
+        return lineBlock(view, g, view.state.doc.lineAt(pos).from).top
       },
       textRect: (anchor) => {
         syncText()
@@ -158,7 +165,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         // text and the line above/below it, and col is the text column. A line
         // that leaves the text runs along them (see textEnd in boardgeom.js);
         // publish/main.js measures the same things from its own DOM.
-        const gapOf = (r) => Math.min(8, Math.max(2, (view.defaultLineHeight - (r.bottom - r.top)) / 2))
+        const gapOf = (r) => Math.min(8, Math.max(2, (view.defaultLineHeight / g.z - (r.bottom - r.top)) / 2))
         const col = [g.colLeft, g.colRight]
         // a screen rect in world pixels
         const world = (r) => ({ left: (r.left - g.ox) / g.z, right: (r.right - g.ox) / g.z, top: (r.top - g.oy) / g.z, bottom: (r.bottom - g.oy) / g.z })
@@ -171,9 +178,9 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           const rows = Math.abs(a.top - b.top) < 4 ? { x: a.left, w: Math.max(4, b.right - a.left) } : { x: g.colLeft, w: g.colRight - g.colLeft }
           rect = { ...rows, y: a.top, h: Math.max(4, b.bottom - a.top), ga: a.top - gapOf(a), gb: b.bottom + gapOf(b), col }
         } else {
-          const top = view.lineBlockAt(from).top
-          const bottom = view.lineBlockAt(to).bottom
-          rect = { x: g.colLeft, y: g.docTop + top, w: g.colRight - g.colLeft, h: Math.max(8, bottom - top), ga: g.docTop + top - 2, gb: g.docTop + bottom + 2, col }
+          const { top } = lineBlock(view, g, from)
+          const { bottom } = lineBlock(view, g, to)
+          rect = { x: g.colLeft, y: top, w: g.colRight - g.colLeft, h: Math.max(8, bottom - top), ga: top - 2, gb: bottom + 2, col }
         }
         rects.set(e, rect)
         return rect
@@ -228,7 +235,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         const doc = view.state.doc
         const docY = y - g.docTop
         if (docY < -4 || !doc.length) return null
-        const block = view.lineBlockAtHeight(Math.max(0, docY))
+        const block = view.lineBlockAtHeight(Math.max(0, docY) * g.z)
         let line = doc.lineAt(block.from)
         // prefer a line with text so blank lines being removed doesn't lose the anchor
         let n = line.number
@@ -239,7 +246,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         }
         if (!doc.line(n).text.trim()) return null
         line = doc.line(n)
-        return { anchor: makeLineAnchor(doc, n), top: g.docTop + view.lineBlockAt(line.from).top }
+        return { anchor: makeLineAnchor(doc, n), top: lineBlock(view, g, line.from).top }
       },
       textAnchorAt: (cx, cy) => {
         const g = geom()
@@ -740,7 +747,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     const anchor = refRange(range)
     const g = measure()
     const a = view.coordsAtPos(range.from, 1)
-    const y = a ? (a.top - g.oy) / g.z - 18 : g.docTop + view.lineBlockAt(range.from).top
+    const y = a ? (a.top - g.oy) / g.z - 18 : lineBlock(view, g, range.from).top
     const w = kind === 'sticky' ? 200 : 250
     const h = kind === 'sticky' ? 150 : 130
     const spot = ctl.freeSpot(g.colRight + 56, y, w, h)
