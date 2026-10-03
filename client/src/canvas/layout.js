@@ -15,7 +15,8 @@ const resolvedCache = new WeakMap()
  *
  * env (note mode only):
  *   lineTop(anchor) -> world y of the anchored line, or null
- *   textRect(anchor) -> { x, y, w, h } in world space, or null
+ *   textRect(anchor) -> { x, y, w, h, ga, gb, col, reach } in world space, or null
+ *     (the last four route a line out of the text, see textEnd in boardgeom.js)
  *   version -> changes whenever anchors may have moved
  */
 export function resolveLayout(snapshot, env = null) {
