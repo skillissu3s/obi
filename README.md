@@ -70,6 +70,7 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 
 **Everything else**
 - **13 colour themes**, each with a light and a dark version. Light-first: Paper (crisp white & ink blue), Sand, Sakura, Mint, Sky. Dark-first: Sumi (warm ink & paper), Graphite, Midnight, Nordic, Forest, Ember, Mocha, Nebula. Switch from *Settings → Appearance* or the command palette (“Colour theme: …”). Themes restyle the whole app, including drawings: surfaces, text, borders, syntax highlighting and accent.
+- **Backgrounds**: a colour, a gradient, a photo from Unsplash, Pexels, Pixabay, Wallhaven, NASA, Flickr, Bing, Wikimedia Commons, the Art Institute of Chicago, The Met or Picsum (search them from *Settings → Appearance → Background*), or an image from your own device. Blur, dim and panel transparency are adjustable, the note itself stays readable, and the picture can change on every launch or daily. [Setting up the photo sources](#background-images)
 - Optional accent override on top of any theme, three editor fonts, adjustable size/line-height, readable line width, focus mode
 - Minimal chrome by design: no panel borders, flat tabs, a header that fades until you reach for it. The left side shows either the full sidebar or a slim icon ribbon, and hidden toggles appear when the pointer nears a panel edge
 - Split panes, tabs, per-workspace layout persistence
@@ -173,6 +174,31 @@ Redeploy (or `docker compose up -d --build`). The server saves open documents an
 | `SMTP_URL` | — | Alternative to the above in one line, e.g. `smtps://user:pass@smtp.example.com`. |
 | `MAIL_FROM` | `SMTP_USER` | Sender, e.g. `Obi <no-reply@example.com>`. |
 | `MAIL_LOG_CODES` | `0` | Development only: with no SMTP configured, print emails (and their codes) to the server log instead of sending them. |
+| `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FLICKR_API_KEY`, `WALLHAVEN_API_KEY`, `NASA_API_KEY` | — | Keys for the photo sources in *Settings → Appearance → Background*. All optional; see [Background images](#background-images). |
+
+---
+
+## Background images
+
+*Settings → Appearance → Background* can put a photo behind the app. Some sources need nothing; the rest show up as "needs a key" until you give the server one. Keys are read from the environment, stay on the server (the browser never sees them) and are never logged. Set them next to the other variables, in `.env` for Compose or in the app's environment on Dokploy, and restart.
+
+| Source | Variable | Free key from | Limits (as published) | Credit |
+|---|---|---|---|---|
+| Unsplash | `UNSPLASH_ACCESS_KEY` | [unsplash.com/oauth/applications](https://unsplash.com/oauth/applications) (the *Access Key*) | 50 requests/hour until Unsplash approves the app for production, then 5,000 | Required: "Photo by *name* on Unsplash", linked. Shown in the status bar and in settings; Obi also tells Unsplash when a photo is chosen, as its guidelines ask |
+| Pexels | `PEXELS_API_KEY` | [pexels.com/api](https://www.pexels.com/api/new/) | 200 requests/hour, 20,000/month | Required: photographer and Pexels, linked |
+| Pixabay | `PIXABAY_API_KEY` | [pixabay.com/api/docs](https://pixabay.com/api/docs/) (shown once you are signed in) | 100 requests/minute; results are cached for 24 hours | Not required; shown |
+| Flickr | `FLICKR_API_KEY` | [flickr.com/services/apps/create](https://www.flickr.com/services/apps/create/apply/) (a non-commercial key is instant) | 3,600 requests/hour | Required by the licence: photographer and licence are shown. Only CC BY, CC BY-SA, CC0, public-domain and US-government photos are offered |
+| Wallhaven | `WALLHAVEN_API_KEY` (optional) | [wallhaven.cc/settings/account](https://wallhaven.cc/settings/account) | 45 requests/minute | Uploaders are not named by the API. Safe-for-work only, with or without a key |
+| NASA APOD | `NASA_API_KEY` (optional) | [api.nasa.gov](https://api.nasa.gov/) | `DEMO_KEY` (the default) allows about 30 requests/hour per IP; a free key 1,000 | Photographer shown when the picture is not NASA's |
+| Bing image of the day | none | — | — | Meant for personal use as a wallpaper |
+| Wikimedia Commons | none | — | be gentle; results are cached | Author and licence are shown. Search is limited to featured pictures |
+| Art Institute of Chicago | none | — | 60 requests/minute | Public-domain works (CC0) |
+| The Met | none | — | 80 requests/second | Public-domain works (CC0) |
+| Lorem Picsum | none | — | — | Photos are from Unsplash; photographer shown |
+
+Everything is cached on the server for 15 minutes (24 hours for Pixabay, 6 for NASA), so browsing and shuffling rarely spend a provider request. The server only ever contacts those providers' own API addresses, and only passes on image links that live on the provider's own image hosts. The picture itself is loaded by the browser straight from the provider. Backgrounds never appear on published notes, in print, or inside the desktop app's title bar.
+
+A background you pick from your own device is stored in that browser only (not synced, never written into a vault or repository).
 
 ---
 

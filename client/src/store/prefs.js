@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../lib/api.js'
 import { debounce } from '../lib/util.js'
+import { DEFAULT_WALLPAPER, normalizeWallpaper, applyWallpaper } from '../lib/wallpaper.js'
 
 // Full colour themes. `dark`/`light` are only used to draw the preview swatches —
 // the real colours live in base.css under [data-palette='…'].
@@ -63,6 +64,7 @@ export const DEFAULT_PREFS = {
   typewriter: false,
   focusParagraph: false,
   graph: { showTags: false, showOrphans: true, showUnresolved: false, showAttachments: false, colorFolders: true, repel: 140, linkDistance: 70, nodeSize: 1, labels: 1 },
+  wallpaper: DEFAULT_WALLPAPER, // the app background; see lib/wallpaper.js
   bookmarks: {},
 }
 
@@ -78,6 +80,8 @@ function migrate(p) {
   return p
 }
 migrate(LS)
+// unlike a plain setting, the background is checked on the way in: it may come from another version
+LS.wallpaper = normalizeWallpaper(LS.wallpaper)
 
 const saveRemote = debounce((prefs) => {
   api.updateMe({ settings: { prefs } }).catch(() => {})
@@ -99,7 +103,12 @@ export const usePrefs = create((set, get) => ({
   hydrate(remotePrefs) {
     if (!remotePrefs) return
     const incoming = migrate({ ...remotePrefs })
-    const merged = { ...snapshot(get()), ...incoming, graph: { ...DEFAULT_PREFS.graph, ...(remotePrefs.graph || {}) } }
+    const merged = {
+      ...snapshot(get()),
+      ...incoming,
+      graph: { ...DEFAULT_PREFS.graph, ...(remotePrefs.graph || {}) },
+      wallpaper: remotePrefs.wallpaper ? normalizeWallpaper(remotePrefs.wallpaper) : get().wallpaper,
+    }
     set(merged)
     try {
       localStorage.setItem('obi:prefs', JSON.stringify(merged))
@@ -133,6 +142,7 @@ export function applyPrefs(p = snapshot(usePrefs.getState())) {
   root.style.setProperty('--note-width', { narrow: '560px', normal: '620px', wide: '800px' }[p.lineWidth] || '620px')
   root.dataset.editorFont = p.editorFont
   root.dataset.uiScale = p.uiScale
+  applyWallpaper(p.wallpaper)
   const meta = document.querySelector('meta[name="theme-color"]')
   const pal = PALETTES.find((x) => x.id === root.dataset.palette) || PALETTES[0]
   if (meta) meta.content = theme === 'light' ? pal.light[0] : pal.dark[0]

@@ -20,6 +20,12 @@
         document.documentElement.dataset.theme = t
         document.documentElement.dataset.palette = s.palette || 'sumi'
         if (s.accent) document.documentElement.style.setProperty('--accent-user', s.accent)
+        // the background, as the app last left it (see lib/wallpaper.js)
+        var wp = JSON.parse(localStorage.getItem('obi:wp') || 'null')
+        if (wp) {
+          for (var k in wp) document.documentElement.style.setProperty(k, wp[k])
+          document.documentElement.dataset.wallpaper = ''
+        }
       } catch (e) {}
     </script>
   </head>

@@ -30,3 +30,11 @@ every published note.
 A note's text is the user's markdown file, in their repository. Canvas data
 lives beside it in `.obi/layers/<note path>.json`; never write canvas or app
 state into the markdown itself.
+
+## The app background
+
+`client/src/styles/wallpaper.css` draws the wallpaper layer and turns the shell's
+surfaces (`.app`, `.ribbon`, `.sidebar`, `.statusbar`, `.pane`, ...) translucent.
+A new full-height view that paints its own `var(--bg)` hides the wallpaper
+behind it: list it there instead of editing the layout-contract files above.
+The background is app-only; it never reaches published pages or print.

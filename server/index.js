@@ -11,6 +11,7 @@ import { adminRouter } from './admin.js'
 import { wsRouter, miscRouter } from './workspaces.js'
 import { publicRouter } from './public.js'
 import { syncRouter } from './syncapi.js'
+import { wallpaperRouter } from './wallpapers.js'
 import { downloadRouter } from './download.js'
 import { desktopRouter, startDesktop, DESKTOP_WEB, desktopWebRouter } from './desktop.js'
 import { attachWebSocket } from './wsserver.js'
@@ -46,6 +47,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/workspaces', wsRouter)
 app.use('/api/sync', syncRouter)
+app.use('/api/wallpapers', wallpaperRouter)
 if (DESKTOP) app.use('/api/desktop', desktopRouter)
 if (DESKTOP && DESKTOP_WEB) app.use(desktopWebRouter)
 app.use('/api', miscRouter)

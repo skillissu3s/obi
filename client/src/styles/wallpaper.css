@@ -1,0 +1,324 @@
+/* Background (wallpaper). One fixed layer behind the whole app, drawn from the
+   --wp-* variables lib/wallpaper.js sets on <html>; the shell's surfaces then
+   turn translucent so it shows through. Screen only: print, published notes
+   (which do not load this file) and the desktop title bar keep the plain theme. */
+@media screen {
+  html[data-wallpaper],
+  .wp-preview {
+    /* the theme's own background laid over the picture: it darkens in a dark
+       theme and washes out in a light one, so text stays readable in both */
+    --wp-veil: color-mix(in srgb, var(--bg) var(--wp-dim, 0%), transparent);
+  }
+  html[data-wallpaper]::before,
+  .wp-preview::before {
+    content: '';
+    position: fixed;
+    z-index: -1;
+    pointer-events: none;
+    /* reach past the screen so the blur's soft edge falls off it */
+    inset: calc(var(--wp-blur, 0px) * -2);
+    background-image: linear-gradient(var(--wp-veil), var(--wp-veil)), var(--wp-image, none);
+    background-size: auto, var(--wp-size, cover);
+    background-position: 0 0, var(--wp-pos, center);
+    background-repeat: no-repeat, var(--wp-repeat, no-repeat);
+    background-color: var(--wp-color, transparent);
+    filter: blur(var(--wp-blur, 0px));
+  }
+
+  html[data-wallpaper] .app {
+    background: transparent;
+  }
+  /* the frame around the notes: see-through by the panel setting */
+  html[data-wallpaper] :is(.ribbon, .sidebar, .statusbar, .mobile-header) {
+    background: color-mix(in srgb, var(--bg-sidebar) var(--wp-panel), transparent);
+  }
+  /* where the notes are read and written: never more see-through than --wp-pane allows */
+  html[data-wallpaper] .pane {
+    background: color-mix(in srgb, var(--bg) var(--wp-pane), transparent);
+  }
+  html[data-wallpaper] :is(.note-view, .board-view, .graph-view, .tabbar-actions) {
+    background: transparent;
+  }
+}
+/* Windows high contrast and the like: plain colours, no picture */
+@media screen and (forced-colors: active) {
+  html[data-wallpaper]::before {
+    display: none;
+  }
+}
+/* on a phone the sidebar slides over the notes, so it has to be solid */
+@media screen and (max-width: 768px) {
+  html[data-wallpaper] .sidebar {
+    background: var(--bg-sidebar);
+  }
+  .statusbar .wp-credit {
+    max-width: 56vw;
+  }
+}
+
+/* ---------- Settings → Appearance → Background ---------- */
+.wp-preview {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  aspect-ratio: 16 / 5;
+  max-height: 116px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+/* On a tall window the heading and preview stay in view while the sliders below are
+   moved. The strip above reaches over the settings body's padding, so nothing shows
+   through between the preview and the top of the window. */
+@media (min-height: 760px) {
+  .wp-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding-bottom: 10px;
+    background: var(--bg-elev);
+  }
+  .wp-head::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    left: 0;
+    height: 24px;
+    background: var(--bg-elev);
+  }
+}
+/* the same layer as the real one, at the size of this box */
+.wp-preview::before {
+  position: absolute;
+  z-index: 0;
+  inset: calc(var(--wp-blur, 0px) * -0.7);
+  filter: blur(calc(var(--wp-blur, 0px) * 0.3));
+}
+.wp-preview > * {
+  position: relative;
+  z-index: 1;
+}
+.wp-mock-side {
+  width: 24%;
+  background: color-mix(in srgb, var(--bg-sidebar) var(--wp-panel, 100%), transparent);
+}
+.wp-mock-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  justify-content: center;
+  padding: 0 9%;
+  background: color-mix(in srgb, var(--bg) var(--wp-pane, 100%), transparent);
+}
+.wp-mock-page i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--text-3);
+  opacity: 0.55;
+}
+.wp-mock-page i:first-child {
+  width: 46%;
+  height: 9px;
+  background: var(--text);
+  opacity: 0.8;
+}
+.wp-mock-page i:last-child {
+  width: 62%;
+}
+.wp-credit {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wp-credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.wp-credit a:hover {
+  color: var(--text);
+}
+.statusbar .wp-credit {
+  display: block;
+  max-width: 38vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
+}
+.wp-preview > .wp-credit {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  max-width: calc(100% - 16px);
+  padding: 2px 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 11.5px;
+}
+.wp-preview > .wp-credit a:hover {
+  color: #fff;
+}
+.wp-tabs {
+  margin: 8px 0 10px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.wp-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wp-bar .select {
+  flex: 0 1 190px;
+}
+.wp-bar .input {
+  flex: 1 1 180px;
+}
+.wp-notice {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--accent-softer);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.wp-notice.error {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.wp-notice code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-active);
+}
+.wp-hint {
+  margin: 8px 0 0;
+}
+/* the photos scroll in their own box, so the sliders below stay within reach */
+.wp-scroll {
+  max-height: 340px;
+  margin: 10px 0 4px;
+  padding: 3px;
+  overflow-y: auto;
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.wp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+}
+.wp-tile {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.wp-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms var(--ease);
+}
+.wp-tile:hover img {
+  transform: scale(1.05);
+}
+.wp-tile.active {
+  box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent);
+}
+.wp-tile.busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+.wp-tile .spinner {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: auto;
+}
+.wp-tile .wp-by {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 14px 7px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 10.5px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.62));
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.wp-tile:hover .wp-by,
+.wp-tile:focus-visible .wp-by {
+  opacity: 1;
+}
+.wp-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+}
+.wp-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+.wp-swatch {
+  position: relative;
+  width: 56px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(var(--tint) / 0.18);
+  transition: transform var(--t) var(--ease-spring);
+}
+.wp-swatch:hover {
+  transform: scale(1.06);
+}
+.wp-swatch.active {
+  box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent);
+}
+.wp-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.wp-swatch.wp-custom {
+  display: grid;
+  place-items: center;
+  background: conic-gradient(from 0deg, #f87171, #fbbf24, #4ade80, #38bdf8, #a78bfa, #f87171);
+  color: #fff;
+}
+.wp-swatch.wp-custom svg {
+  width: 16px;
+  height: 16px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
