@@ -172,7 +172,8 @@ export function CalendarPanel() {
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
   const first = new Date(year, month, 1)
-  const startDay = (first.getDay() + 6) % 7 // Monday first
+  const weekStart = usePrefs((s) => (s.weekStart === 'sunday' ? 0 : 1))
+  const startDay = (first.getDay() - weekStart + 7) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const prevDays = new Date(year, month, 0).getDate()
 
@@ -202,7 +203,7 @@ export function CalendarPanel() {
         </button>
       </div>
       <div className="cal-grid">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].slice(weekStart).concat(['S', 'M', 'T', 'W', 'T', 'F', 'S'].slice(0, weekStart)).map((d, i) => (
           <div className="cal-dow" key={i}>
             {d}
           </div>
@@ -226,6 +227,9 @@ export function CalendarPanel() {
       </div>
       <button className="btn btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => A.openDailyNote(new Date())}>
         <Plus /> Today's note
+      </button>
+      <button className="btn btn-sm btn-block" style={{ marginTop: 6 }} onClick={() => useLayout.getState().openView('calendar')}>
+        <CalendarDays /> Open the full calendar
       </button>
     </div>
   )

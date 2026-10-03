@@ -2402,3 +2402,356 @@
   flex: none;
 }
 
+
+/* ---------- Calendar view ---------- */
+.calv {
+  flex: 1;
+  min-height: 0;
+  outline: none;
+  /* the layout follows the room the calendar has, not the window's */
+  container-type: inline-size;
+}
+.calv-body {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+.calv-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px 20px;
+  overflow: auto;
+}
+.calv-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.calv-bar h2 {
+  flex: 1;
+  min-width: 140px;
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.calv-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.calv-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: min-content;
+  gap: 1px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--border);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.calv-grid.month {
+  grid-auto-rows: minmax(104px, 1fr);
+}
+.calv-grid.week {
+  grid-auto-rows: auto;
+}
+.calv-grid.week > .calv-cell {
+  min-height: 320px;
+}
+.calv-dow {
+  padding: 7px 8px;
+  background: var(--bg-sidebar);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.calv-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 4px 5px 5px;
+  background: var(--bg);
+  cursor: default;
+}
+.calv-cell.dim {
+  background: color-mix(in srgb, var(--bg) 70%, var(--bg-sidebar));
+}
+.calv-cell.dim .calv-num {
+  color: var(--text-faint);
+}
+.calv-cell:hover {
+  background: var(--bg-hover);
+}
+.calv-cell.selected {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.calv-cell.over {
+  background: var(--accent-soft);
+}
+.calv-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+}
+.calv-num {
+  white-space: nowrap;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.calv-cell.today .calv-num {
+  background: var(--accent);
+  color: var(--bg);
+}
+.calv-daily {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+}
+.calv-daily.has {
+  opacity: 1;
+  color: var(--accent);
+}
+.calv-cell:hover .calv-daily {
+  opacity: 1;
+}
+.calv-daily:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.calv-daily svg {
+  width: 13px;
+  height: 13px;
+}
+.calv-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+}
+.calv-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 1px 5px 1px 3px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: var(--bg-active);
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.calv-chip:hover,
+.calv-chip.editing {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-active));
+  color: var(--text);
+}
+.calv-chip.task {
+  cursor: grab;
+}
+.calv-chip.overdue {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+.calv-chip.done .calv-chip-text {
+  color: var(--text-3);
+}
+.calv-chip.done .calv-chip-text,
+.calv-chip.cancelled .calv-chip-text {
+  text-decoration: line-through;
+}
+.calv-chip .task-cb {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  margin: 0;
+}
+.calv-chip svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+.calv-chip-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calv-more {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.calv-more svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* the selected day */
+.calv-side {
+  flex: none;
+  width: 340px;
+  padding: 22px 18px 24px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+}
+.calv-side-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.calv-side-day {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.calv-side-date {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.calv-side .task-add {
+  margin-bottom: 14px;
+}
+.calv-side .task-row {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.calv-side .task-meta {
+  max-width: none;
+  flex-basis: 100%;
+  justify-content: flex-start;
+  padding-left: 26px;
+  min-height: 0;
+}
+.calv-side .task-meta:empty {
+  display: none;
+}
+.calv-side .task-source {
+  max-width: 120px;
+}
+.calv-side-title {
+  margin: 14px 0 4px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.calv-empty {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+.calv-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.calv-note:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.calv-note svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--text-3);
+}
+.calv-note .faint {
+  margin-left: auto;
+  font-size: 11.5px;
+}
+
+/* agenda */
+.calv-agenda {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+.calv-agenda-day {
+  padding: 8px 0 12px;
+  border-top: 1px solid var(--border);
+}
+.calv-agenda-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 8px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.calv-agenda-num {
+  min-width: 26px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.calv-agenda-day.today .calv-agenda-head {
+  color: var(--accent-text);
+}
+.calv-agenda-head .faint {
+  font-weight: 400;
+}
+
+/* not enough room for the day beside the grid: it goes underneath */
+@container (max-width: 880px) {
+  .calv-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .calv-main {
+    overflow: visible;
+    flex: none;
+    padding: 14px 12px;
+  }
+  .calv-side {
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    overflow: visible;
+  }
+  .calv-grid.month {
+    grid-auto-rows: minmax(84px, auto);
+  }
+}

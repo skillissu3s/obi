@@ -3,7 +3,7 @@ import { create } from 'zustand'
 let seq = Date.now()
 const newTabId = () => `t${(seq++).toString(36)}`
 
-const PERSIST_KINDS = new Set(['note', 'graph', 'tasks'])
+const PERSIST_KINDS = new Set(['note', 'graph', 'tasks', 'calendar'])
 const isMobile = () => window.matchMedia('(max-width: 768px)').matches
 
 function emptyPane(id = 'main') {

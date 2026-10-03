@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ListChecks, Search, FileText, Plus, X } from 'lucide-react'
-import { BUCKETS, PRIORITIES, PRIORITY_EMOJI, addDays, bucketOf, compareTasks, isOpen, todayIso } from '@shared/tasks.js'
+import { useEffect, useMemo, useState } from 'react'
+import { ListChecks, Search, X } from 'lucide-react'
+import { BUCKETS, PRIORITIES, PRIORITY_EMOJI, bucketOf, compareTasks, isOpen, todayIso } from '@shared/tasks.js'
 import { basename, stripExt, dirname } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
-import { renderInline } from '../lib/render.js'
 import * as A from '../lib/actions.js'
-import { TaskBox, TaskMeta, TaskEditor, EditButton, taskKey } from './TaskParts.jsx'
+import { TaskRow, QuickAdd, TaskEditor, taskKey } from './TaskParts.jsx'
 
 const STORE = 'obi:tasksView'
 const DEFAULT_VIEW = { status: 'open', group: 'date', query: '', tag: null, priority: null }
@@ -27,100 +26,6 @@ function depthOf(task, byLine) {
   let d = 0
   for (let p = byLine.get(`${task.path}:${task.parent}`); p && d < 6; p = byLine.get(`${p.path}:${p.parent}`)) d++
   return d
-}
-
-// Adds a task to today's note: its words, and a day and a priority if you like.
-function QuickAdd() {
-  const [title, setTitle] = useState('')
-  const [due, setDue] = useState('')
-  const [priority, setPriority] = useState('')
-  const [busy, setBusy] = useState(false)
-  const input = useRef(null)
-  const today = todayIso()
-
-  const submit = async () => {
-    if (!title.trim() || busy) return
-    setBusy(true)
-    const r = await A.addTask({ title, due: due || undefined, priority: priority || undefined })
-    setBusy(false)
-    if (r) {
-      setTitle('')
-      setDue('')
-      setPriority('')
-    }
-    input.current?.focus()
-  }
-
-  return (
-    <div className="task-add">
-      <Plus />
-      <input
-        ref={input}
-        className="task-add-input"
-        placeholder="Add a task to today's note…"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-      />
-      {title.trim() && (
-        <>
-          <button className={`te-quick ${due === today ? 'on' : ''}`} onClick={() => setDue(due === today ? '' : today)}>
-            Today
-          </button>
-          <button className={`te-quick ${due === addDays(today, 1) ? 'on' : ''}`} onClick={() => setDue(due === addDays(today, 1) ? '' : addDays(today, 1))}>
-            Tomorrow
-          </button>
-          <input type="date" className="input task-add-date" value={due} onChange={(e) => setDue(e.target.value)} title="Due date" />
-          <select className="input task-add-pri" value={priority} onChange={(e) => setPriority(e.target.value)} title="Priority">
-            <option value="">Priority</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {PRIORITY_EMOJI[p]} {p[0].toUpperCase() + p.slice(1)}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-primary btn-sm" disabled={busy} onClick={submit}>
-            Add
-          </button>
-        </>
-      )}
-    </div>
-  )
-}
-
-function TaskRow({ task, group, depth, wsId, onTag, onEdit, editing }) {
-  const open = isOpen(task.status)
-  const openAtLine = () => useLayout.getState().openNote(wsId, task.path, { line: task.line })
-  return (
-    <div className={`task-row ${!open ? 'done' : ''} ${task.status === '-' ? 'cancelled' : ''}`} style={depth ? { paddingLeft: 8 + depth * 22 } : undefined}>
-      <TaskBox task={task} />
-      <div
-        className="task-text"
-        title="Open this line in its note"
-        onClick={(e) => {
-          const a = e.target.closest('a')
-          // a #tag in the words filters this list; any other link is its own
-          if (a?.classList.contains('tag')) {
-            e.preventDefault()
-            onTag(a.dataset.tag)
-          } else if (!a) openAtLine()
-        }}
-        dangerouslySetInnerHTML={{ __html: renderInline(task.text, { ws: wsId, path: task.path }) }}
-      />
-      <div className="task-meta">
-        <TaskMeta task={task} />
-      </div>
-      {group !== 'note' && (
-        /* the icon matters: a daily note is called "2026-09-17", which without it
-           reads like a due date sitting in the same row as the real ones */
-        <span className="task-source" title={task.path} onClick={openAtLine}>
-          <FileText />
-          {stripExt(basename(task.path))}
-        </span>
-      )}
-      <EditButton active={editing} onClick={(e) => onEdit(task, e.currentTarget)} />
-    </div>
-  )
 }
 
 export function TasksView() {
@@ -266,7 +171,7 @@ export function TasksView() {
               <TaskRow
                 key={taskKey(t)}
                 task={t}
-                group={group}
+                showSource={group !== 'note'}
                 depth={group === 'note' ? depthOf(t, byLine) : 0}
                 wsId={wsId}
                 onTag={(x) => setView({ tag: x })}

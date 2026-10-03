@@ -507,6 +507,16 @@ function EditorSection() {
       <Setting name="Confirm before deleting" desc="Ask before deleting notes and folders.">
         <Switch checked={prefs.confirmDelete} onChange={(v) => prefs.set({ confirmDelete: v })} />
       </Setting>
+      <Setting name="Week starts on" desc="For the calendars.">
+        <Segmented
+          value={prefs.weekStart}
+          onChange={(v) => prefs.set({ weekStart: v })}
+          options={[
+            { value: 'monday', label: 'Monday' },
+            { value: 'sunday', label: 'Sunday' },
+          ]}
+        />
+      </Setting>
     </>
   )
 }

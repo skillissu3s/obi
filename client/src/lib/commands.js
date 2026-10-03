@@ -88,6 +88,8 @@ export function buildCommands() {
     { id: 'search-note', name: 'Find in current note', icon: Search, hotkey: 'Mod+F', group: 'Navigate', run: ed((v) => openSearchPanel(v)) },
     { id: 'graph', name: 'Open graph view', icon: Network, hotkey: 'Mod+G', group: 'Navigate', run: () => layout.openView('graph') },
     { id: 'tasks', name: 'Open tasks', icon: ListChecks, group: 'Navigate', run: () => layout.openView('tasks') },
+    { id: 'calendar', name: 'Open calendar', icon: CalendarDays, group: 'Navigate', run: () => layout.openView('calendar') },
+    { id: 'mini-calendar', name: 'Show the calendar in the side panel', icon: CalendarDays, group: 'View', run: () => layout.setRightTab('calendar') },
     { id: 'add-task', name: 'Add a task…', icon: ListChecks, hotkey: 'Alt+A', group: 'File', run: async () => {
         const title = await promptDialog({ title: 'Add a task', placeholder: "Goes in today's note", confirmText: 'Add' })
         if (title?.trim()) A.addTask({ title })

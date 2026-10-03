@@ -1,10 +1,12 @@
 // The pieces of a task shown in a list: its box, its chips, and the editor that
 // opens from it. Shared by the Tasks view and the calendar.
 import { useEffect, useRef, useState } from 'react'
-import { Flag, Hourglass, Play, Repeat, SlidersHorizontal, FileText } from 'lucide-react'
+import { Flag, Hourglass, Play, Plus, Repeat, SlidersHorizontal, FileText } from 'lucide-react'
 import { PRIORITIES, PRIORITY_EMOJI, addDays, isOpen, parseRecurrence, todayIso } from '@shared/tasks.js'
 import { basename, stripExt } from '@shared/paths.js'
-import { dueLabel } from '../lib/util.js'
+import { dateOfIso, dueLabel, formatDate } from '../lib/util.js'
+import { renderInline } from '../lib/render.js'
+import { useLayout } from '../store/layout.js'
 import * as A from '../lib/actions.js'
 import { Popover } from './ui.jsx'
 
@@ -232,5 +234,115 @@ export function EditButton({ onClick, active }) {
     <button className={`task-edit ${active ? 'on' : ''}`} title="Edit this task" aria-label="Edit this task" onClick={onClick}>
       <SlidersHorizontal />
     </button>
+  )
+}
+
+/**
+ * Adds a task: its words, and a day and a priority if you like. Without `day`
+ * it goes in today's note; with one, in that day's note, due that day.
+ */
+export function QuickAdd({ day = null }) {
+  const [title, setTitle] = useState('')
+  const [due, setDue] = useState('')
+  const [priority, setPriority] = useState('')
+  const [busy, setBusy] = useState(false)
+  const input = useRef(null)
+  const today = todayIso()
+  const tomorrow = addDays(today, 1)
+
+  const submit = async () => {
+    if (!title.trim() || busy) return
+    setBusy(true)
+    const r = await A.addTask({ title, day: day || undefined, due: day || due || undefined, priority: priority || undefined })
+    setBusy(false)
+    if (r) {
+      setTitle('')
+      setDue('')
+      setPriority('')
+    }
+    input.current?.focus()
+  }
+
+  return (
+    <div className="task-add">
+      <Plus />
+      <input
+        ref={input}
+        className="task-add-input"
+        placeholder={day ? `Add a task for ${formatDate(dateOfIso(day), 'ddd D MMM')}…` : "Add a task to today's note…"}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && submit()}
+      />
+      {title.trim() && (
+        <>
+          {!day && (
+            <>
+              <button className={`te-quick ${due === today ? 'on' : ''}`} onClick={() => setDue(due === today ? '' : today)}>
+                Today
+              </button>
+              <button className={`te-quick ${due === tomorrow ? 'on' : ''}`} onClick={() => setDue(due === tomorrow ? '' : tomorrow)}>
+                Tomorrow
+              </button>
+              <input type="date" className="input task-add-date" value={due} onChange={(e) => setDue(e.target.value)} title="Due date" />
+            </>
+          )}
+          <select className="input task-add-pri" value={priority} onChange={(e) => setPriority(e.target.value)} title="Priority">
+            <option value="">Priority</option>
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {PRIORITY_EMOJI[p]} {p[0].toUpperCase() + p.slice(1)}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-primary btn-sm" disabled={busy} onClick={submit}>
+            Add
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** One task in a list: box, words, what is set on it, where it is, and its editor button */
+export function TaskRow({ task, wsId, showSource = true, depth = 0, onTag, onEdit, editing, onDragStart }) {
+  const open = isOpen(task.status)
+  const openAtLine = () => useLayout.getState().openNote(wsId, task.path, { line: task.line })
+  return (
+    <div
+      className={`task-row ${!open ? 'done' : ''} ${task.status === '-' ? 'cancelled' : ''}`}
+      style={depth ? { paddingLeft: 8 + depth * 22 } : undefined}
+      draggable={!!onDragStart}
+      onDragStart={onDragStart}
+    >
+      <TaskBox task={task} />
+      <div
+        className="task-text"
+        title="Open this line in its note"
+        onClick={(e) => {
+          const a = e.target.closest('a')
+          // a #tag in the words filters a list that can; any other link is its own
+          if (a?.classList.contains('tag')) {
+            if (onTag) {
+              e.preventDefault()
+              onTag(a.dataset.tag)
+            }
+          } else if (!a) openAtLine()
+        }}
+        dangerouslySetInnerHTML={{ __html: renderInline(task.text, { ws: wsId, path: task.path }) }}
+      />
+      <div className="task-meta">
+        <TaskMeta task={task} />
+      </div>
+      {showSource && (
+        /* the icon matters: a daily note is called "2026-09-17", which without it
+           reads like a due date sitting in the same row as the real ones */
+        <span className="task-source" title={task.path} onClick={openAtLine}>
+          <FileText />
+          {stripExt(basename(task.path))}
+        </span>
+      )}
+      <EditButton active={editing} onClick={(e) => onEdit(task, e.currentTarget)} />
+    </div>
   )
 }

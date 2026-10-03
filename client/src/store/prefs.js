@@ -58,6 +58,7 @@ export const DEFAULT_PREFS = {
   confirmDelete: true,
   sortBy: 'name',
   canvasBar: false,
+  weekStart: 'monday', // monday | sunday — where a week begins on the calendars
   canvasTextKind: 'markdown', // what double-clicking empty canvas writes: markdown | plain
   typewriter: false,
   focusParagraph: false,

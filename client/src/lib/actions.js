@@ -6,7 +6,7 @@ import { usePrefs } from '../store/prefs.js'
 import { toast, confirmDialog, promptDialog, useUI } from '../store/ui.js'
 import { basename, dirname, stripExt, joinPath, isNote, safeName, extname } from '@shared/paths.js'
 import { isBoardPath, emptyBoard } from '@shared/board.js'
-import { formatDate, isoDate, downloadUrl, copyText } from './util.js'
+import { formatDate, isoDate, dateOfIso, downloadUrl, copyText } from './util.js'
 import { todayIso } from '@shared/tasks.js'
 import { fetchNote } from './render.js'
 import { conn } from './socket.js'
@@ -592,16 +592,21 @@ export async function updateTask(task, patch) {
   }
 }
 
-/** Adds a task to today's note (made from its template if the day has none yet) */
-export async function addTask({ title, ...fields }) {
+/**
+ * Adds a task to a day's note — today's, or `day`'s (yyyy-mm-dd) — made from its
+ * template if that day has none yet. `fields`: due, scheduled, start, priority,
+ * recurrence.
+ */
+export async function addTask({ title, day, ...fields }) {
   const s = app()
   const ws = s.wsId
-  const path = dailyNotePath()
+  const date = day ? dateOfIso(day) : new Date()
+  const path = dailyNotePath(date)
   try {
-    const template = s.treeMap.has(path) ? undefined : await newDailyContent(ws, new Date(), wsSettings())
+    const template = s.treeMap.has(path) ? undefined : await newDailyContent(ws, date, wsSettings())
     const r = await api.addTask(ws, { path, title, ...fields, today: todayIso(), template })
     if (!s.treeMap.has(path)) s.addEntry(path)
-    toast.success(`Added to ${formatDate(new Date(), 'ddd D MMM')}'s note`, { action: { label: 'Open', run: () => openPath(ws, path, { line: r.line }) } })
+    toast.success(`Added to ${formatDate(date, 'ddd D MMM')}'s note`, { action: { label: 'Open', run: () => openPath(ws, path, { line: r.line }) } })
     return r
   } catch (e) {
     toast.error(e)

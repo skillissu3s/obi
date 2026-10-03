@@ -70,6 +70,9 @@ export function formatDate(date, fmt = 'YYYY-MM-DD') {
   return fmt.replace(/\[([^\]]*)\]|YYYY|YY|MMMM|MMM|MM|M|DD|D|dddd|ddd|HH|mm|ss/g, (m, lit) => (lit != null ? lit : String(map[m])))
 }
 
+/** A yyyy-mm-dd day as a Date at local midnight */
+export const dateOfIso = (iso) => new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10))
+
 export function isoDate(d = new Date()) {
   return formatDate(d, 'YYYY-MM-DD')
 }

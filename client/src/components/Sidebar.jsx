@@ -781,11 +781,7 @@ export function Sidebar({ user, closed }) {
           <ListChecks />
         </button>
         {/* the calendar is how you reach any other day; Ctrl/⌘ D still jumps straight to today */}
-        <button
-          className="icon-btn"
-          title="Calendar — today's note is Ctrl/⌘ D"
-          onClick={() => useLayout.getState().setRightTab('calendar')}
-        >
+        <button className="icon-btn" title="Calendar — today's note is Ctrl/⌘ D" onClick={() => useLayout.getState().openView('calendar')}>
           <CalendarDays />
         </button>
         <button className="icon-btn" title="Settings (Ctrl/⌘ ,)" onClick={() => useUI.getState().openModal('settings')}>

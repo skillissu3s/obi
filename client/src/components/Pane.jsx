@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { X, Plus, FileText, Network, ListChecks, Home as HomeIcon, SplitSquareHorizontal, Pin, PinOff, Copy, MoreHorizontal, Shapes } from 'lucide-react'
+import { X, Plus, FileText, Network, ListChecks, CalendarDays, Home as HomeIcon, SplitSquareHorizontal, Pin, PinOff, Copy, MoreHorizontal, Shapes } from 'lucide-react'
 import { useLayout } from '../store/layout.js'
 import { useApp } from '../store/app.js'
 import { useUI } from '../store/ui.js'
@@ -9,11 +9,13 @@ import { isBoardPath } from '@shared/board.js'
 import { Home } from './Home.jsx'
 import { GraphView } from './GraphView.jsx'
 import { TasksView } from './TasksView.jsx'
+import { CalendarView } from './CalendarView.jsx'
 import { setActiveEditorView } from '../lib/commands.js'
 import { basename, stripExt } from '@shared/paths.js'
 import * as A from '../lib/actions.js'
 
-const KIND_ICON = { note: FileText, graph: Network, tasks: ListChecks, home: HomeIcon }
+const KIND_ICON = { note: FileText, graph: Network, tasks: ListChecks, calendar: CalendarDays, home: HomeIcon }
+const KIND_TITLE = { graph: 'Graph', tasks: 'Tasks', calendar: 'Calendar' }
 
 export function Pane({ pane, isActive, multi }) {
   const panes = useLayout((s) => s.panes)
@@ -38,7 +40,7 @@ export function Pane({ pane, isActive, multi }) {
         {pane.tabs.map((tab, idx) => {
           const Icon = tab.kind === 'note' && isBoardPath(tab.path) ? Shapes : KIND_ICON[tab.kind] || FileText
           const busy = tab.kind === 'note' ? pending[`${tab.ws}:${tab.path}`] : null
-          const title = tab.kind === 'note' ? stripExt(basename(tab.path)) : tab.kind === 'graph' ? 'Graph' : tab.kind === 'tasks' ? 'Tasks' : 'Home'
+          const title = tab.kind === 'note' ? stripExt(basename(tab.path)) : KIND_TITLE[tab.kind] || 'Home'
           return (
             <div
               key={tab.id}
@@ -113,5 +115,6 @@ function TabContent({ tab, paneId, active }) {
   if (tab.kind === 'note') return <NoteView tab={tab} paneId={paneId} active={active} />
   if (tab.kind === 'graph') return <GraphView />
   if (tab.kind === 'tasks') return <TasksView />
+  if (tab.kind === 'calendar') return <CalendarView />
   return <Home />
 }
