@@ -40,14 +40,19 @@ export function styleGroup(typeOrTool) {
 }
 
 function loadStyle() {
-  const base = { ...DEFAULTS, heads: ['none', 'arrow'], curve: false }
+  const style = { ...DEFAULTS, heads: ['none', 'arrow'], curve: true }
   try {
     const saved = JSON.parse(localStorage.getItem(STYLE_STORE) || '{}')
+    // Only what someone chose is read back. The shared base used to be saved
+    // too, but it was just a copy of the defaults of the day, so a default that
+    // changed (lines now bend smoothly) stayed stuck at the old one.
+    if (saved.byTool || saved.base) return { style, byTool: saved.byTool || {} }
     // older versions stored one flat style for every tool
-    if (saved.base || saved.byTool) return { style: { ...base, ...saved.base }, byTool: saved.byTool || {} }
-    return { style: { ...base, ...saved }, byTool: {} }
+    const { curve, ...flat } = saved
+    void curve
+    return { style: { ...style, ...flat }, byTool: {} }
   } catch {
-    return { style: base, byTool: {} }
+    return { style, byTool: {} }
   }
 }
 
@@ -64,6 +69,7 @@ export class CanvasController {
     this.localImages = new Map() // element id -> blob url shown until the upload lands
     this._layout = null
     this._layoutKey = null
+    const saved = loadStyle()
     this.state = {
       tool: 'select',
       lockTool: false,
@@ -80,8 +86,8 @@ export class CanvasController {
       spaceDown: false,
       hover: null,
       grid: mode === 'board' && localStorage.getItem('obi:canvasGrid') !== '0',
-      style: loadStyle().style,
-      styleByTool: loadStyle().byTool,
+      style: saved.style,
+      styleByTool: saved.byTool,
       version: 0,
     }
     this.unsub = store.subscribe(() => {
@@ -179,9 +185,9 @@ export class CanvasController {
       for (const [k, v] of Object.entries(patch)) if (appliesTo(k, { type: TOOL_ELEMENT[g] || 'rect' }) || k === 'markerStroke' || k === 'heads' || k === 'curve') next[k] = v
       styleByTool[g] = next
     }
-    // the shared base stays at the defaults; each tool remembers its own
+    // each tool remembers its own
     try {
-      localStorage.setItem(STYLE_STORE, JSON.stringify({ base: Object.fromEntries(STYLE_KEYS.map((k) => [k, this.state.style[k]])), byTool: styleByTool }))
+      localStorage.setItem(STYLE_STORE, JSON.stringify({ byTool: styleByTool }))
     } catch {}
     this.set({ styleByTool })
     if (!sel.length || this.readOnly) return

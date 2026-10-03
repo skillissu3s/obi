@@ -479,7 +479,7 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
       <div className={`board-controls ${toolsOpen ? 'tools-open' : ''}`}>
         {(!compactControls || toolsOpen) && (
           <div className="cv-dock">
-            <StyleBar ctl={ctl} mode="board" />
+            <StyleBar ctl={ctl} />
             <Toolbar ctl={ctl} />
           </div>
         )}

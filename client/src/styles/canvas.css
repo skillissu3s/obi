@@ -397,113 +397,6 @@ svg.cv-el {
   border: 1px solid var(--border-strong);
   padding: 3px 7px;
 }
-/* One settings menu: named rows, options opening beside them. */
-.cv-menu {
-  min-width: 232px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.cv-menu-sep {
-  height: 1px;
-  margin: 5px 4px;
-  background: var(--border-strong);
-}
-.cv-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 28px;
-  padding: 3px 8px 3px 10px;
-  border: none;
-  background: none;
-  border-radius: var(--radius-sm);
-  color: var(--text-2);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-.cv-row:hover,
-.cv-row.has-sub:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-.cv-row.active {
-  color: var(--accent-text);
-}
-.cv-row.danger:hover {
-  background: color-mix(in srgb, var(--danger) 15%, transparent);
-  color: var(--danger);
-}
-.cv-row-name {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-}
-.cv-row-value,
-.cv-row-hint {
-  flex: none;
-  font-size: 12px;
-  color: var(--text-3);
-  display: flex;
-  align-items: center;
-}
-.cv-row-arrow {
-  width: 13px;
-  height: 13px;
-  flex: none;
-  color: var(--text-faint);
-}
-.cv-row .cv-dot.sm {
-  width: 13px;
-  height: 13px;
-}
-/* the submenu: open on hover, like a menu bar */
-.cv-sub {
-  position: absolute;
-  left: calc(100% + 6px);
-  top: -6px;
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px;
-  border-radius: var(--radius-lg);
-  background: var(--bg-elev);
-  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-strong);
-  z-index: 2;
-}
-/* open is decided in JS (MenuRows) so the pointer can travel to it */
-.cv-row.has-sub.open > .cv-sub,
-.cv-row.has-sub:focus-within > .cv-sub {
-  display: flex;
-}
-.cv-row.has-sub.open {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-/* an invisible bridge over the 6px gap, so crossing it never counts as
-   leaving the row */
-.cv-sub::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 100%;
-  width: 8px;
-}
-/* near the right edge the options open on the other side instead */
-.cv-pop.flip-sub .cv-sub {
-  left: auto;
-  right: calc(100% + 6px);
-}
-.cv-pop.flip-sub .cv-sub::before {
-  right: auto;
-  left: 100%;
-}
-
 /* the live markdown editor sitting inside a canvas block */
 .cv-md-edit {
   background: transparent;
@@ -834,36 +727,72 @@ svg.cv-el {
   background: var(--bg-elev);
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-strong);
   animation: popIn 140ms var(--ease);
+  max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* Style panel: every option of a tool or selection in one view, each row a
+   label and its choices. */
+.cv-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 150px;
+  gap: 4px;
+  /* wide enough for a full row of eleven swatches (fill adds "none") */
+  width: 392px;
+  max-width: 100%;
 }
-.cv-pop-label {
-  font-size: 10.5px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.cv-panel-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-strong);
+}
+.cv-sec {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  min-height: 30px;
+}
+.cv-sec-label {
+  font-size: 12px;
   color: var(--text-3);
+  white-space: nowrap;
+}
+.cv-sec-body {
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .cv-sec {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 3px;
+    padding: 2px 0;
+  }
 }
 .cv-swatches {
-  display: grid;
-  grid-template-columns: repeat(5, 26px);
-  gap: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
 }
 .cv-swatch {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--radius-sm);
+  width: 24px;
+  height: 24px;
+  /* a <button> brings its own padding, which squeezed the dot's box and pushed
+     it off-centre */
+  padding: 0;
   border: none;
+  border-radius: var(--radius-sm);
+  background: none;
   cursor: pointer;
   display: grid;
   place-items: center;
+}
+.cv-swatch:hover {
   background: var(--bg-hover);
 }
 .cv-swatch .cv-dot {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 .cv-swatch.active {
   box-shadow: 0 0 0 2px var(--accent);
@@ -874,10 +803,42 @@ svg.cv-el {
 }
 .cv-opts .cv-sbtn {
   flex: 1;
+  min-width: 0;
+  padding: 0 4px;
+}
+/* previews of a line, a head or a path: drawn at their own size, not the
+   15px of an icon */
+.cv-sbtn .cv-glyph {
+  width: 24px;
+  height: 14px;
+  flex: none;
+  display: block;
+}
+.cv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cv-actions .cv-sbtn {
+  padding: 0 9px;
+}
+.cv-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .cv-range {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   accent-color: var(--accent);
+}
+.cv-range-value {
+  flex: none;
+  width: 34px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Standalone board ---------- */
