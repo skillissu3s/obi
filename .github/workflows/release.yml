@@ -1,0 +1,37 @@
+# Builds the desktop installers on Windows, macOS and Linux and attaches them to
+# a DRAFT GitHub release for the tag. Nothing goes public until you press
+# "Publish release" on GitHub — and only then does the download button on the
+# intro page (which reads the latest published release) move to the new version.
+#
+#   push a tag:   git tag v1.2.0 && git push origin v1.2.0   (package.json must say 1.2.0)
+#   or run it by hand from the Actions tab.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # electron-builder creates the draft release and uploads to it
+
+jobs:
+  installers:
+    strategy:
+      fail-fast: false # one platform failing shouldn't throw away the others
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        if: runner.os == 'Linux'
+      - run: npx vite build
+      - run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
