@@ -90,15 +90,39 @@ const shapeOf = (type) => (type === 'ellipse' ? 'ellipse' : type === 'diamond' ?
 
 const shapeEdge = (t, ref, gap) => outlinePoint(t.shape || 'rect', t, ref[0], ref[1], gap) || center(t)
 
+// A routed line runs along the gap until it is RUN past the last word it could
+// cut, then bends away over TURN more towards its target (less of both when the
+// target is close).
+const RUN = 10
+const TURN = 16
+
+// The points on the way from a to b, as far apart at first as a is from `from`
+// and twice as far apart each time. A smoothed path overshoots where a short
+// stretch follows a long one (it loops back on itself), so a straight stretch
+// that ends in a bend is split like this rather than drawn as one segment.
+function ramp(a, b, from) {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+  const out = []
+  for (let at = 0, s = Math.max(1, Math.hypot(a[0] - from[0], a[1] - from[1])); len - at >= 2 * s; s *= 2) {
+    at += s
+    out.push([a[0] + ((b[0] - a[0]) * at) / len, a[1] + ((b[1] - a[1]) * at) / len])
+  }
+  return out
+}
+
 /**
  * A text end is a row of words (t.text). A line may touch it from above or
  * below, never from the side: that would cut straight through the words next to
- * it. Starting from the edge nearest `ref` (where the line is heading), a line
- * with no bends of its own (`route`) also runs along the gap between the lines
- * of text (t.ga above, t.gb below) and out past the edge of the column (t.col),
- * so it crosses no word on the way. Points come back from the text outwards.
+ * it. Starting from the edge nearest the other end (`look`, the box of whatever
+ * it is heading for), a line with no bends of its own (`route`) also runs along
+ * the gap between the lines of text (t.ga above, t.gb below) to just past the
+ * words it could otherwise cut: those on the rows either side of the gap and on
+ * every row down to the other end, as far as t.reach(from, to) reports them,
+ * else all the way to the edge of the column (t.col). Points come back from the
+ * text outwards; the last is where the line has bent towards the other end.
  */
-function textEnd(t, ref, gap, route) {
+function textEnd(t, look, gap, route) {
+  const ref = center(look)
   // from the top only when the other end is wholly above the row; level with it
   // or lower, the line leaves from underneath
   const below = !(ref[1] < t.y)
@@ -107,15 +131,33 @@ function textEnd(t, ref, gap, route) {
   const gy = below ? t.gb : t.ga
   const [cl, cr] = t.col || []
   if (!route || gy == null || cl == null || (ref[0] >= cl && ref[0] <= cr)) return [[x, below ? t.y + t.h + gap : t.y - gap]]
+  // One set of rules for every exit: u runs the way out, towards the side of
+  // the column the other end is on, and v away from the text.
   const out = ref[0] > cr ? 1 : -1
-  const edge = (out > 0 ? cr : cl) + 10 * out
-  return [[x, gy], [edge, gy], [edge + 16 * out, gy]]
+  const side = below ? 1 : -1
+  const at = (u, v) => [u * out, gy + v * side]
+  const far = (reach) => (out > 0 ? reach[1] : -reach[0])
+  // it starts under words, not past the end of them
+  const u0 = Math.min(x * out, far(t.reach?.(gy, gy) || t.col))
+  const words = Math.max(u0, far(t.reach?.(gy, ref[1]) || t.col))
+  // the run and the bend shrink to fit between the words and a close target:
+  // they want the run, the bend and half as much again to arrive on
+  const near = out > 0 ? look.x : -(look.x + look.w)
+  const k = Math.max(0.2, Math.min(1, (near - words) / (RUN + 2.5 * TURN)))
+  const [run, d] = [words + k * RUN, k * TURN]
+  // a quadratic bend from the end of the run into the direction of the other end
+  const [du, dv] = [ref[0] * out - run - d, (ref[1] - gy) * side]
+  const len = Math.hypot(du, dv) || 1
+  const start = at(u0, 0)
+  const stop = at(run, 0)
+  const bend = at(run + d * (0.75 + du / len / 4), (d * dv) / len / 4)
+  return [start, ...ramp(stop, start, bend).reverse(), stop, bend, at(run + d * (1 + du / len), (d * dv) / len)]
 }
 
 /**
  * Resolve an arrow/line whose ends are bound to elements (or text).
  * `target(binding)` returns { shape, x, y, w, h } or null; text also carries
- * text: true and, for routing, ga, gb and col (see textEnd).
+ * text: true and, for routing, ga, gb, col and reach (see textEnd).
  *
  * Returns the points to draw and, when a route was added through the gaps of
  * the text, `handles`: just the line's own points — the two ends and any bends
@@ -132,8 +174,11 @@ export function resolveLinear(el, target) {
   const last = [pts[pts.length - 1][0], pts[pts.length - 1][1]]
   const mid = pts.slice(1, -1).map((p) => [p[0], p[1]])
   // what each end looks towards: the line's next bend, else the other end
-  const lookS = mid.length ? mid[0] : e ? center(e) : last
-  const lookE = mid.length ? mid[mid.length - 1] : s ? center(s) : first
+  const dot = (p) => ({ x: p[0], y: p[1], w: 0, h: 0 })
+  // a line stops a little short of a shape: that is as near as a route may come
+  const apart = (b) => ({ x: b.x - gap, y: b.y - gap, w: b.w + 2 * gap, h: b.h + 2 * gap })
+  const lookS = mid.length ? dot(mid[0]) : e ? apart(e) : dot(last)
+  const lookE = mid.length ? dot(mid[mid.length - 1]) : s ? apart(s) : dot(first)
   // text ends choose their edge (and route) first; shapes then aim at the result
   const route = !mid.length
   const textS = s?.text ? textEnd(s, lookS, 2 + (el.sw || 2), route && !e?.text) : null
@@ -142,7 +187,9 @@ export function resolveLinear(el, target) {
   const beforeE = mid.length ? mid[mid.length - 1] : textS ? textS[textS.length - 1] : s ? center(s) : first
   const startPts = !s ? [first] : textS || [shapeEdge(s, afterS, gap)]
   const endPts = !e ? [last] : textE ? [...textE].reverse() : [shapeEdge(e, beforeE, gap)]
-  const points = [...startPts, ...mid, ...endPts]
+  // after a routed text end the line straightens out gradually (see ramp)
+  const bridge = startPts.length > 1 ? ramp(startPts[startPts.length - 1], endPts[0], startPts[startPts.length - 2]) : endPts.length > 1 ? ramp(endPts[0], startPts[0], endPts[1]).reverse() : []
+  const points = [...startPts, ...bridge, ...mid, ...endPts]
   const routed = startPts.length > 1 || endPts.length > 1
   return { points, handles: routed ? [startPts[0], ...mid, endPts[endPts.length - 1]] : undefined }
 }

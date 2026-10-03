@@ -47,6 +47,26 @@ is what this contract guards.
    1.25× size boost or its line-height. `ElementView.textStyle`,
    `layout.measureMarkdown` and `boardsvg.textBlock` all follow this.
 
+## Also: lines drawn out of a phrase end where the text ends
+
+An arrow bound to a phrase leaves it through the gap between two lines of text,
+runs along the gap only as far as the words it could otherwise cut, and then
+turns towards its target (`textEnd` in `shared/boardgeom.js`). So that it ends in
+the same place on both sides, `textRect` gives the layout, in world pixels:
+
+- `ga` / `gb` — the middle of the free band above / below the phrase's rows;
+- `col` — `[left, right]` of the text column;
+- `reach(from, to)` — `[left, right]` of the words on the rows whose middle is
+  within a line of height `from` (the rows either side of a gap) and on every
+  row down to height `to`, or `null`. Both sides build it with
+  `client/src/canvas/wordreach.js` from their own DOM: a word is a run of
+  non-space characters, a line is the base line height (`defaultLineHeight` /
+  zoom in the editor, `m.line` on the page) and the editor leaves out its remote
+  cursors' labels.
+
+Measure `reach` the same way on both sides, or a line ends one place in the
+editor and another on the published page.
+
 ## Also: no vertical margins on editor widgets
 
 CodeMirror measures lines and block widgets by their border box. A vertical
@@ -61,8 +81,9 @@ below**. Put spacing inside the box (padding, or a transparent border with
 `client/src/publish/publish.css` · `client/src/publish/main.js` ·
 `shared/markdown.js` (the `sourceLines` parts) · `server/public.js` (page and
 routes) · `client/src/canvas/layout.js` (`resolveLayout`, `measureMarkdown`) ·
-`client/src/canvas/anchors.js` · `client/src/canvas/NoteCanvas.jsx` (`env`,
-`anchorFor`) · `client/src/canvas/ElementView.jsx` (`textStyle`) ·
+`client/src/canvas/anchors.js` · `client/src/canvas/wordreach.js` ·
+`client/src/canvas/NoteCanvas.jsx` (`env`, `anchorFor`) ·
+`client/src/canvas/ElementView.jsx` (`textStyle`) ·
 `shared/boardsvg.js` (`textBlock`, `boardToSvg`) ·
 `client/src/lib/themesnapshot.js`
 

@@ -24,6 +24,7 @@ import { Toolbar, StyleBar } from './Toolbar.jsx'
 import { AnchorTracker, makeAnchor, makeLineAnchor } from './anchors.js'
 import { newElementId, newSeed } from './store.js'
 import { visualBounds, source } from './layout.js'
+import { wordReach } from './wordreach.js'
 
 function useLayerHandle(ws, path) {
   const [handle, setHandle] = useState(null)
@@ -144,6 +145,10 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     const tracker = trackerRef.current
     syncText()
     const rects = new Map()
+    // a screen rect in world pixels
+    const world = (r) => ({ left: (r.left - g.ox) / g.z, right: (r.right - g.ox) / g.z, top: (r.top - g.oy) / g.z, bottom: (r.bottom - g.oy) / g.z })
+    // where the words extend (the remote cursors' labels, floating over the text, are not words)
+    const reach = wordReach(view.contentDOM, { world, pitch: view.defaultLineHeight / g.z, ignore: '.cm-ySelectionCaret' })
     return {
       version: envVersion,
       lineTop: (anchor) => {
@@ -162,13 +167,12 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         const from = Math.min(e.from, len)
         const to = Math.min(Math.max(e.to, from), len)
         // ⚠ LAYOUT CONTRACT: ga/gb are the middle of the free band between this
-        // text and the line above/below it, and col is the text column. A line
-        // that leaves the text runs along them (see textEnd in boardgeom.js);
-        // publish/main.js measures the same things from its own DOM.
+        // text and the line above/below it, col is the text column and reach
+        // says where the words around it extend. A line that leaves the text
+        // runs along the gap, as far as those words (see textEnd in
+        // boardgeom.js); publish/main.js measures the same things from its own DOM.
         const gapOf = (r) => Math.min(8, Math.max(2, (view.defaultLineHeight / g.z - (r.bottom - r.top)) / 2))
         const col = [g.colLeft, g.colRight]
-        // a screen rect in world pixels
-        const world = (r) => ({ left: (r.left - g.ox) / g.z, right: (r.right - g.ox) / g.z, top: (r.top - g.oy) / g.z, bottom: (r.bottom - g.oy) / g.z })
         const sa = view.coordsAtPos(from, 1)
         const sb = view.coordsAtPos(to, -1)
         let rect = null
@@ -176,11 +180,11 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           const a = world(sa)
           const b = world(sb)
           const rows = Math.abs(a.top - b.top) < 4 ? { x: a.left, w: Math.max(4, b.right - a.left) } : { x: g.colLeft, w: g.colRight - g.colLeft }
-          rect = { ...rows, y: a.top, h: Math.max(4, b.bottom - a.top), ga: a.top - gapOf(a), gb: b.bottom + gapOf(b), col }
+          rect = { ...rows, y: a.top, h: Math.max(4, b.bottom - a.top), ga: a.top - gapOf(a), gb: b.bottom + gapOf(b), col, reach }
         } else {
           const { top } = lineBlock(view, g, from)
           const { bottom } = lineBlock(view, g, to)
-          rect = { x: g.colLeft, y: top, w: g.colRight - g.colLeft, h: Math.max(8, bottom - top), ga: top - 2, gb: bottom + 2, col }
+          rect = { x: g.colLeft, y: top, w: g.colRight - g.colLeft, h: Math.max(8, bottom - top), ga: top - 2, gb: bottom + 2, col, reach }
         }
         rects.set(e, rect)
         return rect

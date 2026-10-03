@@ -10,6 +10,7 @@
 import './publish.css'
 import { resolveLayout, measureMarkdown } from '../canvas/layout.js'
 import { resolveAnchor } from '../canvas/anchors.js'
+import { wordReach } from '../canvas/wordreach.js'
 import { boardToSvg, highlightCss } from '@shared/boardsvg.js'
 
 const article = document.getElementById('content')
@@ -77,7 +78,9 @@ function measure() {
     bottoms.set(n, r.bottom + window.scrollY - oy)
   }
   const known = [...tops.keys()].sort((a, b) => a - b)
-  return { ox, oy, line, tops, known, width: box.width }
+  // a client rect in world pixels
+  const world = (r) => ({ left: r.left + window.scrollX - ox, right: r.right + window.scrollX - ox, top: r.top + window.scrollY - oy, bottom: r.bottom + window.scrollY - oy })
+  return { ox, oy, line, tops, known, width: box.width, reach: wordReach(article, { world, pitch: line }) }
 }
 
 // The top of any source line: exact when the page marks it, otherwise between
@@ -179,7 +182,8 @@ function rangeFor(anchor) {
 
 // ⚠ LAYOUT CONTRACT — the same rect NoteCanvas.jsx builds for the editor. ga/gb
 // are the middle of the free band above/below the text (where a line leaving it
-// runs, see textEnd in boardgeom.js) and col is the text column.
+// runs, see textEnd in boardgeom.js), col is the text column and reach says
+// where the words around the text extend.
 function textRect(m, anchor) {
   const range = rangeFor(anchor)
   if (!range) return null
@@ -190,7 +194,7 @@ function textRect(m, anchor) {
   const top = first.top + window.scrollY - m.oy
   const lh = parseFloat(getComputedStyle(range.startContainer.parentElement).lineHeight) || m.line
   const gapOf = (r) => Math.min(8, Math.max(2, (lh - r.height) / 2))
-  const gaps = { ga: top - gapOf(first), gb: last.bottom + window.scrollY - m.oy + gapOf(last), col: [0, m.width] }
+  const gaps = { ga: top - gapOf(first), gb: last.bottom + window.scrollY - m.oy + gapOf(last), col: [0, m.width], reach: m.reach }
   // one line: a tight box; several lines: the column, as the editor does
   if (Math.abs(first.top - last.top) < 4) {
     return { x: first.left + window.scrollX - m.ox, y: top, w: Math.max(4, last.right - first.left), h: Math.max(4, last.bottom - first.top), ...gaps }

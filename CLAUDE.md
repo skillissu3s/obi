@@ -15,8 +15,8 @@ change the matching rule on the other side in the same commit:
 - `client/src/publish/publish.css`, `client/src/publish/main.js`
 - `shared/markdown.js` — the `sourceLines` parts
 - `server/public.js` — the published page and its routes
-- `client/src/canvas/layout.js`, `anchors.js`, `NoteCanvas.jsx` (`env`,
-  `anchorFor`), `ElementView.jsx` (`textStyle`)
+- `client/src/canvas/layout.js`, `anchors.js`, `wordreach.js`, `NoteCanvas.jsx`
+  (`env`, `anchorFor`), `ElementView.jsx` (`textStyle`)
 - `shared/boardsvg.js` — `textBlock`, `boardToSvg`
 - `client/src/lib/themesnapshot.js`
 
