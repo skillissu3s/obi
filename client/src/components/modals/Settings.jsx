@@ -369,12 +369,13 @@ function AppearanceSection() {
             {PALETTES.filter((p) => p.home === group.home).map((p) => {
               // cards preview the theme in the mode it was designed for
               const [bg, fg, accent] = p[group.home]
-              const active = prefs.palette === p.id && (prefs.theme === 'system' || mode === group.home)
+              const active = prefs.palette === p.id && mode === group.home
               return (
                 <button
                   key={p.id}
                   className={`palette-card ${active ? 'active' : ''}`}
-                  onClick={() => prefs.set(prefs.theme === 'system' ? { palette: p.id } : { palette: p.id, theme: group.home })}
+                  // a light card shows light and a dark card dark: from the other mode (System included) it switches
+                  onClick={() => prefs.set(mode === group.home ? { palette: p.id } : { palette: p.id, theme: group.home })}
                   title={`${p.note} (also has a ${group.home === 'light' ? 'dark' : 'light'} version)`}
                 >
                   <span className="palette-swatch" style={{ background: bg }}>
@@ -393,7 +394,7 @@ function AppearanceSection() {
           </div>
         </div>
       ))}
-      <p className="setting-desc palette-hint">Every theme has a light and a dark version. Mode above switches between them, or pick System to follow your device.</p>
+      <p className="setting-desc palette-hint">Every theme has a light and a dark version. Picking a theme from the other group switches the mode to match; System follows your device.</p>
 
       <Setting name="Accent colour" desc="Overrides the accent that comes with the theme.">
         <div className="accent-swatches">
