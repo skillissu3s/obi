@@ -7,7 +7,7 @@ import { toast, confirmDialog, promptDialog, useUI } from '../store/ui.js'
 import { basename, dirname, stripExt, joinPath, isNote, safeName, extname } from '@shared/paths.js'
 import { isBoardPath, emptyBoard } from '@shared/board.js'
 import { formatDate, isoDate, dateOfIso, downloadUrl, copyText } from './util.js'
-import { todayIso } from '@shared/tasks.js'
+import { previewEdit, todayIso } from '@shared/tasks.js'
 import { fetchNote } from './render.js'
 import { conn } from './socket.js'
 
@@ -567,37 +567,57 @@ export function recentNotes(limit = 8) {
     .slice(0, limit)
 }
 
+// A note's tasks keep their identity until the note is indexed again, so what
+// shows them can tell which ones changed.
+const withPath = new WeakMap()
+
 // every task in the workspace, each with the note it is in
 export function allTasks() {
-  const s = app()
   const out = []
-  for (const [path, meta] of s.notes) for (const task of meta.tasks || []) out.push({ ...task, path })
+  for (const [path, meta] of app().notes) {
+    for (const task of meta.tasks || []) {
+      let t = withPath.get(task)
+      if (!t) withPath.set(task, (t = { ...task, path }))
+      out.push(t)
+    }
+  }
   return out
 }
 
 /**
  * Changes a task — { status, due, scheduled, start, priority, recurrence, title };
  * a field set to null is cleared. The note's line is rewritten on the server
- * and the new state comes back through the index like any other edit.
- * Returns the server's answer, or null if it didn't work (already toasted).
+ * and the new state comes back through the index like any other edit; until then
+ * the change shows as if it had. `dropNext` takes back the completion of a
+ * repeating task. Returns the server's answer, or null if it didn't work
+ * (already toasted).
  */
-export async function updateTask(task, patch) {
+export async function updateTask(task, patch, { dropNext = false } = {}) {
+  const s = app()
   try {
-    return await api.updateTask(app().wsId, { path: task.path, line: task.line, title: task.text, patch, today: todayIso() })
+    const meta = s.notes.get(task.path)
+    const at = meta?.tasks?.findIndex((t) => t.line === task.line && t.text === task.text) ?? -1
+    if (at >= 0) {
+      try {
+        s.updateNoteIndex(task.path, { ...meta, tasks: meta.tasks.map((t, i) => (i === at ? previewEdit(t, patch, { today: todayIso() }) : t)) })
+      } catch {} // only a head start: the server says why if the change is no good
+    }
+    return await api.updateTask(s.wsId, { path: task.path, line: task.line, title: task.text, patch, today: todayIso(), dropNext })
   } catch (e) {
     toast.error(e)
     // most likely the note changed under us: reload what we show
-    app().refreshIndex()
+    s.refreshIndex()
     return null
   }
 }
 
 /**
  * Adds a task to a day's note — today's, or `day`'s (yyyy-mm-dd) — made from its
- * template if that day has none yet. `fields`: due, scheduled, start, priority,
- * recurrence.
+ * template if that day has none yet. `fields`: status ('/'), due, scheduled,
+ * start, priority, recurrence. `quiet`: no toast, for when the task shows up
+ * where the person is looking.
  */
-export async function addTask({ title, day, ...fields }) {
+export async function addTask({ title, day, quiet = false, ...fields }) {
   const s = app()
   const ws = s.wsId
   const date = day ? dateOfIso(day) : new Date()
@@ -606,10 +626,21 @@ export async function addTask({ title, day, ...fields }) {
     const template = s.treeMap.has(path) ? undefined : await newDailyContent(ws, date, wsSettings())
     const r = await api.addTask(ws, { path, title, ...fields, today: todayIso(), template })
     if (!s.treeMap.has(path)) s.addEntry(path)
-    toast.success(`Added to ${formatDate(date, 'ddd D MMM')}'s note`, { action: { label: 'Open', run: () => openPath(ws, path, { line: r.line }) } })
+    if (!quiet) toast.success(`Added to ${formatDate(date, 'ddd D MMM')}'s note`, { action: { label: 'Open', run: () => openPath(ws, path, { line: r.line }) } })
     return r
   } catch (e) {
     toast.error(e)
+    return null
+  }
+}
+
+/** Adds a subtask to the line below a task, in its own note */
+export async function addSubtask(task, title) {
+  try {
+    return await api.addTask(app().wsId, { path: task.path, title, under: { line: task.line, title: task.text }, today: todayIso() })
+  } catch (e) {
+    toast.error(e)
+    app().refreshIndex()
     return null
   }
 }

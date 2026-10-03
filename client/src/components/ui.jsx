@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { useToasts, useUI } from '../store/ui.js'
 
-export function Modal({ title, onClose, children, footer, className = '', center = false, icon, headerExtra, bodyClass = 'modal-body' }) {
+export function Modal({ title, label, onClose, children, footer, className = '', center = false, icon, headerExtra, bodyClass = 'modal-body' }) {
   const ref = useRef(null)
   useEffect(() => {
     const onKey = (e) => {
@@ -22,7 +22,7 @@ export function Modal({ title, onClose, children, footer, className = '', center
         if (e.target === e.currentTarget) onClose?.()
       }}
     >
-      <div className={`modal ${className}`} ref={ref} role="dialog" aria-modal="true" style={{ position: 'relative' }}>
+      <div className={`modal ${className}`} ref={ref} role="dialog" aria-modal="true" aria-label={label} style={{ position: 'relative' }}>
         {title == null && onClose && (
           <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: 10, right: 12, zIndex: 5 }}>
             <X />

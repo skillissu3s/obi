@@ -15,7 +15,7 @@ import { cloudStatus } from './cloudsync.js'
 import { extname, isNote, basename, dirname, safeName, joinPath } from '../shared/paths.js'
 import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
 import { scanDir } from './fsutil.js'
-import { applyTaskEdit, appendTask, newTaskLine, isIsoDate, toggleTaskLine, TaskChangedError } from '../shared/tasks.js'
+import { addSubtask, applyTaskEdit, appendTask, newTaskLine, isIsoDate, toggleTaskLine, TaskChangedError } from '../shared/tasks.js'
 import path from 'node:path'
 
 export const wsRouter = express.Router()
@@ -325,9 +325,9 @@ const taskDay = (v) => {
   return v
 }
 
-// Edits one task: { path, line, title, patch: { status, due, scheduled, start, priority, recurrence, title }, today }.
+// Edits one task: { path, line, title, patch: { status, due, scheduled, start, priority, recurrence, title }, today, dropNext }.
 // `title` is what the client last saw on that line, so a note that changed in
-// between is never edited blindly.
+// between is never edited blindly. `dropNext`: this undoes finishing a repeating task.
 wsRouter.post('/:id/tasks/update', async (req, res) => {
   const p = safePath(req.body?.path)
   notePathAccess(req, 'editor', p)
@@ -339,7 +339,7 @@ wsRouter.post('/:id/tasks/update', async (req, res) => {
     await rt.updateNote(
       p,
       (text) => {
-        result = applyTaskEdit(text, { line, title, patch, today: taskDay(req.body.today) })
+        result = applyTaskEdit(text, { line, title, patch, today: taskDay(req.body.today), dropNext: req.body.dropNext === true })
         return result.text
       },
       { userId: req.user.id },
@@ -375,13 +375,16 @@ wsRouter.post('/:id/tasks/toggle', async (req, res) => {
   res.json({ status: /\[(.)\]/.exec(task)?.[1] ?? null })
 })
 
-// Adds a task to the end of a note (made if it isn't there yet):
-// { path, title, due, scheduled, start, priority, recurrence, today, template }
+// Adds a task to the end of a note (made if it isn't there yet), or with `under`
+// ({ line, title }, as for an update) as a subtask of a task in it:
+// { path, title, status ('/'), due, scheduled, start, priority, recurrence, today, template, under }
 wsRouter.post('/:id/tasks/add', async (req, res) => {
   const p = safePath(req.body?.path)
   notePathAccess(req, 'editor', p)
   const title = String(req.body?.title || '').trim()
   if (!title) throw new HttpError(400, 'A task needs some text')
+  const under = req.body.under
+  if (under && !Number.isInteger(under.line)) throw new HttpError(400, 'A subtask needs the line of its task')
   const rt = await getRuntime(req.ws.id)
   let line
   try {
@@ -391,20 +394,30 @@ wsRouter.post('/:id/tasks/add', async (req, res) => {
     throw e
   }
   // a note that isn't there yet starts from the caller's text (a daily note's template)
-  if (!rt.hasFile(p)) {
+  if (!under && !rt.hasFile(p)) {
     if (!isNote(p)) throw new HttpError(400, 'Notes must end with .md')
     await rt.writeNote(p, typeof req.body.template === 'string' ? req.body.template : '', { userId: req.user.id, ifMissing: true })
   }
   let at = 0
-  await rt.updateNote(
-    p,
-    (text) => {
-      const next = appendTask(text, line)
-      at = next.replace(/\n$/, '').split('\n').length - 1
-      return next
-    },
-    { userId: req.user.id },
-  )
+  try {
+    await rt.updateNote(
+      p,
+      (text) => {
+        if (under) {
+          const r = addSubtask(text, under, line)
+          at = r.line
+          return r.text
+        }
+        const next = appendTask(text, line)
+        at = next.replace(/\n$/, '').split('\n').length - 1
+        return next
+      },
+      { userId: req.user.id },
+    )
+  } catch (e) {
+    if (e instanceof TaskChangedError) throw new HttpError(409, e.message)
+    throw e
+  }
   res.json({ path: p, line: at })
 })
 
