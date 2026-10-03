@@ -145,16 +145,22 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         const len = view.state.doc.length
         const from = Math.min(e.from, len)
         const to = Math.min(Math.max(e.to, from), len)
+        // ⚠ LAYOUT CONTRACT: ga/gb are the middle of the free band between this
+        // text and the line above/below it, and col is the text column. A line
+        // that leaves the text runs along them (see textEnd in boardgeom.js);
+        // publish/main.js measures the same things from its own DOM.
+        const gapOf = (r) => Math.min(8, Math.max(2, (view.defaultLineHeight - (r.bottom - r.top)) / 2))
+        const col = [g.colLeft, g.colRight]
         let rect = null
         const a = view.coordsAtPos(from, 1)
         const b = view.coordsAtPos(to, -1)
         if (a && b) {
-          if (Math.abs(a.top - b.top) < 4) rect = { x: a.left - g.ox, y: a.top - g.oy, w: Math.max(4, b.right - a.left), h: Math.max(4, b.bottom - a.top) }
-          else rect = { x: g.colLeft, y: a.top - g.oy, w: g.colRight - g.colLeft, h: b.bottom - a.top }
+          const rows = Math.abs(a.top - b.top) < 4 ? { x: a.left - g.ox, w: Math.max(4, b.right - a.left) } : { x: g.colLeft, w: g.colRight - g.colLeft }
+          rect = { ...rows, y: a.top - g.oy, h: Math.max(4, b.bottom - a.top), ga: a.top - g.oy - gapOf(a), gb: b.bottom - g.oy + gapOf(b), col }
         } else {
           const top = view.lineBlockAt(from).top
           const bottom = view.lineBlockAt(to).bottom
-          rect = { x: g.colLeft, y: g.docTop + top, w: g.colRight - g.colLeft, h: Math.max(8, bottom - top) }
+          rect = { x: g.colLeft, y: g.docTop + top, w: g.colRight - g.colLeft, h: Math.max(8, bottom - top), ga: g.docTop + top - 2, gb: g.docTop + bottom + 2, col }
         }
         rects.set(e, rect)
         return rect

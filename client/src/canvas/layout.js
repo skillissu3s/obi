@@ -1,6 +1,6 @@
 // Resolves where elements actually sit (note anchors, arrow bindings) and hit-tests them.
 import {
-  elementBounds, resolveLinearPoints, isLinear, distToPolyline, sampleSmooth, midPoint, rectsIntersect, center, BINDABLE, absPoints,
+  elementBounds, resolveLinear, isLinear, distToPolyline, sampleSmooth, midPoint, rectsIntersect, center, BINDABLE, absPoints,
 } from '@shared/boardgeom.js'
 import { val, penSize, FONTS, fontScale, lineHeight, cornerRadius } from '@shared/boardsvg.js'
 
@@ -50,10 +50,10 @@ export function resolveLayout(snapshot, env = null) {
   for (let i = 0; i < list.length; i++) {
     const el = list[i]
     if ((el.type !== 'arrow' && el.type !== 'line') || (!el.start && !el.end)) continue
-    const pts = resolveLinearPoints(el, target)
+    const { points: pts, handles } = resolveLinear(el, target)
     const sig = pts.map((p) => `${Math.round(p[0])},${Math.round(p[1])}`).join(' ')
     const base = el._src || el
-    const r = cached(base, `p${el.y}|${sig}`, () => ({ ...el, _src: base, _pts: pts }))
+    const r = cached(base, `p${el.y}|${sig}`, () => ({ ...el, _src: base, _pts: pts, _hpts: handles }))
     list[i] = r
     byId.set(el.id, r)
   }
@@ -71,8 +71,15 @@ function cached(el, key, make) {
 
 export const source = (el) => el._src || el
 
+// the line as drawn
 export function visiblePoints(el) {
   return el._pts || absPoints(el)
+}
+
+// The line's own points, which its handles edit. They differ from the drawn
+// line when it was routed through the gaps between lines of text.
+export function handlePoints(el) {
+  return el._hpts || visiblePoints(el)
 }
 
 // ---------------- hit testing ----------------

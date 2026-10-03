@@ -2,7 +2,7 @@
 import { elementBounds, unionBounds, isLinear, normalizeLinear, simplify, absPoints, midPoint } from '@shared/boardgeom.js'
 import { DEFAULTS, val } from '@shared/boardsvg.js'
 import { newElementId, newSeed } from './store.js'
-import { resolveLayout, hitTest, inMarquee, erasedBy, bindTargetAt, visualBounds, source, measureText, measureMarkdown, visiblePoints } from './layout.js'
+import { resolveLayout, hitTest, inMarquee, erasedBy, bindTargetAt, visualBounds, source, measureText, measureMarkdown, handlePoints } from './layout.js'
 
 export const TOOL_KEYS = {
   v: 'select', h: 'hand', r: 'rect', o: 'ellipse', d: 'diamond', a: 'arrow', l: 'line', p: 'pen', m: 'marker',
@@ -486,7 +486,7 @@ export class CanvasController {
     if (el.type === 'pen') return
     if (isLinear(el)) {
       // double-click on a bend removes it
-      const pts = visiblePoints(hit)
+      const pts = handlePoints(hit)
       const zoom = this.host.zoom()
       const idx = pts.findIndex((q, i) => i > 0 && i < pts.length - 1 && Math.hypot(q[0] - p.x, q[1] - p.y) < 10 / zoom)
       if (idx > 0) {
@@ -885,7 +885,7 @@ export class CanvasController {
     if (data.handle === 'point' || data.handle === 'mid') {
       const el = layout.byId.get(data.id)
       if (!el) return
-      this.startGesture({ type: 'point', id: el.id, index: Number(data.index), mid: data.handle === 'mid', inserted: false, pts: visiblePoints(el) }, e)
+      this.startGesture({ type: 'point', id: el.id, index: Number(data.index), mid: data.handle === 'mid', inserted: false, pts: handlePoints(el) }, e)
       return
     }
     const sel = this.selected().filter((el) => !el.locked)

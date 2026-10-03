@@ -177,6 +177,9 @@ function rangeFor(anchor) {
   return range
 }
 
+// ⚠ LAYOUT CONTRACT — the same rect NoteCanvas.jsx builds for the editor. ga/gb
+// are the middle of the free band above/below the text (where a line leaving it
+// runs, see textEnd in boardgeom.js) and col is the text column.
 function textRect(m, anchor) {
   const range = rangeFor(anchor)
   if (!range) return null
@@ -185,11 +188,14 @@ function textRect(m, anchor) {
   const first = rects[0]
   const last = rects[rects.length - 1]
   const top = first.top + window.scrollY - m.oy
+  const lh = parseFloat(getComputedStyle(range.startContainer.parentElement).lineHeight) || m.line
+  const gapOf = (r) => Math.min(8, Math.max(2, (lh - r.height) / 2))
+  const gaps = { ga: top - gapOf(first), gb: last.bottom + window.scrollY - m.oy + gapOf(last), col: [0, m.width] }
   // one line: a tight box; several lines: the column, as the editor does
   if (Math.abs(first.top - last.top) < 4) {
-    return { x: first.left + window.scrollX - m.ox, y: top, w: Math.max(4, last.right - first.left), h: Math.max(4, last.bottom - first.top) }
+    return { x: first.left + window.scrollX - m.ox, y: top, w: Math.max(4, last.right - first.left), h: Math.max(4, last.bottom - first.top), ...gaps }
   }
-  return { x: 0, y: top, w: m.width, h: last.bottom - first.top }
+  return { x: 0, y: top, w: m.width, h: last.bottom - first.top, ...gaps }
 }
 
 let layers = null

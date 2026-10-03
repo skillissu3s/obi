@@ -12,6 +12,7 @@
     "dev:server": "node --watch --disable-warning=ExperimentalWarning server/index.js",
     "dev:client": "vite",
     "build": "vite build",
+    "test": "node --test",
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "desktop": "vite build && electron .",
     "desktop:dev": "electron .",

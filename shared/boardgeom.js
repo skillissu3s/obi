@@ -88,33 +88,66 @@ export function outlinePoint(shape, b, tx, ty, gap = 0) {
 
 const shapeOf = (type) => (type === 'ellipse' ? 'ellipse' : type === 'diamond' ? 'diamond' : 'rect')
 
+const shapeEdge = (t, ref, gap) => outlinePoint(t.shape || 'rect', t, ref[0], ref[1], gap) || center(t)
+
 /**
- * Resolve the visible points of an arrow/line whose ends are bound to elements (or text).
- * `target(binding)` returns { shape, x, y, w, h } or null.
+ * A text end is a row of words (t.text). A line may touch it from above or
+ * below, never from the side: that would cut straight through the words next to
+ * it. Starting from the edge nearest `ref` (where the line is heading), a line
+ * with no bends of its own (`route`) also runs along the gap between the lines
+ * of text (t.ga above, t.gb below) and out past the edge of the column (t.col),
+ * so it crosses no word on the way. Points come back from the text outwards.
  */
-export function resolveLinearPoints(el, target) {
+function textEnd(t, ref, gap, route) {
+  // from the top only when the other end is wholly above the row; level with it
+  // or lower, the line leaves from underneath
+  const below = !(ref[1] < t.y)
+  const r = Math.min(6, t.w / 2)
+  const x = Math.max(t.x + r, Math.min(t.x + t.w - r, ref[0]))
+  const gy = below ? t.gb : t.ga
+  const [cl, cr] = t.col || []
+  if (!route || gy == null || cl == null || (ref[0] >= cl && ref[0] <= cr)) return [[x, below ? t.y + t.h + gap : t.y - gap]]
+  const out = ref[0] > cr ? 1 : -1
+  const edge = (out > 0 ? cr : cl) + 10 * out
+  return [[x, gy], [edge, gy], [edge + 16 * out, gy]]
+}
+
+/**
+ * Resolve an arrow/line whose ends are bound to elements (or text).
+ * `target(binding)` returns { shape, x, y, w, h } or null; text also carries
+ * text: true and, for routing, ga, gb and col (see textEnd).
+ *
+ * Returns the points to draw and, when a route was added through the gaps of
+ * the text, `handles`: just the line's own points — the two ends and any bends
+ * — which are what its handles edit.
+ */
+export function resolveLinear(el, target) {
   const pts = absPoints(el)
-  if (pts.length < 2 || el.type === 'pen') return pts
+  if (pts.length < 2 || el.type === 'pen') return { points: pts }
   const s = el.start ? target(el.start) : null
   const e = el.end ? target(el.end) : null
-  if (!s && !e) return pts
+  if (!s && !e) return { points: pts }
   const gap = 5 + (el.sw || 2)
-  const out = pts.map((p) => [p[0], p[1]])
-  const last = out.length - 1
-  if (s) {
-    const ref = out.length > 2 ? out[1] : e ? center(e) : out[last]
-    const p = outlinePoint(s.shape || 'rect', s, ref[0], ref[1], gap)
-    if (p) out[0] = p
-    else out[0] = center(s)
-  }
-  if (e) {
-    const ref = out.length > 2 ? out[last - 1] : s ? center(s) : out[0]
-    const p = outlinePoint(e.shape || 'rect', e, ref[0], ref[1], gap)
-    if (p) out[last] = p
-    else out[last] = center(e)
-  }
-  return out
+  const first = [pts[0][0], pts[0][1]]
+  const last = [pts[pts.length - 1][0], pts[pts.length - 1][1]]
+  const mid = pts.slice(1, -1).map((p) => [p[0], p[1]])
+  // what each end looks towards: the line's next bend, else the other end
+  const lookS = mid.length ? mid[0] : e ? center(e) : last
+  const lookE = mid.length ? mid[mid.length - 1] : s ? center(s) : first
+  // text ends choose their edge (and route) first; shapes then aim at the result
+  const route = !mid.length
+  const textS = s?.text ? textEnd(s, lookS, 2 + (el.sw || 2), route && !e?.text) : null
+  const textE = e?.text ? textEnd(e, lookE, 2 + (el.sw || 2), route && !s?.text) : null
+  const afterS = mid.length ? mid[0] : textE ? textE[textE.length - 1] : e ? center(e) : last
+  const beforeE = mid.length ? mid[mid.length - 1] : textS ? textS[textS.length - 1] : s ? center(s) : first
+  const startPts = !s ? [first] : textS || [shapeEdge(s, afterS, gap)]
+  const endPts = !e ? [last] : textE ? [...textE].reverse() : [shapeEdge(e, beforeE, gap)]
+  const points = [...startPts, ...mid, ...endPts]
+  const routed = startPts.length > 1 || endPts.length > 1
+  return { points, handles: routed ? [startPts[0], ...mid, endPts[endPts.length - 1]] : undefined }
 }
+
+export const resolveLinearPoints = (el, target) => resolveLinear(el, target).points
 
 // Standard binding target resolver over an id → element map.
 export function elementTarget(byId, bounds = elementBounds) {

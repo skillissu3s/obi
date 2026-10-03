@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { unionBounds, isLinear, sampleSmooth } from '@shared/boardgeom.js'
+import { unionBounds, isLinear, sampleSmooth, midPoint } from '@shared/boardgeom.js'
 import { ElementView } from './ElementView.jsx'
-import { visualBounds, visiblePoints, source } from './layout.js'
+import { visualBounds, visiblePoints, handlePoints, source } from './layout.js'
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const HANDLE_CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }
@@ -120,16 +120,19 @@ function SelBox({ b, pad, soft, locked }) {
 }
 
 function PointHandles({ el, show }) {
-  const pts = visiblePoints(el)
+  const drawn = visiblePoints(el)
+  const pts = handlePoints(el)
   const src = source(el)
-  const trace = el.curve && pts.length > 2 ? sampleSmooth(pts, 8) : null
+  const trace = el.curve && drawn.length > 2 ? sampleSmooth(drawn, 8) : null
   return (
     <>
       {show &&
         pts.slice(0, -1).map((p, i) => {
-          // midpoint handle to add a bend
+          // midpoint handle to add a bend: on the line as drawn (a routed line
+          // has just the one, halfway along its whole route)
           let m = [(p[0] + pts[i + 1][0]) / 2, (p[1] + pts[i + 1][1]) / 2]
-          if (trace) m = trace[Math.min(trace.length - 1, i * 8 + 4)]
+          if (el._hpts) m = midPoint(drawn)
+          else if (trace) m = trace[Math.min(trace.length - 1, i * 8 + 4)]
           return <div key={`m${i}`} className="cv-handle mid" data-handle="mid" data-id={el.id} data-index={i} style={{ left: m[0], top: m[1], cursor: 'copy' }} />
         })}
       {pts.map((p, i) => {
