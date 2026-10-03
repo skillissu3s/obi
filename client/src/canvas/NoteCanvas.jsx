@@ -920,7 +920,6 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         {open ? (
           <Toolbar
             ctl={ctl}
-            mode="note"
             onCollapse={() => {
               ctl.setTool('select')
               usePrefs.getState().set({ canvasBar: false })

@@ -30,19 +30,18 @@ export const TOOLS = [
   'sep',
   { id: 'image', key: 'I', label: 'Image', icon: ImagePlus },
   { id: 'note', key: 'K', label: 'Link a note or web page', icon: Link2 },
-  { id: 'frame', key: 'F', label: 'Frame', icon: Frame, boardOnly: true },
+  { id: 'frame', key: 'F', label: 'Frame — group things on the canvas', icon: Frame },
   { id: 'eraser', key: 'E', label: 'Eraser', icon: Eraser },
   { id: 'laser', key: 'X', label: 'Laser pointer', icon: Pointer },
 ]
 
-export function Toolbar({ ctl, mode, extra, onCollapse }) {
+export function Toolbar({ ctl, extra, onCollapse }) {
   const state = useController(ctl)
   const readOnly = ctl.readOnly
   return (
     <div className="cv-toolbar" role="toolbar" aria-label="Canvas tools" onPointerDown={(e) => e.stopPropagation()}>
       {TOOLS.map((t, i) => {
         if (t === 'sep') return <div key={i} className="cv-sep" />
-        if (t.boardOnly && mode !== 'board') return null
         const disabled = readOnly && !['select', 'hand', 'laser'].includes(t.id)
         return (
           <button

@@ -480,7 +480,7 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
         {(!compactControls || toolsOpen) && (
           <div className="cv-dock">
             <StyleBar ctl={ctl} mode="board" />
-            <Toolbar ctl={ctl} mode="board" />
+            <Toolbar ctl={ctl} />
           </div>
         )}
         <div className="cv-hud" onPointerDown={(e) => e.stopPropagation()}>
