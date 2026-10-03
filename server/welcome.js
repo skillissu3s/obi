@@ -62,7 +62,10 @@ Back to [[Welcome]]. #getting-started
 
 ## Tasks
 - [ ] Open task 📅 2026-12-31
-- [x] Finished task
+- [ ] Urgent, repeating task ⏫ 🔁 every week 📅 2026-12-31
+- [x] Finished task ✅ 2026-12-01
+
+Priority is 🔺 ⏫ 🔼 🔽 ⏬, dates are 🛫 start, ⏳ scheduled and 📅 due. The Tasks view and the Calendar read these and write changes back to the line.
 
 ## Math
 Inline $e^{i\\pi} + 1 = 0$ and blocks:

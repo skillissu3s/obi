@@ -38,7 +38,10 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 - **Every note has a canvas around it.** Open *Canvas* at the bottom of a note to draw over or beside the text, drop sticky notes, images and page links into the margins. Drawings are pinned to the paragraph they sit next to, so they move with the text as you write
 - **Select text** for a small toolbar: highlight it, attach a sticky note (joined by a dashed arrow), link a page beside it, or start an arrow from it and drop the end on anything — shapes or other text
 - Pan with the scroll wheel (sideways on notes), **Space + drag**, the **middle mouse button** or the hand tool; `Ctrl/⌘` + wheel zooms whiteboards
+- **Zoom a note** from 50% to 200% with `Ctrl/⌘` + wheel, `Ctrl/⌘ +` / `−` / `0` or the zoom chip in the status bar. Text and canvas scale together, so drawings stay on their lines — and a note published while zoomed still lays out at its normal size
+- A text reference's arrow leaves from the top or bottom of the phrase, in the gap between lines, instead of cutting through the words beside it
 - Live cursors and selections when several people are on the same whiteboard or note canvas
+- Each tool's style options (colour, fill, stroke, bends, arrowheads…) are in one panel, with smooth curves as the default for bent lines
 - The markdown never changes: a note's canvas is saved beside it in `.obi/layers/<note path>.json` and follows the note when it's renamed, moved, deleted or restored. Whiteboards and layers are plain JSON with one element per line, and simultaneous edits from different machines are merged element by element during git sync
 
 **Finding things**
@@ -46,11 +49,12 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 - Full-text search with `tag:`, `path:`, `file:`, `"phrases"` and `-exclusions`
 - Backlinks **and** unlinked mentions, outline, local graph, note info
 - Global **graph view** — force-directed, folder-coloured, filterable
-- Tasks view across the whole workspace (grouped by due date or note)
-- Calendar with daily-note dots, bookmarks, recent notes
+- **Tasks** view across the whole workspace, grouped by date, priority or note; filter by status, priority, tag or text, add tasks from the top, and edit everything about one (status, priority, due / scheduled / start dates, repeat) in a card that writes straight back to its line. Tasks use the Obi/Obsidian-Tasks emoji format — `- [ ] Write report #work ⏫ 🔁 every week 📅 2026-10-05` — so existing vaults just work. Checking off a repeating task adds the next one, and done tasks are stamped `✅`
+- **Calendar** with month, week and agenda views: each day shows its daily note, the tasks due or scheduled on it and the notes you worked on that day; click a day to open or create its note, add a task for it, and drag a task to another day to reschedule it. The week can start on Monday or Sunday (Settings)
 
 **Working together** (online workspaces)
 - Real-time collaborative editing with live cursors and presence avatars
+- **Who is where**: everyone in the workspace is listed by the file they have open, and in a note you see which line and heading each person is on, can jump to them or follow them as they move through it
 - Share a single note with specific people (can edit / can view), or add members to the whole workspace
 - Publish any note to a public read-only link that updates live
 - Version history with diffs and one-click restore; trash with restore
