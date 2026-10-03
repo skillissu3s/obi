@@ -7,7 +7,7 @@ import { useNoteZoom, zoomLabel, ZOOM_MIN, ZOOM_MAX } from '../store/zoom.js'
 import { syncNow } from '../lib/actions.js'
 import { conn } from '../lib/socket.js'
 import { timeAgo, readingTime } from '../lib/util.js'
-import { AvatarStack } from './ui.jsx'
+import { WorkspacePeople } from './People.jsx'
 import { HardDrive } from 'lucide-react'
 import { dapi } from '../lib/desktop.js'
 import { cloudStatusText } from './Desktop.jsx'
@@ -101,9 +101,15 @@ export function StatusBar() {
     if (!tab || tab.kind !== 'note') setStats(null)
   }, [tab?.id, tab?.kind])
 
-  const everyone = new Map()
-  for (const list of Object.values(presence || {})) for (const u of list) if (u.id !== user?.id) everyone.set(u.id, u)
-  const others = [...everyone.values()]
+  // everyone else in the workspace, with the files they have open
+  const people = new Map()
+  for (const [path, list] of Object.entries(presence || {})) {
+    for (const u of list) {
+      if (u.id === user?.id) continue
+      if (!people.has(u.id)) people.set(u.id, { user: u, paths: [] })
+      people.get(u.id).paths.push(path)
+    }
+  }
 
   const syncIcon = () => {
     if (!sync) return null
@@ -159,11 +165,7 @@ export function StatusBar() {
           {connection === 'reconnecting' ? 'Reconnecting…' : connection === 'offline' ? 'Offline' : 'Connecting…'}
         </span>
       )}
-      {others.length > 0 && (
-        <span className="status-item" title={others.map((o) => o.name).join(', ')}>
-          <AvatarStack users={others} size={16} max={5} />
-        </span>
-      )}
+      <WorkspacePeople people={[...people.values()]} />
       <span className="status-spacer" />
       {tab?.kind === 'note' && <ZoomChip />}
       {tab?.kind === 'note' && tab.ws === wsId && treeMap.get(tab.path)?.mtime > 0 && (

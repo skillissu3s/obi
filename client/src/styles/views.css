@@ -1946,3 +1946,191 @@
   background: var(--text-faint);
   opacity: 0.55;
 }
+
+/* ---------- People: who is where ---------- */
+.people-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 7px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-3);
+  font-size: 12px;
+  cursor: pointer;
+}
+.people-btn:hover,
+.people-btn.open {
+  background: var(--bg-hover);
+  color: var(--text-2);
+}
+.people-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.people-btn .avatar-stack {
+  margin: 0;
+}
+.people-count {
+  font-variant-numeric: tabular-nums;
+}
+.people-pop {
+  position: fixed;
+  z-index: 420;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  max-height: min(420px, calc(100vh - 80px));
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-strong);
+  animation: popIn 140ms var(--ease);
+}
+.people-label {
+  padding: 8px 8px 4px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.people-label:first-child {
+  padding-top: 4px;
+}
+.people-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+.people-row.clickable {
+  cursor: pointer;
+}
+.people-row.clickable:hover {
+  background: var(--bg-hover);
+}
+.people-main {
+  flex: 1;
+  min-width: 0;
+}
+.people-name {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text);
+}
+.people-where {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.people-where svg {
+  flex: none;
+}
+.people-actions {
+  display: flex;
+  gap: 2px;
+}
+.people-act {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.people-act:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.people-act.on {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.people-act svg {
+  width: 14px;
+  height: 14px;
+}
+.follow-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 4px 0 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent);
+  color: var(--text);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.follow-chip button {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.follow-chip button:hover {
+  background: color-mix(in srgb, var(--c) 30%, transparent);
+}
+.follow-chip svg {
+  width: 12px;
+  height: 12px;
+}
+/* a collaborator's caret scrolled out of sight, marked at the edge */
+.cursor-chips {
+  position: absolute;
+  right: 18px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+.cursor-chips.up {
+  top: 52px;
+}
+.cursor-chips.down {
+  bottom: 62px;
+}
+.cursor-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  height: 26px;
+  padding: 0 8px 0 4px;
+  border: none;
+  border-radius: 999px;
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-sm), 0 0 0 1.5px var(--c);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  animation: popIn 160ms var(--ease);
+}
+.cursor-chip:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--c) 14%, var(--bg-elev));
+}
+.cursor-chip svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+

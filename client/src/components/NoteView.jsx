@@ -15,7 +15,9 @@ import { Editor } from './Editor.jsx'
 import { Reader } from './Reader.jsx'
 import { Board } from './Board.jsx'
 import { NoteCanvas } from '../canvas/NoteCanvas.jsx'
-import { AvatarStack, menuFromElement } from './ui.jsx'
+import { menuFromElement } from './ui.jsx'
+import { PeopleButton, OffscreenCursors } from './People.jsx'
+import { useCollaborators } from '../lib/collab.js'
 import { isBoardContent } from '../lib/kanban.js'
 import { basename, dirname, stripExt, joinPath, isNote } from '@shared/paths.js'
 import { renameEntry, deleteEntry, duplicateNote, toggleBookmark, isBookmarked, copyNoteLink, openPath, uploadFiles, moveEntry, moveTo } from '../lib/actions.js'
@@ -103,8 +105,6 @@ export function NoteView({ tab, paneId, active }) {
   useHandleState(handle)
   const prefs = usePrefs()
   const layout = useLayout()
-  const presence = useApp((s) => s.presence)
-  const user = useApp((s) => s.user)
   const wsId = useApp((s) => s.wsId)
   const workspaces = useApp((s) => s.workspaces)
   const version = useApp((s) => s.version)
@@ -187,7 +187,7 @@ export function NoteView({ tab, paneId, active }) {
 
   const setMode = (m) => useLayout.getState().updateTab(tab.id, { mode: m })
 
-  const viewers = (presence[tab.path] || []).filter((u) => u.id !== user?.id)
+  const collab = useCollaborators({ path: tab.path, handle, view, foreign })
   const rightOpen = useLayout((st) => st.right)
 
   const noteMenuRef = useRef(null)
@@ -343,7 +343,7 @@ export function NoteView({ tab, paneId, active }) {
             </span>
           ))}
         </div>
-        {viewers.length > 0 && <AvatarStack users={viewers} size={22} />}
+        <PeopleButton collab={collab} />
         {handle?.status === 'ready' && conn.state !== 'online' && (
           <span className="badge warning" title="Changes are kept locally and will sync when you reconnect">
             <WifiOff /> Offline
@@ -384,6 +384,7 @@ export function NoteView({ tab, paneId, active }) {
       <div className="note-scroll" ref={setScroll} tabIndex={-1}>
         {body()}
       </div>
+      {view && mode !== 'read' && <OffscreenCursors collab={collab} view={view} scrollEl={scrollEl} />}
       {handle?.status === 'ready' && (mode === 'live' || mode === 'source') && view && originEl && scrollEl && (
         <NoteCanvas key={`${handle.key}:${handle.generation}`} tab={tab} view={view} scrollEl={scrollEl} innerEl={innerEl} originEl={originEl} stageEl={stageEl} mode={mode} />
       )}

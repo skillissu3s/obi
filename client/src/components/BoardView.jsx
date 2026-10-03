@@ -7,7 +7,9 @@ import { conn } from '../lib/socket.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
-import { AvatarStack, Spinner, menuFromElement } from './ui.jsx'
+import { Spinner, menuFromElement } from './ui.jsx'
+import { PeopleButton } from './People.jsx'
+import { useCollaborators } from '../lib/collab.js'
 import { BoardCanvas, exportBoard } from '../canvas/BoardCanvas.jsx'
 import { basename, stripExt, joinPath } from '@shared/paths.js'
 import { renameEntry, deleteEntry, duplicateFile, toggleBookmark, isBookmarked, copyNoteLink } from '../lib/actions.js'
@@ -37,12 +39,10 @@ function useHandle(ws, path, enabled) {
 export function BoardView({ tab, paneId, active }) {
   const creating = useApp((s) => s.pending[`${tab.ws}:${tab.path}`]) === 'creating'
   const handle = useHandle(tab.ws, tab.path, !creating)
-  const presence = useApp((s) => s.presence)
-  const user = useApp((s) => s.user)
   const wsId = useApp((s) => s.wsId)
   const connection = useApp((s) => s.connection)
   const foreign = tab.ws !== wsId
-  const viewers = (presence[tab.path] || []).filter((u) => u.id !== user?.id)
+  const collab = useCollaborators({ path: tab.path, handle, view: null, foreign })
   const crumbs = tab.path.split('/')
   const readOnly = handle?.role === 'viewer'
 
@@ -127,7 +127,7 @@ export function BoardView({ tab, paneId, active }) {
             </span>
           ))}
         </div>
-        {viewers.length > 0 && <AvatarStack users={viewers} size={22} />}
+        <PeopleButton collab={collab} />
         {readOnly && (
           <span className="badge">
             <Eye /> View only
