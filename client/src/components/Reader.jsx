@@ -4,6 +4,8 @@ import { openLink, openTagSearch } from '../lib/actions.js'
 import { copyText } from '../lib/util.js'
 import { toast } from '../store/ui.js'
 import { useApp } from '../store/app.js'
+import { toggleTaskLine as toggleLine, todayIso } from '@shared/tasks.js'
+import { applyToYText } from '@shared/textdiff.js'
 
 export function Properties({ frontmatter }) {
   if (!frontmatter) return null
@@ -143,16 +145,12 @@ export function Reader({ handle, onStats, readOnly }) {
   )
 }
 
+// done ↔ open, with everything that goes with it (the ✅ date, the next repeat)
 export function toggleTaskLine(handle, line) {
-  const text = handle.ytext.toString()
-  const lines = text.split('\n')
-  const m = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX/\-])(\])/.exec(lines[line] ?? '')
-  if (!m) return
-  let offset = 0
-  for (let i = 0; i < line; i++) offset += lines[i].length + 1
-  const at = offset + m[1].length
-  handle.ydoc.transact(() => {
-    handle.ytext.delete(at, 1)
-    handle.ytext.insert(at, m[2] === ' ' ? 'x' : ' ')
-  })
+  const lines = handle.ytext.toString().split('\n')
+  const r = toggleLine(lines[line] ?? '', { today: todayIso() })
+  if (!r) return
+  lines[line] = r.line
+  if (r.next) lines.splice(line + 1, 0, r.next)
+  applyToYText(handle.ytext, lines.join('\n'))
 }

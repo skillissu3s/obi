@@ -1,13 +1,12 @@
 // Extract structural metadata (links, tags, headings, tasks, frontmatter) from markdown.
 import { parse as parseYaml } from 'yaml'
 import { basename, dirname, extname, stripExt, joinPath, normalizePath } from './paths.js'
+import { parseTask } from './tasks.js'
 
 const WIKI_RE = /(!?)\[\[([^\[\]\n]+?)\]\]/g
 const MDLINK_RE = /(!?)\[([^\]\n]*)\]\(<?([^)\s>]+)>?(?:\s+"[^"]*")?\)/g
 const TAG_RE = /(^|[\s(,;])#([\p{L}\p{N}_\-/]*[\p{L}_\-/][\p{L}\p{N}_\-/]*)/gu
-const TASK_RE = /^(\s*)(?:[-*+]|\d+[.)])\s+\[([ xX/\-])\]\s?(.*)$/
 const HEADING_RE = /^(#{1,6})\s+(.+?)\s*#*\s*$/
-const DUE_RE = /(?:📅|due::?|@due\(?)\s*(\d{4}-\d{2}-\d{2})\)?/u
 
 export function splitFrontmatter(content) {
   if (!content.startsWith('---')) return { frontmatter: null, body: content, bodyLine: 0, raw: '' }
@@ -36,6 +35,7 @@ export function parseNote(content) {
   const tagSet = new Map()
   const headings = []
   const tasks = []
+  const parents = []
   let words = 0
 
   if (frontmatter) {
@@ -91,18 +91,13 @@ export function parseNote(content) {
     const h = HEADING_RE.exec(line)
     if (h) headings.push({ level: h[1].length, text: h[2].replace(/\[\[([^\]|]+\|)?([^\]]+)\]\]/g, '$2'), line: lineNo })
 
-    const t = TASK_RE.exec(line)
-    if (t) {
-      const text = t[3]
-      const due = DUE_RE.exec(text)
-      tasks.push({
-        line: lineNo,
-        text,
-        status: t[2],
-        checked: t[2] === 'x' || t[2] === 'X',
-        indent: t[1].length,
-        due: due ? due[1] : null,
-      })
+    const task = parseTask(line)
+    if (task) {
+      // a task under a less-indented one is its subtask
+      while (parents.length && parents[parents.length - 1].indent >= task.indent) parents.pop()
+      if (parents.length) task.parent = parents[parents.length - 1].line
+      tasks.push({ line: lineNo, ...task })
+      parents.push({ line: lineNo, indent: task.indent })
     }
 
     // Remove inline code spans before scanning for links/tags

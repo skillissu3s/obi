@@ -60,6 +60,42 @@ export function Avatar({ name = '?', color = '#888', size = 24, title }) {
   )
 }
 
+// A card under the element it belongs to (`anchor`), its right or left edge in line
+// with the anchor's; closes on a click outside or Escape. For things too big for
+// a menu: a list of people, a form.
+export function Popover({ anchor, onClose, align = 'right', className = '', children }) {
+  const ref = useRef(null)
+  const [pos, setPos] = useState(null)
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    const r = anchor.getBoundingClientRect()
+    const w = ref.current.offsetWidth
+    const h = ref.current.offsetHeight
+    const left = align === 'right' ? r.right - w : r.left
+    // below the anchor, or above it when there is no room underneath
+    const top = r.bottom + 6 + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6
+    setPos({ left: Math.max(8, Math.min(window.innerWidth - w - 8, left)), top })
+  }, [anchor, align])
+  useEffect(() => {
+    const down = (e) => {
+      if (!ref.current?.contains(e.target) && !anchor.contains(e.target)) onClose()
+    }
+    const key = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('pointerdown', down, true)
+    window.addEventListener('keydown', key, true)
+    return () => {
+      window.removeEventListener('pointerdown', down, true)
+      window.removeEventListener('keydown', key, true)
+    }
+  }, [anchor, onClose])
+  return createPortal(
+    <div ref={ref} className={`pop-card ${className}`} style={pos || { left: -9999, top: -9999 }}>
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
 export function AvatarStack({ users, size = 22, max = 4 }) {
   if (!users?.length) return null
   return (

@@ -4,6 +4,8 @@ import { syntaxTree } from '@codemirror/language'
 import { renderMarkdown, renderInline, fetchNote, extractSection, loadKatex, renderMermaid } from '../lib/render.js'
 import { IMAGE_EXT, AUDIO_EXT, VIDEO_EXT, extname, basename, stripExt } from '@shared/paths.js'
 import { splitFrontmatter } from '@shared/parse.js'
+import { toggleTaskLine, todayIso } from '@shared/tasks.js'
+import { computeChanges } from '@shared/textdiff.js'
 
 export const editorCtx = Facet.define({ combine: (v) => v[0] || {} })
 export const refreshEffect = StateEffect.define()
@@ -60,12 +62,21 @@ class CheckboxWidget extends WidgetType {
   }
 }
 
+// The edit that turns a task line into `r` (from shared/tasks.js), as small as
+// it can be so that someone typing on the same line is not trampled.
+export function taskChanges(line, r) {
+  const changes = computeChanges(line.text, r.line).map((c) => ({ from: line.from + c.from, to: line.from + c.to, insert: c.insert }))
+  // a repeating task done: its next occurrence goes on the line below
+  if (r.next) changes.push({ from: line.to, insert: `\n${r.next}` })
+  return changes
+}
+
+// done ↔ open, with everything that goes with it (the ✅ date, the next repeat)
 export function toggleTaskAt(view, pos) {
   const line = view.state.doc.lineAt(pos)
-  const m = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX/\-])(\])/.exec(line.text)
-  if (!m) return false
-  const at = line.from + m[1].length
-  view.dispatch({ changes: { from: at, to: at + 1, insert: m[2] === ' ' ? 'x' : ' ' } })
+  const r = toggleTaskLine(line.text, { today: todayIso() })
+  if (!r) return false
+  view.dispatch({ changes: taskChanges(line, r) })
   return true
 }
 

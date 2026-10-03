@@ -1,153 +1,293 @@
-import { useMemo, useState } from 'react'
-import { ListChecks, Search, FileText, Filter } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ListChecks, Search, FileText, Plus, X } from 'lucide-react'
+import { BUCKETS, PRIORITIES, PRIORITY_EMOJI, addDays, bucketOf, compareTasks, isOpen, todayIso } from '@shared/tasks.js'
+import { basename, stripExt, dirname } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
-import { api } from '../lib/api.js'
-import { toast } from '../store/ui.js'
-import * as A from '../lib/actions.js'
 import { renderInline } from '../lib/render.js'
-import { formatDate, dueLabel } from '../lib/util.js'
-import { basename, stripExt, dirname } from '@shared/paths.js'
+import * as A from '../lib/actions.js'
+import { TaskBox, TaskMeta, TaskEditor, EditButton, taskKey } from './TaskParts.jsx'
 
-const today = () => formatDate(new Date(), 'YYYY-MM-DD')
+const STORE = 'obi:tasksView'
+const DEFAULT_VIEW = { status: 'open', group: 'date', query: '', tag: null, priority: null }
+
+function loadView() {
+  try {
+    return { ...DEFAULT_VIEW, ...JSON.parse(localStorage.getItem(STORE) || '{}') }
+  } catch {
+    return DEFAULT_VIEW
+  }
+}
+
+const PRIORITY_GROUPS = [...PRIORITIES.slice(0, 3), 'none', ...PRIORITIES.slice(3)]
+const PRIORITY_NAME = { highest: 'Highest', high: 'High', medium: 'Medium', none: 'No priority', low: 'Low', lowest: 'Lowest' }
+
+// how deep a task sits under others in its note (for showing subtasks nested)
+function depthOf(task, byLine) {
+  let d = 0
+  for (let p = byLine.get(`${task.path}:${task.parent}`); p && d < 6; p = byLine.get(`${p.path}:${p.parent}`)) d++
+  return d
+}
+
+// Adds a task to today's note: its words, and a day and a priority if you like.
+function QuickAdd() {
+  const [title, setTitle] = useState('')
+  const [due, setDue] = useState('')
+  const [priority, setPriority] = useState('')
+  const [busy, setBusy] = useState(false)
+  const input = useRef(null)
+  const today = todayIso()
+
+  const submit = async () => {
+    if (!title.trim() || busy) return
+    setBusy(true)
+    const r = await A.addTask({ title, due: due || undefined, priority: priority || undefined })
+    setBusy(false)
+    if (r) {
+      setTitle('')
+      setDue('')
+      setPriority('')
+    }
+    input.current?.focus()
+  }
+
+  return (
+    <div className="task-add">
+      <Plus />
+      <input
+        ref={input}
+        className="task-add-input"
+        placeholder="Add a task to today's note…"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && submit()}
+      />
+      {title.trim() && (
+        <>
+          <button className={`te-quick ${due === today ? 'on' : ''}`} onClick={() => setDue(due === today ? '' : today)}>
+            Today
+          </button>
+          <button className={`te-quick ${due === addDays(today, 1) ? 'on' : ''}`} onClick={() => setDue(due === addDays(today, 1) ? '' : addDays(today, 1))}>
+            Tomorrow
+          </button>
+          <input type="date" className="input task-add-date" value={due} onChange={(e) => setDue(e.target.value)} title="Due date" />
+          <select className="input task-add-pri" value={priority} onChange={(e) => setPriority(e.target.value)} title="Priority">
+            <option value="">Priority</option>
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {PRIORITY_EMOJI[p]} {p[0].toUpperCase() + p.slice(1)}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-primary btn-sm" disabled={busy} onClick={submit}>
+            Add
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+function TaskRow({ task, group, depth, wsId, onTag, onEdit, editing }) {
+  const open = isOpen(task.status)
+  const openAtLine = () => useLayout.getState().openNote(wsId, task.path, { line: task.line })
+  return (
+    <div className={`task-row ${!open ? 'done' : ''} ${task.status === '-' ? 'cancelled' : ''}`} style={depth ? { paddingLeft: 8 + depth * 22 } : undefined}>
+      <TaskBox task={task} />
+      <div
+        className="task-text"
+        title="Open this line in its note"
+        onClick={(e) => {
+          const a = e.target.closest('a')
+          // a #tag in the words filters this list; any other link is its own
+          if (a?.classList.contains('tag')) {
+            e.preventDefault()
+            onTag(a.dataset.tag)
+          } else if (!a) openAtLine()
+        }}
+        dangerouslySetInnerHTML={{ __html: renderInline(task.text, { ws: wsId, path: task.path }) }}
+      />
+      <div className="task-meta">
+        <TaskMeta task={task} />
+      </div>
+      {group !== 'note' && (
+        /* the icon matters: a daily note is called "2026-09-17", which without it
+           reads like a due date sitting in the same row as the real ones */
+        <span className="task-source" title={task.path} onClick={openAtLine}>
+          <FileText />
+          {stripExt(basename(task.path))}
+        </span>
+      )}
+      <EditButton active={editing} onClick={(e) => onEdit(task, e.currentTarget)} />
+    </div>
+  )
+}
 
 export function TasksView() {
   const version = useApp((s) => s.version)
   const wsId = useApp((s) => s.wsId)
-  const [filter, setFilter] = useState('open')
-  const [query, setQuery] = useState('')
-  const [group, setGroup] = useState('due')
-  const [busy, setBusy] = useState(null)
+  const [view, setViewState] = useState(loadView)
+  const [editing, setEditing] = useState(null) // { key, anchor }
+  const { status, group, query, tag, priority } = view
+  const setView = (patch) =>
+    setViewState((v) => {
+      const next = { ...v, ...patch }
+      try {
+        localStorage.setItem(STORE, JSON.stringify(next))
+      } catch {}
+      return next
+    })
+
+  // the day rolls over while the view stays open
+  const [today, setToday] = useState(todayIso)
+  useEffect(() => {
+    const t = setInterval(() => setToday(todayIso()), 60000)
+    return () => clearInterval(t)
+  }, [])
+
+  const all = useMemo(() => A.allTasks(), [version])
+  const byLine = useMemo(() => new Map(all.map((t) => [taskKey(t), t])), [all])
 
   const tasks = useMemo(() => {
-    let list = A.allTasks()
-    if (filter === 'open') list = list.filter((t) => !t.checked)
-    if (filter === 'done') list = list.filter((t) => t.checked)
-    if (query.trim()) {
-      const q = query.toLowerCase()
-      list = list.filter((t) => t.text.toLowerCase().includes(q) || t.path.toLowerCase().includes(q))
-    }
-    return list
-  }, [version, filter, query])
+    const q = query.trim().toLowerCase()
+    return all
+      .filter((t) => (status === 'all' ? true : status === 'open' ? isOpen(t.status) : !isOpen(t.status)))
+      .filter((t) => !priority || (priority === 'none' ? !t.priority : t.priority === priority))
+      .filter((t) => !tag || t.tags?.some((x) => x.toLowerCase() === tag.toLowerCase()))
+      .filter((t) => !q || t.text.toLowerCase().includes(q) || t.path.toLowerCase().includes(q))
+      .sort(compareTasks)
+  }, [all, status, priority, tag, query])
 
   const groups = useMemo(() => {
-    const t = today()
     const out = new Map()
-    const push = (key, task) => {
-      if (!out.has(key)) out.set(key, [])
-      out.get(key).push(task)
-    }
+    const push = (key, task) => (out.has(key) ? out.get(key).push(task) : out.set(key, [task]))
     for (const task of tasks) {
       if (group === 'note') push(task.path, task)
-      else if (task.checked) push('Completed', task)
-      else if (!task.due) push('No date', task)
-      else if (task.due < t) push('Overdue', task)
-      else if (task.due === t) push('Today', task)
-      else if (task.due <= formatDate(new Date(Date.now() + 7 * 86400000), 'YYYY-MM-DD')) push('Next 7 days', task)
-      else push('Later', task)
+      else if (group === 'priority') push(task.priority || 'none', task)
+      else push(bucketOf(task, today), task)
     }
-    const order = ['Overdue', 'Today', 'Next 7 days', 'Later', 'No date', 'Completed']
-    return [...out.entries()].sort((a, b) => {
-      if (group === 'note') return a[0].localeCompare(b[0])
-      return order.indexOf(a[0]) - order.indexOf(b[0])
-    })
-  }, [tasks, group])
+    const order = group === 'date' ? BUCKETS.map((b) => b.id) : group === 'priority' ? PRIORITY_GROUPS : null
+    const entries = [...out.entries()].sort((a, b) => (order ? order.indexOf(a[0]) - order.indexOf(b[0]) : a[0].localeCompare(b[0])))
+    // in a note, in the order they are written, so subtasks follow their parents
+    if (group === 'note') for (const [, list] of entries) list.sort((a, b) => a.line - b.line)
+    return entries
+  }, [tasks, group, today])
 
-  const toggle = async (task) => {
-    setBusy(`${task.path}:${task.line}`)
-    try {
-      await api.toggleTask(wsId, task.path, task.line)
-    } catch (e) {
-      toast.error(e)
-    } finally {
-      setBusy(null)
-    }
-  }
+  const counts = useMemo(() => {
+    const open = all.filter((t) => isOpen(t.status))
+    return { open: open.length, overdue: open.filter((t) => t.due && t.due < today).length, done: all.length - open.length }
+  }, [all, today])
 
-  const total = A.allTasks()
-  const open = total.filter((t) => !t.checked).length
+  const topTags = useMemo(() => {
+    const n = new Map()
+    for (const t of all) if (isOpen(t.status)) for (const x of t.tags || []) n.set(x, (n.get(x) || 0) + 1)
+    return [...n.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12)
+  }, [all])
+
+  const labelOf = (key) => (group === 'date' ? BUCKETS.find((b) => b.id === key)?.label : group === 'priority' ? `${PRIORITY_EMOJI[key] || ''} ${PRIORITY_NAME[key]}`.trim() : key)
+  const editedTask = editing ? byLine.get(editing.key) : null
 
   return (
     <div className="tasks-view">
       <div className="tasks-inner">
         <div className="tasks-head">
           <h2>Tasks</h2>
-          <span className="badge">{open} open</span>
-          <span className="badge success">{total.length - open} done</span>
+          <span className="badge">{counts.open} open</span>
+          {counts.overdue > 0 && <span className="badge danger">{counts.overdue} overdue</span>}
+          <span className="badge success">{counts.done} done</span>
         </div>
+
+        <QuickAdd />
+
         <div className="tasks-head">
-          <div className="search-box grow" style={{ margin: 0, maxWidth: 320 }}>
+          <div className="search-box grow" style={{ margin: 0, maxWidth: 300 }}>
             <Search />
-            <input className="input" placeholder="Filter tasks…" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input className="input" placeholder="Filter tasks…" value={query} onChange={(e) => setView({ query: e.target.value })} />
           </div>
           <div className="segmented">
-            {['open', 'done', 'all'].map((f) => (
-              <button key={f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>
-                {f[0].toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
-          <div className="segmented">
-            {[
-              ['due', 'By date'],
-              ['note', 'By note'],
-            ].map(([g, label]) => (
-              <button key={g} className={group === g ? 'active' : ''} onClick={() => setGroup(g)}>
+            {[['open', 'Open'], ['done', 'Done'], ['all', 'All']].map(([f, label]) => (
+              <button key={f} className={status === f ? 'active' : ''} onClick={() => setView({ status: f })}>
                 {label}
               </button>
             ))}
           </div>
+          <div className="segmented">
+            {[['date', 'By date'], ['priority', 'By priority'], ['note', 'By note']].map(([g, label]) => (
+              <button key={g} className={group === g ? 'active' : ''} onClick={() => setView({ group: g })}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <select className="input task-filter" value={priority || ''} onChange={(e) => setView({ priority: e.target.value || null })} title="Only this priority">
+            <option value="">Any priority</option>
+            {[...PRIORITIES, 'none'].map((p) => (
+              <option key={p} value={p}>
+                {PRIORITY_EMOJI[p] || ''} {PRIORITY_NAME[p] || p[0].toUpperCase() + p.slice(1)}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {(topTags.length > 0 || tag) && (
+          <div className="task-tags">
+            {tag && !topTags.some(([t]) => t === tag) && (
+              <button className="task-tag on" onClick={() => setView({ tag: null })}>
+                #{tag} <X />
+              </button>
+            )}
+            {topTags.map(([t, n]) => (
+              <button key={t} className={`task-tag ${tag === t ? 'on' : ''}`} onClick={() => setView({ tag: tag === t ? null : t })}>
+                #{t} <span className="faint">{n}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {!tasks.length && (
           <div className="empty">
             <ListChecks />
-            No tasks {filter === 'open' ? 'open' : 'found'}. Add <span className="code-inline">- [ ] something</span> to a note.
+            No tasks {status === 'open' ? 'open' : 'found'}. Add one above, or write <span className="code-inline">- [ ] something</span> in any note.
           </div>
         )}
 
         {groups.map(([key, list]) => (
           <div className="task-group" key={key}>
-            <div className={`task-group-title ${key === 'Overdue' ? 'overdue' : ''}`}>
+            <div className={`task-group-title ${key === 'overdue' ? 'overdue' : ''}`}>
               {group === 'note' ? (
                 <span style={{ cursor: 'pointer' }} onClick={() => useLayout.getState().openNote(wsId, key)}>
                   {stripExt(basename(key))} <span className="faint">{dirname(key)}</span>
                 </span>
               ) : (
-                key
+                labelOf(key)
               )}
               <span className="badge">{list.length}</span>
             </div>
             {list.map((t) => (
-              <div className={`task-row ${t.checked ? 'done' : ''} ${busy === `${t.path}:${t.line}` ? 'busy' : ''}`} key={`${t.path}:${t.line}`}>
-                <input type="checkbox" className="task-cb" checked={t.checked} disabled={busy === `${t.path}:${t.line}`} onChange={() => toggle(t)} />
-                <div
-                  className="task-text"
-                  title="Open this line"
-                  onClick={(e) => {
-                    if (e.target.closest('a')) return
-                    useLayout.getState().openNote(wsId, t.path, { line: t.line })
-                  }}
-                  dangerouslySetInnerHTML={{ __html: renderInline(t.text.replace(/📅\s*(\d{4}-\d{2}-\d{2})/, ''), { ws: wsId, path: t.path }) }}
-                />
-                {t.due && (
-                  <span className={`due-chip ${!t.checked && t.due < today() ? 'overdue' : t.due === today() ? 'today' : ''}`} title={t.due}>
-                    {dueLabel(t.due)}
-                  </span>
-                )}
-                {group !== 'note' && (
-                  /* the icon matters: a daily note is called "2026-09-17", which without it
-                     reads like a due date sitting in the same row as the real ones */
-                  <span className="task-source" title={t.path} onClick={() => useLayout.getState().openNote(wsId, t.path, { line: t.line })}>
-                    <FileText />
-                    {stripExt(basename(t.path))}
-                  </span>
-                )}
-              </div>
+              <TaskRow
+                key={taskKey(t)}
+                task={t}
+                group={group}
+                depth={group === 'note' ? depthOf(t, byLine) : 0}
+                wsId={wsId}
+                onTag={(x) => setView({ tag: x })}
+                editing={editing?.key === taskKey(t)}
+                onEdit={(task, anchor) => setEditing(editing?.key === taskKey(task) ? null : { key: taskKey(task), anchor })}
+              />
             ))}
           </div>
         ))}
       </div>
+      {editedTask && editing.anchor.isConnected && (
+        <TaskEditor
+          task={editedTask}
+          anchor={editing.anchor}
+          onClose={() => setEditing(null)}
+          onOpenNote={() => {
+            useLayout.getState().openNote(wsId, editedTask.path, { line: editedTask.line })
+            setEditing(null)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -11,7 +11,7 @@ import { openSearchPanel } from '@codemirror/search'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs, PALETTES } from '../store/prefs.js'
-import { useUI, toast, confirmDialog } from '../store/ui.js'
+import { useUI, toast, confirmDialog, promptDialog } from '../store/ui.js'
 import { useNoteZoom } from '../store/zoom.js'
 import { navigate } from './router.js'
 import { isDesktop } from './desktop.js'
@@ -88,6 +88,10 @@ export function buildCommands() {
     { id: 'search-note', name: 'Find in current note', icon: Search, hotkey: 'Mod+F', group: 'Navigate', run: ed((v) => openSearchPanel(v)) },
     { id: 'graph', name: 'Open graph view', icon: Network, hotkey: 'Mod+G', group: 'Navigate', run: () => layout.openView('graph') },
     { id: 'tasks', name: 'Open tasks', icon: ListChecks, group: 'Navigate', run: () => layout.openView('tasks') },
+    { id: 'add-task', name: 'Add a task…', icon: ListChecks, hotkey: 'Alt+A', group: 'File', run: async () => {
+        const title = await promptDialog({ title: 'Add a task', placeholder: "Goes in today's note", confirmText: 'Add' })
+        if (title?.trim()) A.addTask({ title })
+      } },
     { id: 'random-note', name: 'Open random note', icon: Shuffle, group: 'Navigate', run: () => {
         const notes = app.tree.filter((e) => e.type === 'file' && isNote(e.path))
         if (notes.length) layout.openNote(app.wsId, notes[Math.floor(Math.random() * notes.length)].path)

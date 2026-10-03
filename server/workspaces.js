@@ -15,14 +15,13 @@ import { cloudStatus } from './cloudsync.js'
 import { extname, isNote, basename, dirname, safeName, joinPath } from '../shared/paths.js'
 import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
 import { scanDir } from './fsutil.js'
+import { applyTaskEdit, appendTask, newTaskLine, isIsoDate, toggleTaskLine, TaskChangedError } from '../shared/tasks.js'
 import path from 'node:path'
 
 export const wsRouter = express.Router()
 export const miscRouter = express.Router()
 wsRouter.use(requireAuth)
 miscRouter.use(requireAuth)
-
-const TASK_RE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX/\-])(\].*)$/
 
 function serializeWorkspace(w, role, userId) {
   const rt = peekRuntime(w.id)
@@ -316,27 +315,97 @@ wsRouter.get('/:id/backlinks', access('viewer'), async (req, res) => {
   res.json(rt.backlinks(p))
 })
 
+// ---------------- tasks ----------------
+// A task is a line of the note's markdown (shared/tasks.js); changing one rewrites that line.
+
+// the client's local date: "done today" is the person's today, not the server's
+const taskDay = (v) => {
+  if (v == null) return undefined
+  if (!isIsoDate(v)) throw new HttpError(400, 'Invalid date')
+  return v
+}
+
+// Edits one task: { path, line, title, patch: { status, due, scheduled, start, priority, recurrence, title }, today }.
+// `title` is what the client last saw on that line, so a note that changed in
+// between is never edited blindly.
+wsRouter.post('/:id/tasks/update', async (req, res) => {
+  const p = safePath(req.body?.path)
+  notePathAccess(req, 'editor', p)
+  const { line, title, patch } = req.body || {}
+  if (!Number.isInteger(line) || line < 0 || !patch || typeof patch !== 'object') throw new HttpError(400, 'A task line and a change are required')
+  const rt = await getRuntime(req.ws.id)
+  let result = null
+  try {
+    await rt.updateNote(
+      p,
+      (text) => {
+        result = applyTaskEdit(text, { line, title, patch, today: taskDay(req.body.today) })
+        return result.text
+      },
+      { userId: req.user.id },
+    )
+  } catch (e) {
+    if (e instanceof TaskChangedError) throw new HttpError(409, e.message)
+    if (e instanceof RangeError) throw new HttpError(400, e.message)
+    throw e
+  }
+  res.json({ line: result.line, task: result.task, next: result.next })
+})
+
+// The checkbox, from before tasks had more to them
 wsRouter.post('/:id/tasks/toggle', async (req, res) => {
   const p = safePath(req.body?.path)
   notePathAccess(req, 'editor', p)
   const line = Number(req.body?.line)
-  const status = req.body?.status ?? null
   const rt = await getRuntime(req.ws.id)
-  let result = null
+  let task = null
   await rt.updateNote(
     p,
     (text) => {
       const lines = text.split('\n')
-      const m = TASK_RE.exec(lines[line] ?? '')
-      if (!m) throw new HttpError(409, 'The task has changed, please refresh')
-      const next = status != null ? String(status).slice(0, 1) : m[2] === ' ' ? 'x' : ' '
-      lines[line] = m[1] + next + m[3]
-      result = next
+      const r = toggleTaskLine(lines[line] ?? '', { today: taskDay(req.body?.today) })
+      if (!r) throw new HttpError(409, 'The task has changed, please refresh')
+      lines[line] = r.line
+      if (r.next) lines.splice(line + 1, 0, r.next)
+      task = r.line
       return lines.join('\n')
     },
     { userId: req.user.id },
   )
-  res.json({ status: result })
+  res.json({ status: /\[(.)\]/.exec(task)?.[1] ?? null })
+})
+
+// Adds a task to the end of a note (made if it isn't there yet):
+// { path, title, due, scheduled, start, priority, recurrence, today, template }
+wsRouter.post('/:id/tasks/add', async (req, res) => {
+  const p = safePath(req.body?.path)
+  notePathAccess(req, 'editor', p)
+  const title = String(req.body?.title || '').trim()
+  if (!title) throw new HttpError(400, 'A task needs some text')
+  const rt = await getRuntime(req.ws.id)
+  let line
+  try {
+    line = newTaskLine(title, req.body, { today: taskDay(req.body.today) })
+  } catch (e) {
+    if (e instanceof RangeError) throw new HttpError(400, e.message)
+    throw e
+  }
+  // a note that isn't there yet starts from the caller's text (a daily note's template)
+  if (!rt.hasFile(p)) {
+    if (!isNote(p)) throw new HttpError(400, 'Notes must end with .md')
+    await rt.writeNote(p, typeof req.body.template === 'string' ? req.body.template : '', { userId: req.user.id, ifMissing: true })
+  }
+  let at = 0
+  await rt.updateNote(
+    p,
+    (text) => {
+      const next = appendTask(text, line)
+      at = next.replace(/\n$/, '').split('\n').length - 1
+      return next
+    },
+    { userId: req.user.id },
+  )
+  res.json({ path: p, line: at })
 })
 
 // ---------------- history ----------------

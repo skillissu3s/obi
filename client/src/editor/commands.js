@@ -1,5 +1,6 @@
 import { EditorSelection } from '@codemirror/state'
-import { editorCtx, toggleTaskAt } from './livePreview.js'
+import { editorCtx, toggleTaskAt, taskChanges } from './livePreview.js'
+import { toggleTaskLine, todayIso } from '@shared/tasks.js'
 
 function wordAt(state, pos) {
   const line = state.doc.lineAt(pos)
@@ -76,9 +77,9 @@ export const toggleTask = (view) => {
   }
   for (const n of lines) {
     const line = state.doc.line(n)
-    const task = /^(\s*(?:[-*+]|\d+[.)])\s+\[)([ xX/\-])(\])/.exec(line.text)
-    if (task) {
-      changes.push({ from: line.from + task[1].length, to: line.from + task[1].length + 1, insert: task[2] === ' ' ? 'x' : ' ' })
+    const done = toggleTaskLine(line.text, { today: todayIso() })
+    if (done) {
+      changes.push(...taskChanges(line, done))
       continue
     }
     const list = /^(\s*)([-*+]|\d+[.)])\s+/.exec(line.text)

@@ -1,41 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Eye, EyeOff, FileText, LocateFixed, Users, X } from 'lucide-react'
 import { basename, dirname, stripExt } from '@shared/paths.js'
 import { useLayout } from '../store/layout.js'
 import { useApp } from '../store/app.js'
-import { Avatar, AvatarStack } from './ui.jsx'
-
-// A popover under its button, right edges aligned (these buttons sit at the
-// right of a header). Closes on a click outside or Escape.
-function Popover({ anchor, onClose, children }) {
-  const ref = useRef(null)
-  const [pos, setPos] = useState(null)
-  useLayoutEffect(() => {
-    if (!ref.current) return
-    const r = anchor.getBoundingClientRect()
-    const w = ref.current.offsetWidth
-    setPos({ left: Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)), top: r.bottom + 6 })
-  }, [anchor])
-  useEffect(() => {
-    const down = (e) => {
-      if (!ref.current?.contains(e.target) && !anchor.contains(e.target)) onClose()
-    }
-    const key = (e) => e.key === 'Escape' && onClose()
-    window.addEventListener('pointerdown', down, true)
-    window.addEventListener('keydown', key, true)
-    return () => {
-      window.removeEventListener('pointerdown', down, true)
-      window.removeEventListener('keydown', key, true)
-    }
-  }, [anchor, onClose])
-  return createPortal(
-    <div ref={ref} className="people-pop" style={pos || { left: -9999, top: -9999 }}>
-      {children}
-    </div>,
-    document.body,
-  )
-}
+import { Avatar, AvatarStack, Popover } from './ui.jsx'
 
 // someone typing has a caret; anyone else just has it open
 const placeText = (p) => (p.index == null ? 'Viewing' : ['Editing', p.line && `line ${p.line}`, p.heading].filter(Boolean).join(' · '))
@@ -148,7 +116,7 @@ export function PeopleButton({ collab }) {
         {!here.length && <span className="people-count">{elsewhere.length}</span>}
       </button>
       {anchor && (
-        <Popover anchor={anchor} onClose={close}>
+        <Popover anchor={anchor} onClose={close} className="people-pop">
           <PeopleList collab={collab} onClose={close} />
         </Popover>
       )}
@@ -169,7 +137,7 @@ export function WorkspacePeople({ people }) {
         <AvatarStack users={people.map((p) => p.user)} size={16} max={5} />
       </button>
       {anchor && (
-        <Popover anchor={anchor} onClose={close}>
+        <Popover anchor={anchor} onClose={close} className="people-pop">
           <PeopleList collab={collab} onClose={close} />
         </Popover>
       )}

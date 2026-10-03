@@ -8,6 +8,7 @@ import * as A from '../lib/actions.js'
 import { LocalGraph } from './GraphView.jsx'
 import { AvatarStack } from './ui.jsx'
 import { basename, dirname, stripExt, isNote } from '@shared/paths.js'
+import { isOpen, taskDate } from '@shared/tasks.js'
 import { formatDate, timeAgo, readingTime, formatBytes, plainSnippet } from '../lib/util.js'
 
 export function RightPanel({ tab, closed }) {
@@ -177,7 +178,7 @@ export function CalendarPanel() {
 
   const tasksByDay = useMemo(() => {
     const map = new Map()
-    for (const t of A.allTasks()) if (t.due && !t.checked) map.set(t.due, (map.get(t.due) || 0) + 1)
+    for (const t of A.allTasks()) if (isOpen(t.status) && taskDate(t)) map.set(taskDate(t), (map.get(taskDate(t)) || 0) + 1)
     return map
   }, [version])
 

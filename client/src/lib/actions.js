@@ -7,6 +7,7 @@ import { toast, confirmDialog, promptDialog, useUI } from '../store/ui.js'
 import { basename, dirname, stripExt, joinPath, isNote, safeName, extname } from '@shared/paths.js'
 import { isBoardPath, emptyBoard } from '@shared/board.js'
 import { formatDate, isoDate, downloadUrl, copyText } from './util.js'
+import { todayIso } from '@shared/tasks.js'
 import { fetchNote } from './render.js'
 import { conn } from './socket.js'
 
@@ -335,6 +336,17 @@ export function dailyNotePath(date = new Date(), settings = wsSettings()) {
   return joinPath(folder, `${formatDate(date, fmt)}.md`)
 }
 
+// what a day's note starts as: its template, or just the date as a heading
+async function newDailyContent(ws, date, settings) {
+  const tpl = settings.dailyTemplate
+  if (tpl && app().treeMap.has(tpl)) {
+    try {
+      return applyTemplate(await fetchNote(ws, tpl), { date, title: formatDate(date, settings.dailyFormat || 'YYYY-MM-DD') })
+    } catch {}
+  }
+  return `# ${formatDate(date, 'dddd, D MMMM YYYY')}\n\n`
+}
+
 export async function openDailyNote(date = new Date(), { newTab, announce = false } = {}) {
   const s = app()
   const ws = s.wsId
@@ -348,13 +360,7 @@ export async function openDailyNote(date = new Date(), { newTab, announce = fals
   s.addEntry(path)
   s.setPending(ws, path, 'creating')
   layout().openNote(ws, path, { newTab })
-  let content = `# ${formatDate(date, 'dddd, D MMMM YYYY')}\n\n`
-  const tpl = settings.dailyTemplate
-  if (tpl && s.treeMap.has(tpl)) {
-    try {
-      content = applyTemplate(await fetchNote(ws, tpl), { date, title: formatDate(date, settings.dailyFormat || 'YYYY-MM-DD') })
-    } catch {}
-  }
+  const content = await newDailyContent(ws, date, settings)
   try {
     await api.writeNote(ws, path, content, { ifMissing: true })
     app().clearPending(ws, path)
@@ -561,11 +567,46 @@ export function recentNotes(limit = 8) {
     .slice(0, limit)
 }
 
+// every task in the workspace, each with the note it is in
 export function allTasks() {
   const s = app()
   const out = []
   for (const [path, meta] of s.notes) for (const task of meta.tasks || []) out.push({ ...task, path })
   return out
+}
+
+/**
+ * Changes a task — { status, due, scheduled, start, priority, recurrence, title };
+ * a field set to null is cleared. The note's line is rewritten on the server
+ * and the new state comes back through the index like any other edit.
+ * Returns the server's answer, or null if it didn't work (already toasted).
+ */
+export async function updateTask(task, patch) {
+  try {
+    return await api.updateTask(app().wsId, { path: task.path, line: task.line, title: task.text, patch, today: todayIso() })
+  } catch (e) {
+    toast.error(e)
+    // most likely the note changed under us: reload what we show
+    app().refreshIndex()
+    return null
+  }
+}
+
+/** Adds a task to today's note (made from its template if the day has none yet) */
+export async function addTask({ title, ...fields }) {
+  const s = app()
+  const ws = s.wsId
+  const path = dailyNotePath()
+  try {
+    const template = s.treeMap.has(path) ? undefined : await newDailyContent(ws, new Date(), wsSettings())
+    const r = await api.addTask(ws, { path, title, ...fields, today: todayIso(), template })
+    if (!s.treeMap.has(path)) s.addEntry(path)
+    toast.success(`Added to ${formatDate(new Date(), 'ddd D MMM')}'s note`, { action: { label: 'Open', run: () => openPath(ws, path, { line: r.line }) } })
+    return r
+  } catch (e) {
+    toast.error(e)
+    return null
+  }
 }
 
 export function workspaceStats() {

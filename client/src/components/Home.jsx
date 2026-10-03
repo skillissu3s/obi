@@ -8,6 +8,7 @@ import * as A from '../lib/actions.js'
 import { runCommand } from '../lib/commands.js'
 import { timeAgo, modKey, formatDate, dueLabel, plainSnippet } from '../lib/util.js'
 import { basename, stripExt } from '@shared/paths.js'
+import { compareTasks, isOpen, taskDate, todayIso } from '@shared/tasks.js'
 
 export function Home() {
   const user = useApp((s) => s.user)
@@ -19,10 +20,12 @@ export function Home() {
   const recent = useMemo(() => A.recentNotes(8), [version])
   const stats = useMemo(() => A.workspaceStats(), [version])
   const bookmarks = (prefs.bookmarks[wsId] || []).slice(0, 6)
+  // open tasks whose day has come (or gone), most pressing first
   const tasks = useMemo(() => {
-    const today = formatDate(new Date(), 'YYYY-MM-DD')
+    const today = todayIso()
     return A.allTasks()
-      .filter((t) => !t.checked && t.due && t.due <= today)
+      .filter((t) => isOpen(t.status) && taskDate(t) && taskDate(t) <= today)
+      .sort(compareTasks)
       .slice(0, 6)
   }, [version])
 
@@ -128,8 +131,8 @@ export function Home() {
             {tasks.map((t, i) => (
               <div key={i} className="recent-item" onClick={() => useLayout.getState().openNote(wsId, t.path, { line: t.line })}>
                 <ListChecks />
-                <span className="truncate grow">{plainSnippet(t.text.replace(/📅\s*\d{4}-\d{2}-\d{2}/, ''), 120)}</span>
-                <span className="when" title={t.due}>{dueLabel(t.due)}</span>
+                <span className="truncate grow">{plainSnippet(t.text, 120)}</span>
+                <span className="when" title={taskDate(t)}>{dueLabel(taskDate(t))}</span>
               </div>
             ))}
             {!!A.allTasks().length && (
