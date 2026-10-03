@@ -4,7 +4,10 @@ import assert from 'node:assert/strict'
 import {
   parseTask, editTaskLine, toggleTaskLine, applyTaskEdit, appendTask, newTaskLine, parseRecurrence, nextOccurrence,
   addDays, addMonths, daysBetween, weekdayOf, isIsoDate, bucketOf, compareTasks, priorityRank, TaskChangedError,
+  addSubtask, boardColumns, columnOf, columnFields, dateKeyOf, dropPatch, undoPatch, taskTree, splitTags, joinTags,
+  hasTag, matchTask, previewEdit, cleanTag, weekStartOf, monthDays,
 } from './tasks.js'
+import { parseNote } from './parse.js'
 
 const today = '2026-10-03' // a Saturday
 
@@ -17,6 +20,11 @@ test('dates: arithmetic stays within a day, month and year', () => {
   assert.equal(daysBetween('2026-10-03', '2026-10-10'), 7)
   assert.equal(weekdayOf(today), 6)
   assert.ok(isIsoDate('2026-02-28') && !isIsoDate('2026-02-30') && !isIsoDate('2026-2-3') && !isIsoDate(null))
+  assert.equal(weekStartOf(today, 1), '2026-09-28')
+  assert.equal(weekStartOf('2026-10-04', 0), '2026-10-04')
+  const oct = monthDays(today, 1)
+  assert.deepEqual([oct[0], oct.at(-1), oct.length], ['2026-09-28', '2026-11-01', 35])
+  assert.equal(monthDays('2027-02-10', 1).length, 28, 'a February that fits four weeks')
 })
 
 test('parse: the fields of a task, and the title that is left', () => {
@@ -167,4 +175,130 @@ test('lists: which part of the day a task belongs to, and the order within it', 
   assert.ok(priorityRank('highest') > priorityRank('high') && priorityRank('medium') > priorityRank(undefined) && priorityRank(undefined) > priorityRank('low'))
   const sorted = [t({ path: 'b', line: 1, due: '2026-10-05' }), t({ path: 'a', line: 2 }), t({ path: 'a', line: 1, due: '2026-10-05', priority: 'high' }), t({ status: 'x', due: '2026-10-01' })].sort(compareTasks)
   assert.deepEqual(sorted.map((x) => `${x.path || '-'}${x.line}`), ['a1', 'b1', 'a2', '-0'])
+})
+
+test('new tasks can start in progress', () => {
+  assert.equal(newTaskLine('Draft', { status: '/', priority: 'high' }), '- [/] Draft ⏫')
+  assert.equal(newTaskLine('Draft', { status: 'x' }), '- [ ] Draft', 'only open or in progress')
+})
+
+test('applyTaskEdit: taking back the completion of a repeating task takes its next occurrence with it', () => {
+  const note = '- [ ] Pay rent 🔁 every month 📅 2026-10-01\n- [ ] three\n'
+  const done = applyTaskEdit(note, { line: 0, title: 'Pay rent', patch: { status: 'x' }, today })
+  const back = applyTaskEdit(done.text, { line: 0, title: 'Pay rent', patch: { status: ' ' }, today, dropNext: true })
+  assert.equal(back.text, '- [ ] Pay rent 🔁 every month 📅 2026-10-01\n- [ ] three\n')
+  // without it the reopened task would sit beside the copy
+  assert.ok(applyTaskEdit(done.text, { line: 0, title: 'Pay rent', patch: { status: ' ' }, today }).text.includes('2026-11-01'))
+  // a line that is not that copy stays
+  const other = '- [x] Pay rent 🔁 every month 📅 2026-10-01 ✅ 2026-10-03\n- [ ] Pay rent 🔁 every week 📅 2026-10-08\n'
+  assert.equal(applyTaskEdit(other, { line: 0, title: 'Pay rent', patch: { status: ' ' }, today, dropNext: true }).text.split('\n').length, 3)
+})
+
+test('subtasks: go under their task, after what is already nested there', () => {
+  const sub = (note, line, title = null) => addSubtask(note, { line, title }, '- [ ] new')
+  assert.deepEqual(sub('- [ ] a\n- [ ] b\n', 0), { text: '- [ ] a\n  - [ ] new\n- [ ] b\n', line: 1 })
+  assert.equal(sub('- [ ] a\n  - [ ] one\n    - [ ] deep\n  note text\n- [ ] b\n', 0).text, '- [ ] a\n  - [ ] one\n    - [ ] deep\n  note text\n  - [ ] new\n- [ ] b\n')
+  assert.equal(sub('- [ ] a\n    - [ ] one\n', 0).text, '- [ ] a\n    - [ ] one\n    - [ ] new\n', 'indented like the others')
+  assert.equal(sub('1. [ ] a\n\n- [ ] b', 0).text, '1. [ ] a\n   - [ ] new\n\n- [ ] b', 'inside a numbered item, past its marker')
+  assert.equal(sub('\t- [ ] a\r\n\t- [ ] b\r\n', 0).text, '\t- [ ] a\r\n\t\t- [ ] new\r\n\t- [ ] b\r\n')
+  assert.equal(sub('x\n- [ ] a', 0, 'a').line, 2, 'found by its title when the line has moved')
+  assert.throws(() => sub('- [ ] a', 0, 'b'), TaskChangedError)
+})
+
+test('boards: the columns of a grouping, and where a task is', () => {
+  assert.deepEqual(boardColumns('status').map((c) => c.id), ['todo', 'doing', 'done'])
+  assert.deepEqual(boardColumns('date', { done: false }).map((c) => c.id), ['overdue', 'today', 'tomorrow', 'week', 'later', 'none'])
+  assert.deepEqual(boardColumns('priority').map((c) => c.id), ['highest', 'high', 'medium', 'low', 'lowest', 'none', 'done'])
+  const t = (extra) => ({ status: ' ', line: 0, ...extra })
+  assert.equal(columnOf(t({}), 'status', today), 'todo')
+  assert.equal(columnOf(t({ status: '/' }), 'status', today), 'doing')
+  assert.equal(columnOf(t({ status: '-' }), 'status', today), 'done', 'cancelled sits with done')
+  assert.equal(columnOf(t({ due: '2026-10-02' }), 'date', today), 'overdue')
+  assert.equal(columnOf(t({ status: 'x', due: '2026-10-02' }), 'date', today), 'done')
+  assert.equal(columnOf(t({ priority: 'low' }), 'priority', today), 'low')
+  assert.equal(columnOf(t({}), 'priority', today), 'none')
+})
+
+test('boards: dropping a card on a column changes the field the column is about', () => {
+  const task = (line) => ({ ...parseTask(line), line: 0 })
+  const apply = (line, group, column) => {
+    const patch = dropPatch(task(line), group, column, today)
+    return patch && editTaskLine(line, patch, { today })
+  }
+  assert.equal(apply('- [ ] a', 'status', 'doing').line, '- [/] a')
+  assert.equal(apply('- [/] a', 'status', 'done').line, '- [x] a ✅ 2026-10-03')
+  assert.equal(apply('- [x] a ✅ 2026-10-01', 'status', 'todo').line, '- [ ] a')
+  assert.equal(apply('- [ ] a', 'status', 'todo'), null, 'already there')
+  assert.equal(apply('- [ ] a 📅 2026-10-20', 'date', 'today').line, '- [ ] a 📅 2026-10-03')
+  assert.equal(apply('- [ ] a', 'date', 'tomorrow').line, '- [ ] a 📅 2026-10-04')
+  assert.equal(apply('- [ ] a 📅 2026-10-03', 'date', 'week').line, '- [ ] a 📅 2026-10-05')
+  assert.equal(apply('- [ ] a', 'date', 'later').line, '- [ ] a 📅 2026-11-03')
+  assert.equal(apply('- [ ] a ⏳ 2026-10-20', 'date', 'tomorrow').line, '- [ ] a ⏳ 2026-10-04', 'moves the date it sits on')
+  assert.equal(apply('- [ ] a 🛫 2026-10-01 ⏳ 2026-10-02 📅 2026-10-20', 'date', 'none').line, '- [ ] a')
+  assert.equal(apply('- [ ] a', 'date', 'overdue'), null, 'a past date is not something to drop on')
+  assert.equal(apply('- [x] a ✅ 2026-10-01', 'date', 'today').line, '- [ ] a 📅 2026-10-03', 'out of Done: open again')
+  assert.equal(apply('- [ ] a', 'priority', 'high').line, '- [ ] a ⏫')
+  assert.equal(apply('- [ ] a ⏫', 'priority', 'none').line, '- [ ] a')
+  assert.equal(apply('- [ ] a ⏫', 'priority', 'done').line, '- [x] a ⏫ ✅ 2026-10-03')
+  // finishing goes through the same status logic as the checkbox, so a repeating task repeats
+  assert.equal(apply('- [ ] a 🔁 every day 📅 2026-10-03', 'status', 'done').next, '- [ ] a 🔁 every day 📅 2026-10-04')
+  assert.equal(columnFields('priority', 'low', today).priority, 'low')
+  assert.equal(dateKeyOf({}), 'due')
+  assert.equal(dateKeyOf({ start: today }), 'start')
+})
+
+test('boards: undoing a change restores the line', () => {
+  for (const [line, group, column] of [
+    ['- [x] a ✅ 2026-10-01 📅 2026-10-02', 'status', 'doing'],
+    ['- [ ] a ⏫ 📅 2026-10-20', 'date', 'none'],
+    ['- [ ] a ⏳ 2026-10-20', 'date', 'today'],
+    ['- [-] a ❌ 2026-10-01', 'priority', 'low'],
+    ['- [ ] a ⏫', 'status', 'done'],
+  ]) {
+    const task = { ...parseTask(line), line: 0 }
+    const patch = dropPatch(task, group, column, today)
+    const moved = editTaskLine(line, patch, { today }).line
+    assert.notEqual(moved, line)
+    assert.equal(parseTask(editTaskLine(moved, undoPatch(task, patch), { today }).line).text, task.text)
+    assert.deepEqual(parseTask(editTaskLine(moved, undoPatch(task, patch), { today }).line), parseTask(line), line)
+  }
+  assert.deepEqual(undoPatch({ text: 'old', due: '2026-10-05' }, { title: 'new', due: '2026-10-09', priority: 'low' }), { title: 'old', due: '2026-10-05', priority: null })
+})
+
+test('checklists: what is nested under a task, and how far along it is', () => {
+  const note = '- [ ] Trip\n  - [x] Flights\n  - [ ] Hotel\n    - [-] Ask Sam\n- [ ] Rent\n\n- [ ] Lonely'
+  const { roots, lists } = taskTree(parseNote(note).tasks)
+  assert.deepEqual(roots.map((t) => t.text), ['Trip', 'Rent', 'Lonely'])
+  const trip = lists.get(0)
+  assert.deepEqual(trip.items.map((i) => [i.task.text, i.depth]), [['Flights', 1], ['Hotel', 1], ['Ask Sam', 2]])
+  assert.deepEqual([trip.done, trip.total], [2, 3], 'cancelled counts as finished')
+  assert.equal(lists.get(4), undefined)
+})
+
+test('tags: the ones that end a title, and filters', () => {
+  assert.deepEqual(splitTags('Pay rent #home/bills #monthly'), { title: 'Pay rent', tags: ['home/bills', 'monthly'] })
+  assert.deepEqual(splitTags('Call #sam about it'), { title: 'Call #sam about it', tags: [] })
+  assert.deepEqual(splitTags('#only'), { title: '#only', tags: [] })
+  assert.equal(joinTags('Pay rent', ['a', 'b']), 'Pay rent #a #b')
+  assert.equal(joinTags('Pay rent', []), 'Pay rent')
+  assert.equal(cleanTag(' #Home Office! '), 'Home-Office')
+  assert.equal(cleanTag('home/'), 'home')
+  assert.equal(cleanTag('2026'), '', 'a number is not a tag')
+  assert.equal(cleanTag('  #  '), '')
+  const t = { text: 'Pay rent #Home/Bills', tags: ['Home/Bills'], priority: 'high', path: 'Daily/2026-10-03.md' }
+  assert.ok(hasTag(t, 'home') && hasTag(t, 'home/bills') && !hasTag(t, 'hom'))
+  assert.ok(matchTask(t, {}) && matchTask(t, { q: ' RENT ' }) && matchTask(t, { q: 'daily' }) && !matchTask(t, { q: 'milk' }))
+  assert.ok(matchTask(t, { tags: ['work', 'home'] }) && !matchTask(t, { tags: ['work'] }), 'any of the tags')
+  assert.ok(matchTask(t, { priority: 'high' }) && !matchTask(t, { priority: 'low' }) && !matchTask(t, { priority: 'none' }) && matchTask({ text: 'x' }, { priority: 'none' }))
+})
+
+test('preview: a change worked out without the note is the change the note gets', () => {
+  const lines = ['  - [ ] Ship #work 🔼 🔁 every week 🛫 2026-10-01 ⏳ 2026-10-02 📅 2026-10-05', '- [/] Half way', '- [x] Done ✅ 2026-10-01 📅 2026-09-30']
+  for (const line of lines) {
+    const task = { ...parseTask(line), line: 7, parent: 3 }
+    for (const patch of [{ status: 'x' }, { status: ' ' }, { due: null, priority: 'low' }, { title: 'Renamed #x' }, { recurrence: 'every day' }]) {
+      const want = parseTask(editTaskLine(line, patch, { today }).line)
+      assert.deepEqual(previewEdit(task, patch, { today }), { ...want, line: 7, parent: 3 }, `${line} ← ${JSON.stringify(patch)}`)
+    }
+  }
 })

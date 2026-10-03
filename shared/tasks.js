@@ -31,6 +31,17 @@ export function addMonths(iso, n) {
   return fromUtc(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(+iso.slice(8, 10), last)))
 }
 
+/** The first day of the week `iso` is in (`startDay`: 0 Sunday, 1 Monday) */
+export const weekStartOf = (iso, startDay) => addDays(iso, -((weekdayOf(iso) - startDay + 7) % 7))
+
+/** The days of the whole weeks that make up the month `iso` is in */
+export function monthDays(iso, startDay) {
+  const first = `${iso.slice(0, 8)}01`
+  const start = weekStartOf(first, startDay)
+  const weeks = Math.ceil(daysBetween(start, addMonths(first, 1)) / 7)
+  return Array.from({ length: weeks * 7 }, (_, i) => addDays(start, i))
+}
+
 // ---------- the line ----------
 
 /** indent, bullet, status character, then everything after the checkbox */
@@ -273,28 +284,61 @@ export class TaskChangedError extends Error {
   }
 }
 
-/**
- * Edits the task at `line` in a note's text. The note may have changed since
- * the line number was read, so `title` (as the index gave it) must still match;
- * if the line moved, the task is found by its title as long as that is
- * unambiguous. Returns { text, line, task, next }.
- */
-export function applyTaskEdit(text, { line, title, patch, today }) {
-  const lines = text.split('\n')
+// Where the task the index called (`line`, `title`) is now. The note may have
+// changed since the line number was read, so `title` must still match; if the
+// line moved, the task is found by its title as long as that is unambiguous.
+function findTask(lines, line, title) {
   const is = (n) => {
     const t = lines[n] != null && parseTask(lines[n])
     return !!t && (title == null || t.text === title)
   }
-  let at = line
-  if (!is(at)) {
-    const hits = lines.map((_, n) => n).filter(is)
-    if (hits.length !== 1) throw new TaskChangedError()
-    at = hits[0]
-  }
+  if (is(line)) return line
+  const hits = lines.map((_, n) => n).filter(is)
+  if (hits.length !== 1) throw new TaskChangedError()
+  return hits[0]
+}
+
+/**
+ * Edits the task at `line` in a note's text. Returns { text, line, task, next }.
+ * `dropNext` is for taking back the completion of a repeating task: the next
+ * occurrence that completing it wrote just below, if it is still untouched, goes
+ * again with the reopening.
+ */
+export function applyTaskEdit(text, { line, title, patch, today, dropNext = false }) {
+  const lines = text.split('\n')
+  const at = findTask(lines, line, title)
   const r = editTaskLine(lines[at], patch, { today })
   lines[at] = r.line
   if (r.next) lines.splice(at + 1, 0, r.next)
+  else if (dropNext && isRepeatOf(lines[at + 1], r.line)) lines.splice(at + 1, 1)
   return { text: lines.join('\n'), line: at, task: parseTask(r.line), next: r.next ? parseTask(r.next) : null }
+}
+
+function isRepeatOf(line, of) {
+  const a = line != null && parseTask(line)
+  const b = parseTask(of)
+  return !!a && isOpen(a.status) && isOpen(b.status) && a.text === b.text && !!a.recurrence && a.recurrence === b.recurrence
+}
+
+/**
+ * A new subtask (the line `taskLine`) under the task at `line`: after the last
+ * line nested beneath it, indented like its other subtasks, or else to sit
+ * inside it. Returns { text, line }.
+ */
+export function addSubtask(text, { line, title }, taskLine) {
+  const lines = text.split('\n')
+  const at = findTask(lines, line, title)
+  const parent = TASK_LINE.exec(lines[at].replace(/\r$/, ''))
+  const nested = (n) => /\S/.test(lines[n] ?? '') && /^\s*/.exec(lines[n])[0].length > parent[1].length
+  let end = at
+  while (nested(end + 1)) end++
+  const sibling = lines
+    .slice(at + 1, end + 1)
+    .map((l) => TASK_LINE.exec(l.replace(/\r$/, '')))
+    .find((m) => m && m[1].length > parent[1].length)
+  const indent = sibling ? sibling[1] : parent[1] + (parent[1].includes('\t') ? '\t' : ' '.repeat(parent[2].length))
+  lines.splice(end + 1, 0, `${indent}${taskLine.trimStart()}${lines[at].endsWith('\r') ? '\r' : ''}`)
+  return { text: lines.join('\n'), line: end + 1 }
 }
 
 /** A new task at the end of a note, with its siblings if it ends in a list of them */
@@ -305,9 +349,9 @@ export function appendTask(text, taskLine) {
   return `${body}${TASK_LINE.test(last) ? '\n' : '\n\n'}${taskLine}\n`
 }
 
-/** The line for a new, open task */
+/** The line for a new task: open, or in progress with `status: '/'` */
 export function newTaskLine(title, fields = {}, { today = todayIso() } = {}) {
-  const base = `- [ ] ${String(title).replace(/\s+/g, ' ').trim()}`
+  const base = `- [${fields.status === '/' ? '/' : ' '}] ${String(title).replace(/\s+/g, ' ').trim()}`
   const patch = {}
   for (const k of FIELD_KEYS) if (fields[k]) patch[k] = fields[k]
   return editTaskLine(base, patch, { today }).line
@@ -346,4 +390,157 @@ export function compareTasks(a, b) {
   const db = taskDate(b)
   if (da !== db) return da == null ? 1 : db == null ? -1 : da < db ? -1 : 1
   return priorityRank(b.priority) - priorityRank(a.priority) || (a.path || '').localeCompare(b.path || '') || a.line - b.line
+}
+
+/** the most recently finished first */
+export function compareFinished(a, b) {
+  const on = (t) => t.done || t.cancelled || ''
+  return on(b).localeCompare(on(a)) || compareTasks(a, b)
+}
+
+// ---------- boards ----------
+// A board is a view over one field of the tasks: its columns are that field's
+// values, and moving a card changes the field on its line. Nothing about a board
+// is stored anywhere.
+
+export const BOARD_GROUPS = [
+  { id: 'status', label: 'Status' },
+  { id: 'date', label: 'Due date' },
+  { id: 'priority', label: 'Priority' },
+]
+
+const COLUMNS = {
+  status: [
+    { id: 'todo', label: 'To do' },
+    { id: 'doing', label: 'Doing' },
+  ],
+  date: BUCKETS.filter((b) => b.id !== 'done'),
+  priority: [...PRIORITIES, 'none'].map((id) => ({ id, label: id === 'none' ? 'No priority' : id[0].toUpperCase() + id.slice(1) })),
+}
+const DONE = BUCKETS.find((b) => b.id === 'done')
+
+/** The columns of a grouping, then Done (cancelled tasks are there too) unless `done` is off */
+export const boardColumns = (group, { done = true } = {}) => (done ? [...COLUMNS[group], DONE] : COLUMNS[group])
+
+export function columnOf(task, group, today) {
+  if (!isOpen(task.status)) return 'done'
+  if (group === 'status') return task.status === '/' ? 'doing' : 'todo'
+  if (group === 'priority') return task.priority || 'none'
+  return bucketOf(task, today)
+}
+
+/** The date a task sits on is the one `taskDate` reads, so that is the one a move changes */
+export const dateKeyOf = (t) => (t.due ? 'due' : t.scheduled ? 'scheduled' : t.start ? 'start' : 'due')
+
+/**
+ * What being in a column means for a task, as a patch (null: it can't be set,
+ * as for Overdue). "Next 7 days" is the day after tomorrow, "Later" a month on.
+ */
+export function columnFields(group, column, today, dateKey = 'due') {
+  if (column === 'done') return { status: 'x' }
+  if (group === 'status') return { status: column === 'doing' ? '/' : ' ' }
+  if (group === 'priority') return { priority: column === 'none' ? null : column }
+  const day = { today, tomorrow: addDays(today, 1), week: addDays(today, 2), later: addMonths(today, 1) }[column]
+  if (day) return { [dateKey]: day }
+  return column === 'none' ? { due: null, scheduled: null, start: null } : null
+}
+
+/** The change dropping `task` on a column makes: null if it is there already or can't go there */
+export function dropPatch(task, group, column, today) {
+  if (columnOf(task, group, today) === column) return null
+  const patch = columnFields(group, column, today, dateKeyOf(task))
+  // out of Done into a column that says nothing about the status: open again
+  if (patch && !isOpen(task.status) && !patch.status) patch.status = ' '
+  return patch
+}
+
+/** The patch that puts `task` back as it was before `patch` */
+export function undoPatch(task, patch) {
+  const back = {}
+  for (const k of Object.keys(patch)) back[k] = k === 'title' ? task.text : (task[k] ?? null)
+  if ('status' in patch) Object.assign(back, task.done && { done: task.done }, task.cancelled && { cancelled: task.cancelled })
+  return back
+}
+
+/**
+ * A note's tasks as a tree: `roots` (what a board shows as cards) and, for each
+ * root with any, its checklist — every task below it in order, with its depth,
+ * and how many are finished. `tasks` are one note's, in line order, each with
+ * the `parent` line the index gave it.
+ */
+export function taskTree(tasks) {
+  const roots = []
+  const lists = new Map()
+  const at = new Map() // line → { root: line of its top-level task, depth }
+  for (const task of tasks) {
+    const parent = at.get(task.parent)
+    if (!parent) {
+      roots.push(task)
+      at.set(task.line, { root: task.line, depth: 0 })
+      continue
+    }
+    const depth = parent.depth + 1
+    at.set(task.line, { root: parent.root, depth })
+    const list = lists.get(parent.root) || lists.set(parent.root, { items: [], done: 0, total: 0 }).get(parent.root)
+    list.items.push({ task, depth })
+    list.total++
+    if (!isOpen(task.status)) list.done++
+  }
+  return { roots, lists }
+}
+
+// ---------- tags and filters ----------
+
+const TAG_WORD = /^#([\p{L}\p{N}_\-/]*[\p{L}_\-/][\p{L}\p{N}_\-/]*)$/u
+
+/** A title and the tags that end it: "Pay rent #home #bills" → { title: "Pay rent", tags: ["home", "bills"] } */
+export function splitTags(text) {
+  const words = String(text).trim().split(/\s+/)
+  const tags = []
+  while (words.length > 1) {
+    const tag = TAG_WORD.exec(words[words.length - 1])?.[1].replace(/\/+$/, '')
+    if (!tag) break
+    tags.unshift(tag)
+    words.pop()
+  }
+  return { title: words.join(' '), tags }
+}
+
+export const joinTags = (title, tags) => [title, ...tags.map((t) => `#${t}`)].join(' ')
+
+/** What someone typed as a tag, made into one (spaces become dashes); '' if it can't be */
+export function cleanTag(typed) {
+  const tag = String(typed).trim().replace(/^#+/, '').replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_\-/]/gu, '').replace(/\/+$/, '')
+  return TAG_WORD.test(`#${tag}`) ? tag : ''
+}
+
+/** Is the task under `tag`, or one of its subtags (#home/bills is under #home)? */
+export function hasTag(task, tag) {
+  const want = tag.toLowerCase()
+  return !!task.tags?.some((t) => {
+    const have = t.toLowerCase()
+    return have === want || have.startsWith(`${want}/`)
+  })
+}
+
+/** `filter`: { q: words in the title or the note's name, tags: any of these, priority: one, or 'none' } */
+export function matchTask(task, { q = '', tags = [], priority = null }) {
+  if (priority && (priority === 'none' ? task.priority : task.priority !== priority)) return false
+  if (tags.length && !tags.some((t) => hasTag(task, t))) return false
+  const needle = q.trim().toLowerCase()
+  return !needle || task.text.toLowerCase().includes(needle) || (task.path || '').toLowerCase().includes(needle)
+}
+
+// ---------- showing a change before it is written ----------
+
+// the task as a line, from what the index keeps of it
+function lineOf(t) {
+  const fields = FIELD_KEYS.filter((k) => t[k]).map((k) => tokenFor(k, t[k]))
+  return `${' '.repeat(t.indent || 0)}- [${t.status}] ${[t.text, ...fields].join(' ')}`
+}
+
+/** What an index entry becomes under `patch`, worked out without the note */
+export function previewEdit(task, patch, opts) {
+  const r = editTaskLine(lineOf(task), patch, opts)
+  return { ...parseTask(r.line), line: task.line, ...(task.parent != null && { parent: task.parent }) }
 }

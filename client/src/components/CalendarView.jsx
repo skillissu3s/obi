@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, Plus } from 'lucide-react'
-import { addDays, addMonths, compareTasks, daysBetween, isIsoDate, isOpen, taskDate, todayIso, weekdayOf } from '@shared/tasks.js'
+import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, FilePlus, FileText, Filter, PanelRight, Plus } from 'lucide-react'
+import { addDays, addMonths, compareTasks, dateKeyOf, isIsoDate, isOpen, monthDays, taskDate, weekStartOf } from '@shared/tasks.js'
 import { basename, isNote, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
+import { usePlanner } from '../store/planner.js'
 import { usePrefs } from '../store/prefs.js'
 import * as A from '../lib/actions.js'
+import { changeTasks, moveToDay, passes, taskKey, useCanEdit, useDayDrop, useFilter, useFilterCount, useTasks, useToday } from '../lib/planner.js'
 import { dateOfIso, formatDate, timeAgo } from '../lib/util.js'
-import { TaskBox, TaskEditor, TaskRow, QuickAdd, dueClass, taskKey } from './TaskParts.jsx'
+import { Popover } from './ui.jsx'
+import { QuickAdd, TaskChip, TaskRow, dueClass } from './TaskParts.jsx'
+import { TaskFilters } from './TaskFilters.jsx'
+import { useTaskDialog } from './TaskDialog.jsx'
+import { PAGE } from './TaskBoard.jsx'
 
-const STORE = 'obi:calendar'
 const MODES = [
   ['month', 'Month'],
   ['week', 'Week'],
@@ -19,19 +24,6 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const AGENDA_DAYS = 30
 const CHIPS_IN_A_MONTH_CELL = 3
 
-const loadMode = () => {
-  try {
-    const m = JSON.parse(localStorage.getItem(STORE) || '{}').mode
-    return MODES.some(([id]) => id === m) ? m : 'month'
-  } catch {
-    return 'month'
-  }
-}
-
-const monthStart = (iso) => `${iso.slice(0, 8)}01`
-// the first day of the week containing `iso`; startDay is 0 (Sunday) or 1 (Monday)
-const weekStartOf = (iso, startDay) => addDays(iso, -((weekdayOf(iso) - startDay + 7) % 7))
-
 // the days a view shows
 function daysOf(mode, selected, startDay) {
   if (mode === 'week') {
@@ -39,22 +31,19 @@ function daysOf(mode, selected, startDay) {
     return Array.from({ length: 7 }, (_, i) => addDays(start, i))
   }
   if (mode === 'agenda') return Array.from({ length: AGENDA_DAYS }, (_, i) => addDays(selected, i))
-  const first = monthStart(selected)
-  const start = weekStartOf(first, startDay)
-  const weeks = Math.ceil(daysBetween(start, addMonths(first, 1)) / 7)
-  return Array.from({ length: weeks * 7 }, (_, i) => addDays(start, i))
+  return monthDays(selected, startDay)
 }
 
 // What each day holds: its tasks (on their due, else scheduled, else start day —
 // a finished one with no date of its own, on the day it was finished) and the
 // notes that say `date:` in their properties.
-function useDays(version) {
+function useDays(model, filter) {
   return useMemo(() => {
     const days = new Map()
     const at = (d) => days.get(d) || days.set(d, { tasks: [], notes: [] }).get(d)
-    for (const t of A.allTasks()) {
+    for (const t of model.all) {
       const d = taskDate(t) || (isOpen(t.status) ? null : t.done || t.cancelled)
-      if (d) at(d).tasks.push(t)
+      if (d && passes(t, filter)) at(d).tasks.push(t)
     }
     for (const [path, meta] of useApp.getState().notes) {
       const d = String(meta.fm?.date ?? '').slice(0, 10)
@@ -65,74 +54,54 @@ function useDays(version) {
       day.notes.sort()
     }
     return days
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version])
+  }, [model, filter])
 }
 
 const NONE = { tasks: [], notes: [] }
 const openNote = (wsId, path) => useLayout.getState().openNote(wsId, path)
 
-function TaskChip({ task, onEdit, editing }) {
-  return (
-    <div
-      className={`calv-chip task ${isOpen(task.status) ? '' : 'done'} ${task.status === '-' ? 'cancelled' : ''} ${dueClass(task)} ${editing ? 'editing' : ''}`}
-      title={task.text}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/obi-task', taskKey(task))
-        e.dataTransfer.effectAllowed = 'move'
-      }}
-      onClick={(e) => {
-        e.stopPropagation()
-        onEdit(task, e.currentTarget)
-      }}
-    >
-      <span onClick={(e) => e.stopPropagation()}>
-        <TaskBox task={task} />
-      </span>
-      <span className="calv-chip-text">{task.text}</span>
-    </div>
-  )
-}
-
-function Cell({ iso, today, selected, dim, data, hasNote, limit, wsId, editingKey, onSelect, onOpenDay, onEdit, onDropTask }) {
-  const [over, setOver] = useState(false)
+function Cell({ iso, today, selected, dim, data, hasNote, limit, wsId, canEdit, onSelect, onOpenDay, onOpen, onAdd }) {
+  const { over, drop } = useDayDrop(iso)
   const shown = data.tasks.slice(0, limit)
   const more = data.tasks.length - shown.length
   const date = dateOfIso(iso)
   return (
     <div
-      className={`calv-cell ${iso === today ? 'today' : ''} ${iso === selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${over ? 'over' : ''}`}
+      className={`calv-cell ${iso === today ? 'today' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${over ? 'over' : ''}`}
+      role="group"
+      aria-label={`${formatDate(date, 'dddd D MMMM')}${data.tasks.length ? `, ${data.tasks.length} tasks` : ''}`}
       onClick={() => onSelect(iso)}
       onDoubleClick={() => onOpenDay(iso)}
-      onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes('text/obi-task')) return
-        e.preventDefault()
-        setOver(true)
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        setOver(false)
-        const key = e.dataTransfer.getData('text/obi-task')
-        if (key) onDropTask(key, iso)
-      }}
+      {...(canEdit ? drop : {})}
     >
       <div className="calv-cell-head">
+        <span className="calv-wd">{formatDate(date, 'ddd')}</span>
         <span className="calv-num">{date.getDate() === 1 ? formatDate(date, 'D MMM') : date.getDate()}</span>
-        <button
-          className={`calv-daily ${hasNote ? 'has' : ''}`}
-          title={hasNote ? "Open this day's note" : "Start this day's note"}
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenDay(iso)
-          }}
-        >
-          {hasNote ? <FileText /> : <Plus />}
-        </button>
+        <span className="calv-dots" aria-hidden="true">
+          {data.tasks.slice(0, 3).map((t) => (
+            <i key={taskKey(t)} className={`${dueClass(t, today)} ${isOpen(t.status) ? '' : 'done'}`} />
+          ))}
+        </span>
+        <span className="calv-actions">
+          {canEdit && (
+            <button type="button" className="calv-btn" title="Add a task for this day" aria-label="Add a task for this day" onClick={(e) => (e.stopPropagation(), onAdd(iso, e.currentTarget))}>
+              <Plus />
+            </button>
+          )}
+          <button
+            type="button"
+            className={`calv-btn ${hasNote ? 'has' : ''}`}
+            title={hasNote ? "Open this day's note" : "Start this day's note"}
+            aria-label={hasNote ? "Open this day's note" : "Start this day's note"}
+            onClick={(e) => (e.stopPropagation(), onOpenDay(iso))}
+          >
+            {hasNote ? <FileText /> : <FilePlus />}
+          </button>
+        </span>
       </div>
       <div className="calv-items">
         {shown.map((t) => (
-          <TaskChip key={taskKey(t)} task={t} editing={editingKey === taskKey(t)} onEdit={onEdit} />
+          <TaskChip key={taskKey(t)} task={t} today={today} canEdit={canEdit} onOpen={onOpen} />
         ))}
         {limit === Infinity &&
           data.notes.map((p) => (
@@ -162,13 +131,13 @@ function Cell({ iso, today, selected, dim, data, hasNote, limit, wsId, editingKe
 
 // The selected day in full: its note, a way to add to it, what is planned, what
 // is dated, and what was written that day.
-function DayPanel({ iso, data, hasNote, wsId, editingKey, onEdit, edited }) {
+function DayPanel({ iso, data, hasNote, wsId, today, canEdit, onOpen, edited, lists }) {
   const date = dateOfIso(iso)
   return (
     <>
       <div className="calv-side-head">
         <div>
-          <div className="calv-side-day">{iso === todayIso() ? 'Today' : formatDate(date, 'dddd')}</div>
+          <div className="calv-side-day">{iso === today ? 'Today' : formatDate(date, 'dddd')}</div>
           <div className="calv-side-date">{formatDate(date, 'D MMMM YYYY')}</div>
         </div>
         <button className="btn btn-sm" onClick={() => A.openDailyNote(date, { announce: !hasNote })}>
@@ -178,15 +147,15 @@ function DayPanel({ iso, data, hasNote, wsId, editingKey, onEdit, edited }) {
             </>
           ) : (
             <>
-              <Plus /> Start the note
+              <FilePlus /> Start the note
             </>
           )}
         </button>
       </div>
-      <QuickAdd day={iso} />
+      {canEdit && <QuickAdd day={iso} />}
       <div className="calv-side-title">Tasks</div>
       {data.tasks.length ? (
-        data.tasks.map((t) => <TaskRow key={taskKey(t)} task={t} wsId={wsId} editing={editingKey === taskKey(t)} onEdit={onEdit} />)
+        data.tasks.map((t) => <TaskRow key={taskKey(t)} task={t} today={today} ws={wsId} canEdit={canEdit} onOpen={onOpen} done={lists.get(taskKey(t))?.done} total={lists.get(taskKey(t))?.total} />)
       ) : (
         <div className="faint calv-empty">Nothing planned.</div>
       )}
@@ -215,29 +184,108 @@ function DayPanel({ iso, data, hasNote, wsId, editingKey, onEdit, edited }) {
   )
 }
 
+// A task's way onto a day without dragging
+function Reschedule({ task, today }) {
+  return (
+    <span className="pl-quick">
+      <button type="button" className="te-quick" onClick={() => moveToDay(task, today)}>
+        Today
+      </button>
+      <button type="button" className="te-quick" onClick={() => moveToDay(task, addDays(today, 1))}>
+        Tomorrow
+      </button>
+    </span>
+  )
+}
+
+// What still needs a day: the tasks that are overdue, and those with no date at
+// all — the ones to drag onto the calendar.
+function PlanPanel({ overdue, unscheduled, today, wsId, canEdit, onOpen, lists }) {
+  const [q, setQ] = useState('')
+  const [limit, setLimit] = useState(PAGE)
+  const matching = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    return needle ? unscheduled.filter((t) => t.text.toLowerCase().includes(needle) || t.path.toLowerCase().includes(needle)) : unscheduled
+  }, [unscheduled, q])
+  const row = (t) => (
+    <TaskRow key={taskKey(t)} task={t} today={today} ws={wsId} canEdit={canEdit} onOpen={onOpen} done={lists.get(taskKey(t))?.done} total={lists.get(taskKey(t))?.total} actions={canEdit && <Reschedule task={t} today={today} />} />
+  )
+  return (
+    <>
+      <div className="calv-side-title danger">
+        Overdue <span className="pl-count">{overdue.length}</span>
+        {canEdit && overdue.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => changeTasks(overdue, (t) => ({ [dateKeyOf(t)]: today }), `Moved ${overdue.length} overdue ${overdue.length === 1 ? 'task' : 'tasks'} to Today`)}
+          >
+            Move all to today
+          </button>
+        )}
+      </div>
+      {overdue.length ? overdue.slice(0, limit).map(row) : <div className="faint calv-empty">Nothing overdue.</div>}
+      {overdue.length > limit && (
+        <button type="button" className="pl-more" onClick={() => setLimit(limit + PAGE)}>
+          Show {Math.min(PAGE, overdue.length - limit)} more
+        </button>
+      )}
+      <div className="calv-side-title">
+        Unscheduled <span className="pl-count">{unscheduled.length}</span>
+      </div>
+      <input className="input calv-tray-search" aria-label="Search unscheduled tasks" placeholder="Search unscheduled…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {matching.length ? matching.slice(0, limit).map(row) : <div className="faint calv-empty">{unscheduled.length ? 'No match.' : 'Everything has a day.'}</div>}
+      {matching.length > limit && (
+        <button type="button" className="pl-more" onClick={() => setLimit(limit + PAGE)}>
+          Show {Math.min(PAGE, matching.length - limit)} more
+        </button>
+      )}
+      {canEdit && unscheduled.length > 0 && <div className="rail-hint">Drag a task onto a day to schedule it.</div>}
+    </>
+  )
+}
+
+function AgendaDay({ iso, today, data, wsId, canEdit, onOpen, onOpenDay, lists }) {
+  const { over, drop } = useDayDrop(iso)
+  return (
+    <div className={`calv-agenda-day ${iso === today ? 'today' : ''} ${over ? 'over' : ''}`} {...(canEdit ? drop : {})}>
+      <div className="calv-agenda-head" onClick={() => onOpenDay(iso)} title="Open this day's note">
+        <span className="calv-agenda-num">{dateOfIso(iso).getDate()}</span>
+        <span>{iso === today ? 'Today' : iso === addDays(today, 1) ? 'Tomorrow' : formatDate(dateOfIso(iso), 'dddd')}</span>
+        <span className="faint">{formatDate(dateOfIso(iso), 'D MMMM')}</span>
+      </div>
+      {data.tasks.map((t) => (
+        <TaskRow key={taskKey(t)} task={t} today={today} ws={wsId} canEdit={canEdit} onOpen={onOpen} done={lists.get(taskKey(t))?.done} total={lists.get(taskKey(t))?.total} />
+      ))}
+      {data.notes.map((p) => (
+        <button key={p} className="calv-note" onClick={() => openNote(wsId, p)}>
+          <FileText /> {stripExt(basename(p))}
+        </button>
+      ))}
+      {!data.tasks.length && !data.notes.length && <div className="faint calv-empty">Nothing planned.</div>}
+    </div>
+  )
+}
+
 export function CalendarView() {
-  const version = useApp((s) => s.version)
   const wsId = useApp((s) => s.wsId)
   const treeMap = useApp((s) => s.treeMap)
   const startDay = usePrefs((s) => (s.weekStart === 'sunday' ? 0 : 1))
-  const [mode, setModeState] = useState(loadMode)
-  const [today, setToday] = useState(todayIso)
+  const mode = usePlanner((s) => s.mode)
+  const side = usePlanner((s) => s.side)
+  const panel = usePlanner((s) => s.panel)
+  const set = usePlanner((s) => s.set)
+  const model = useTasks()
+  const filter = useFilter()
+  const filters = useFilterCount()
+  const canEdit = useCanEdit()
+  const today = useToday()
+  const { openTask, dialog } = useTaskDialog()
   const [selected, setSelected] = useState(today)
-  const [editing, setEditing] = useState(null) // { key, anchor }
-  const days = useDays(version)
+  const [filtering, setFiltering] = useState(null) // the Filter button, while its card is open
+  const [adding, setAdding] = useState(null) // { iso, anchor }
+  const days = useDays(model, filter)
 
-  // the day rolls over while the view stays open
-  useEffect(() => {
-    const t = setInterval(() => setToday(todayIso()), 60000)
-    return () => clearInterval(t)
-  }, [])
-
-  const setMode = (m) => {
-    setModeState(m)
-    try {
-      localStorage.setItem(STORE, JSON.stringify({ mode: m }))
-    } catch {}
-  }
   const shown = useMemo(() => daysOf(mode, selected, startDay), [mode, selected, startDay])
   const data = (iso) => days.get(iso) || NONE
   const hasNote = (iso) => treeMap.has(A.dailyNotePath(dateOfIso(iso)))
@@ -246,15 +294,12 @@ export function CalendarView() {
   // the previous or next month, week or stretch of the agenda
   const go = (n) => setSelected((d) => (mode === 'month' ? addMonths(d, n) : addDays(d, n * (mode === 'week' ? 7 : 14))))
 
-  const tasksByKey = useMemo(() => new Map(A.allTasks().map((t) => [taskKey(t), t])), [version])
-  const editedTask = editing ? tasksByKey.get(editing.key) : null
-
-  // dropping a task on a day moves its date there
-  const dropTask = (key, iso) => {
-    const task = tasksByKey.get(key)
-    if (!task || taskDate(task) === iso) return
-    A.updateTask(task, { [task.due ? 'due' : task.scheduled ? 'scheduled' : task.start ? 'start' : 'due']: iso })
-  }
+  // what has no day yet, and what has gone by
+  const plan = useMemo(() => {
+    const overdue = model.all.filter((t) => isOpen(t.status) && taskDate(t) && taskDate(t) < today && passes(t, filter)).sort(compareTasks)
+    const unscheduled = model.cards.filter((t) => isOpen(t.status) && !taskDate(t) && passes(t, filter)).sort(compareTasks)
+    return { overdue, unscheduled }
+  }, [model, filter, today])
 
   const edited = useMemo(() => {
     if (mode === 'agenda') return []
@@ -268,7 +313,7 @@ export function CalendarView() {
   }, [mode, selected, treeMap])
 
   const onKeyDown = (e) => {
-    if (e.target.closest('input, select, textarea, button')) return
+    if (e.defaultPrevented || e.target.closest('input, select, textarea, button')) return
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key]
     if (step) setSelected((d) => addDays(d, step))
     else if (e.key === 'PageUp' || e.key === 'PageDown') go(e.key === 'PageUp' ? -1 : 1)
@@ -278,6 +323,8 @@ export function CalendarView() {
     e.preventDefault()
   }
 
+  // the Day panel is for a grid; the agenda already lists its days
+  const tab = !panel ? null : mode === 'agenda' ? 'plan' : side
   const startLabel = (d) => formatDate(dateOfIso(d), 'D MMM')
   const title = mode === 'month' ? formatDate(dateOfIso(selected), 'MMMM YYYY') : mode === 'week' ? `${startLabel(shown[0])} – ${formatDate(dateOfIso(shown[6]), 'D MMM YYYY')}` : 'Coming up'
   const names = DOW.slice(startDay).concat(DOW.slice(0, startDay))
@@ -292,14 +339,13 @@ export function CalendarView() {
       hasNote={hasNote(iso)}
       limit={limit}
       wsId={wsId}
-      editingKey={editing?.key}
+      canEdit={canEdit}
       onSelect={setSelected}
       onOpenDay={openDay}
-      onEdit={(task, anchor) => setEditing(editing?.key === taskKey(task) ? null : { key: taskKey(task), anchor })}
-      onDropTask={dropTask}
+      onOpen={openTask}
+      onAdd={(day, anchor) => setAdding({ iso: day, anchor })}
     />
   )
-  const edit = (task, anchor) => setEditing(editing?.key === taskKey(task) ? null : { key: taskKey(task), anchor })
   const agenda = shown.filter((d) => d === today || d === selected || data(d).tasks.length || data(d).notes.length)
 
   return (
@@ -309,23 +355,29 @@ export function CalendarView() {
           <div className="calv-bar">
             <h2>{title}</h2>
             <div className="calv-nav">
-              <button className="icon-btn" title="Previous" onClick={() => go(-1)}>
+              <button className="icon-btn" title="Previous" aria-label="Previous" onClick={() => go(-1)}>
                 <ChevronLeft />
               </button>
               <button className="btn btn-sm" onClick={() => setSelected(today)}>
                 Today
               </button>
-              <button className="icon-btn" title="Next" onClick={() => go(1)}>
+              <button className="icon-btn" title="Next" aria-label="Next" onClick={() => go(1)}>
                 <ChevronRight />
               </button>
             </div>
-            <div className="segmented">
+            <div className="segmented" role="group" aria-label="Show as">
               {MODES.map(([id, label]) => (
-                <button key={id} className={mode === id ? 'active' : ''} onClick={() => setMode(id)}>
+                <button key={id} aria-pressed={mode === id} className={mode === id ? 'active' : ''} onClick={() => set({ mode: id })}>
                   {label}
                 </button>
               ))}
             </div>
+            <button type="button" className={`btn btn-sm ${filters ? 'on' : ''}`} aria-expanded={!!filtering} onClick={(e) => setFiltering(filtering ? null : e.currentTarget)}>
+              <Filter /> Filter {filters > 0 && <span className="badge accent">{filters}</span>}
+            </button>
+            <button type="button" className={`icon-btn ${panel ? 'active' : ''}`} title={panel ? 'Hide the side panel' : 'Show the side panel'} aria-label="Side panel" aria-pressed={panel} onClick={() => set({ panel: !panel })}>
+              <PanelRight />
+            </button>
           </div>
 
           {mode !== 'agenda' && (
@@ -342,45 +394,44 @@ export function CalendarView() {
           {mode === 'agenda' && (
             <div className="calv-agenda">
               {agenda.map((iso) => (
-                <div key={iso} className={`calv-agenda-day ${iso === today ? 'today' : ''}`}>
-                  <div className="calv-agenda-head" onClick={() => openDay(iso)} title="Open this day's note">
-                    <span className="calv-agenda-num">{dateOfIso(iso).getDate()}</span>
-                    <span>{iso === today ? 'Today' : iso === addDays(today, 1) ? 'Tomorrow' : formatDate(dateOfIso(iso), 'dddd')}</span>
-                    <span className="faint">{formatDate(dateOfIso(iso), 'D MMMM')}</span>
-                  </div>
-                  {data(iso).tasks.map((t) => (
-                    <TaskRow key={taskKey(t)} task={t} wsId={wsId} editing={editing?.key === taskKey(t)} onEdit={edit} />
-                  ))}
-                  {data(iso).notes.map((p) => (
-                    <button key={p} className="calv-note" onClick={() => openNote(wsId, p)}>
-                      <FileText /> {stripExt(basename(p))}
-                    </button>
-                  ))}
-                  {!data(iso).tasks.length && !data(iso).notes.length && <div className="faint calv-empty">Nothing planned.</div>}
-                </div>
+                <AgendaDay key={iso} iso={iso} today={today} data={data(iso)} wsId={wsId} canEdit={canEdit} onOpen={openTask} onOpenDay={openDay} lists={model.lists} />
               ))}
             </div>
           )}
         </div>
 
-        {mode !== 'agenda' && (
+        {tab && (
           <aside className="calv-side">
-            <DayPanel iso={selected} data={data(selected)} hasNote={hasNote(selected)} wsId={wsId} editingKey={editing?.key} onEdit={edit} edited={edited} />
+            {mode !== 'agenda' && (
+              <div className="segmented calv-tabs" role="group" aria-label="Side panel">
+                <button className={tab === 'day' ? 'active' : ''} aria-pressed={tab === 'day'} onClick={() => set({ side: 'day' })}>
+                  Day
+                </button>
+                <button className={tab === 'plan' ? 'active' : ''} aria-pressed={tab === 'plan'} onClick={() => set({ side: 'plan' })}>
+                  To plan {plan.overdue.length > 0 && <span className="badge danger">{plan.overdue.length}</span>}
+                </button>
+              </div>
+            )}
+            {tab === 'day' ? (
+              <DayPanel iso={selected} data={data(selected)} hasNote={hasNote(selected)} wsId={wsId} today={today} canEdit={canEdit} onOpen={openTask} edited={edited} lists={model.lists} />
+            ) : (
+              <PlanPanel overdue={plan.overdue} unscheduled={plan.unscheduled} today={today} wsId={wsId} canEdit={canEdit} onOpen={openTask} lists={model.lists} />
+            )}
           </aside>
         )}
       </div>
 
-      {editedTask && editing.anchor.isConnected && (
-        <TaskEditor
-          task={editedTask}
-          anchor={editing.anchor}
-          onClose={() => setEditing(null)}
-          onOpenNote={() => {
-            useLayout.getState().openNote(wsId, editedTask.path, { line: editedTask.line })
-            setEditing(null)
-          }}
-        />
+      {filtering && (
+        <Popover anchor={filtering} onClose={() => setFiltering(null)} align="right" className="pl-filter-pop">
+          <TaskFilters tags={model.tags} stacked />
+        </Popover>
       )}
+      {adding && (
+        <Popover anchor={adding.anchor} onClose={() => setAdding(null)} align="left" className="pl-dayadd">
+          <QuickAdd day={adding.iso} autoFocus />
+        </Popover>
+      )}
+      {dialog}
     </div>
   )
 }
