@@ -16,6 +16,7 @@ import { PasswordInput } from '../../pages/Auth.jsx'
 import { basename, stripExt } from '@shared/paths.js'
 import { isDesktop, wsWhere } from '../../lib/desktop.js'
 import { VaultSyncSection, DesktopAccountSection } from '../Desktop.jsx'
+import { WallpaperSettings } from './WallpaperSettings.jsx'
 
 // `stacked` puts wide controls (pickers, multi-input rows) under the label instead of beside it
 function Setting({ name, desc, children, status, stacked = false }) {
@@ -456,6 +457,7 @@ function AppearanceSection() {
       <Setting name="Strike through completed tasks">
         <Switch checked={prefs.strikeDone} onChange={(v) => prefs.set({ strikeDone: v })} />
       </Setting>
+      <WallpaperSettings />
     </>
   )
 }

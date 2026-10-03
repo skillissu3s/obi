@@ -34,6 +34,13 @@ services:
       # where the desktop app's installers are published (owner/repo on GitHub);
       # /download/windows and friends redirect to the latest release
       DOWNLOAD_REPO: ${DOWNLOAD_REPO:-}
+      # photo sources for Settings → Appearance → Background (all optional)
+      UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY:-}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
+      PIXABAY_API_KEY: ${PIXABAY_API_KEY:-}
+      FLICKR_API_KEY: ${FLICKR_API_KEY:-}
+      WALLHAVEN_API_KEY: ${WALLHAVEN_API_KEY:-}
+      NASA_API_KEY: ${NASA_API_KEY:-}
     ports:
       - "${PORT:-3000}:3000"
     volumes:

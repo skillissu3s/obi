@@ -12,6 +12,7 @@ import { api } from '../lib/api.js'
 import { conn } from '../lib/socket.js'
 import { navigate, useLocation, notePathFromUrl, urlForNote } from '../lib/router.js'
 import { installHotkeys, runCommand } from '../lib/commands.js'
+import { loadOwnWallpaper, rotateWallpaperOnStart } from '../lib/wallpaperSource.js'
 import * as A from '../lib/actions.js'
 import { Sidebar } from '../components/Sidebar.jsx'
 import { RightPanel } from '../components/RightPanel.jsx'
@@ -73,6 +74,12 @@ export default function AppShell() {
   }, [])
 
   useEffect(() => installHotkeys(), [])
+
+  // the picture kept on this device, and a new one if it is due
+  useEffect(() => {
+    loadOwnWallpaper()
+    rotateWallpaperOnStart()
+  }, [])
 
   // reflect active note in the URL
   const activeTab = useLayout((s) => {
