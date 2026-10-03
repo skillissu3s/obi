@@ -122,6 +122,8 @@ export function matchHotkey(e, combo) {
   const k = key.length === 1 ? key.toLowerCase() : key
   const ek = e.key.length === 1 ? e.key.toLowerCase() : e.key
   if (ek === k) return true
+  // "+" is Shift + "=" on most keyboards: either zooms in
+  if (key === '=' && ek === '+') return true
   // Alt on mac changes e.key; fall back to code
   if (key.length === 1 && e.code === `Key${key.toUpperCase()}`) return true
   if (key === '\\' && e.code === 'Backslash') return true

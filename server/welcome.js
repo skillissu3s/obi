@@ -44,6 +44,7 @@ Obi is your calm, fast home for notes — in the cloud, shared with others, or s
 | Close tab | Ctrl/⌘ W (Alt W in browsers that reserve it) |
 | New whiteboard | Alt B |
 | Canvas tools on a note | Alt C |
+| Zoom a note | Ctrl/⌘ wheel, or Ctrl/⌘ = / - / 0 |
 | Pan a canvas | Space + drag, middle mouse, or H |
 
 Back to [[Welcome]]. #getting-started

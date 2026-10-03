@@ -78,7 +78,8 @@ export function themeSnapshot() {
     // so it is measured from the note's own text column, not assumed
     // other open tabs keep their editors mounted but hidden (0 wide), so take
     // the one actually on screen
-    const col = Math.max(0, ...[...document.querySelectorAll('.obi-editor .cm-content')].map((el) => el.getBoundingClientRect().width))
+    // (offsetWidth, not the bounding box: a zoomed note is scaled on screen, but its column is still this wide)
+    const col = Math.max(0, ...[...document.querySelectorAll('.obi-editor .cm-content')].map((el) => el.offsetWidth))
     return {
       columnWidth: col && col > 120 ? Math.round(col) : null,
       theme: root.dataset.theme || 'dark',

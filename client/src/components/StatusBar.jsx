@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, Check, CloudOff, AlertTriangle, Cloud, Wifi, WifiOff, GitBranch, Users, FileText, Loader2 } from 'lucide-react'
+import { RefreshCw, Check, CloudOff, AlertTriangle, Cloud, Wifi, WifiOff, GitBranch, Users, FileText, Loader2, Minus, Plus } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
+import { useNoteZoom, zoomLabel, ZOOM_MIN, ZOOM_MAX } from '../store/zoom.js'
 import { syncNow } from '../lib/actions.js'
 import { conn } from '../lib/socket.js'
 import { timeAgo, readingTime } from '../lib/util.js'
@@ -29,6 +30,26 @@ function CloudChip({ ws }) {
       {icon}
       {label}
     </button>
+  )
+}
+
+// Zoom for the note in front: − and + step through the levels, the percentage
+// puts it back to 100%
+function ZoomChip() {
+  const zoom = useNoteZoom((s) => s.zoom)
+  const { step, reset } = useNoteZoom.getState()
+  return (
+    <span className="status-zoom desktop-only">
+      <button className="status-item" title="Zoom out (Ctrl/⌘ −)" aria-label="Zoom out" disabled={zoom <= ZOOM_MIN} onClick={() => step(-1)}>
+        <Minus />
+      </button>
+      <button className="status-item status-zoom-value" title="Back to 100% (Ctrl/⌘ 0)" onClick={reset}>
+        {zoomLabel(zoom)}
+      </button>
+      <button className="status-item" title="Zoom in (Ctrl/⌘ +)" aria-label="Zoom in" disabled={zoom >= ZOOM_MAX} onClick={() => step(1)}>
+        <Plus />
+      </button>
+    </span>
   )
 }
 
@@ -144,6 +165,7 @@ export function StatusBar() {
         </span>
       )}
       <span className="status-spacer" />
+      {tab?.kind === 'note' && <ZoomChip />}
       {tab?.kind === 'note' && tab.ws === wsId && treeMap.get(tab.path)?.mtime > 0 && (
         <span className="status-item desktop-only" title={new Date(treeMap.get(tab.path).mtime).toLocaleString()}>
           Edited {timeAgo(treeMap.get(tab.path).mtime)}

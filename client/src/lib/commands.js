@@ -3,7 +3,7 @@ import {
   Maximize2, SplitSquareHorizontal, X, RefreshCw, Share2, Globe, History, Pencil, Trash2, Copy, Link2, Star, Shuffle,
   Download, Upload, LogOut, ShieldCheck, Command, FolderInput, Keyboard, Plus, LayoutGrid, BookOpen, Undo2, Redo2,
   Bold, Italic, Quote, IndentIncrease, IndentDecrease, Hash, Users, Layers, Palette, Shapes, PencilRuler, PanelLeftOpen,
-  Printer,
+  Printer, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import { indentMore, indentLess, undo, redo } from '@codemirror/commands'
 import { yUndoManagerKeymap } from 'y-codemirror.next'
@@ -12,6 +12,7 @@ import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs, PALETTES } from '../store/prefs.js'
 import { useUI, toast, confirmDialog } from '../store/ui.js'
+import { useNoteZoom } from '../store/zoom.js'
 import { navigate } from './router.js'
 import { isDesktop } from './desktop.js'
 import { api } from './api.js'
@@ -166,6 +167,9 @@ export function buildCommands() {
           useApp.getState().revealPath(note.path)
           layout.setLeftTab('files')
         } },
+      { id: 'zoom-in', name: 'Zoom in on the note', icon: ZoomIn, hotkey: 'Mod+=', alt: 'Mod+Shift+=', group: 'View', run: () => useNoteZoom.getState().step(1) },
+      { id: 'zoom-out', name: 'Zoom out on the note', icon: ZoomOut, hotkey: 'Mod+-', group: 'View', run: () => useNoteZoom.getState().step(-1) },
+      { id: 'zoom-reset', name: 'Reset the note zoom to 100%', icon: ZoomIn, hotkey: 'Mod+0', group: 'View', run: () => useNoteZoom.getState().reset() },
       { id: 'insert-template', name: 'Insert template…', icon: Copy, group: 'Note', run: () => ui.openPalette('templates') },
       // editor commands
       { id: 'bold', name: 'Format: bold', icon: Bold, hotkey: 'Mod+B', group: 'Format', run: ed(toggleWrap('**')) },

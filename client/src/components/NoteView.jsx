@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   ChevronLeft, ChevronRight, MoreHorizontal, Eye, Pencil, Code2, LayoutGrid, Share2, History, Star, Trash2, Copy, Link2,
   FolderInput, SplitSquareHorizontal, Info, Globe, AlertTriangle, FileWarning, Wifi, WifiOff, Bold, Italic, List, ListChecks,
@@ -10,6 +10,7 @@ import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
 import { useUI, toast } from '../store/ui.js'
+import { useNoteZoom } from '../store/zoom.js'
 import { Editor } from './Editor.jsx'
 import { Reader } from './Reader.jsx'
 import { Board } from './Board.jsx'
@@ -48,6 +49,53 @@ function useHandleState(handle) {
   return handle
 }
 
+// Zooms a note by scaling it whole, text and canvas together, without changing
+// how it lays out: its lines wrap exactly where they do at 100%, so the
+// drawings pinned to them stay where they were put. A transform leaves the
+// layout size alone, so the margin stands in for the height the scaled note
+// takes up and the page scrolls to the right length. `reflow` (reading view,
+// which has no canvas to keep in place) lets the text re-wrap to the room there
+// is instead, as browser zoom does.
+function ZoomFrame({ zoom, reflow, children }) {
+  const ref = useRef(null)
+  const [height, setHeight] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const measure = () => setHeight(el.offsetHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // keep the same part of the page under the pointer (or in the middle)
+  const prev = useRef(zoom)
+  useLayoutEffect(() => {
+    const k = zoom / prev.current
+    prev.current = zoom
+    const scroller = ref.current?.closest('.note-scroll')
+    if (!scroller || k === 1) return
+    const at = useNoteZoom.getState().anchorY ?? scroller.clientHeight / 2
+    scroller.scrollTop = (scroller.scrollTop + at) * k - at
+  }, [zoom])
+
+  const style =
+    zoom === 1
+      ? undefined
+      : {
+          transform: `scale(${zoom})`,
+          transformOrigin: '50% 0',
+          marginBottom: (zoom - 1) * height,
+          ...(reflow ? { width: `${100 / zoom}%`, marginInline: 'auto' } : null),
+        }
+  return (
+    <div className="note-zoom" ref={ref} style={style}>
+      {children}
+    </div>
+  )
+}
+
 export function NoteView({ tab, paneId, active }) {
   // a note we just created isn't on the server yet — wait before joining its document
   const creating = useApp((s) => s.pending[`${tab.ws}:${tab.path}`]) === 'creating'
@@ -69,6 +117,7 @@ export function NoteView({ tab, paneId, active }) {
   const [innerEl, setInnerEl] = useState(null)
   const [originEl, setOriginEl] = useState(null)
   const [stageEl, setStageEl] = useState(null)
+  const zoom = useNoteZoom((z) => z.zoom)
   const setScroll = useCallback((el) => {
     scrollRef.current = el
     setScrollEl(el)
@@ -85,6 +134,21 @@ export function NoteView({ tab, paneId, active }) {
   useEffect(() => {
     if (active && view) setActiveEditorView(view)
   }, [active, view])
+
+  // Ctrl/⌘ + wheel (and a trackpad pinch, which arrives the same way) zooms the
+  // note about the pointer
+  useEffect(() => {
+    if (!scrollEl) return undefined
+    const onWheel = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || !scrollEl.querySelector('.note-zoom')) return
+      e.preventDefault()
+      const delta = Math.max(-100, Math.min(100, e.deltaY * (e.deltaMode === 1 ? 16 : 1)))
+      const { zoom: z, setZoom } = useNoteZoom.getState()
+      setZoom(z * Math.exp(-delta * 0.002), e.clientY - scrollEl.getBoundingClientRect().top)
+    }
+    scrollEl.addEventListener('wheel', onWheel, { passive: false })
+    return () => scrollEl.removeEventListener('wheel', onWheel)
+  }, [scrollEl])
 
   // doc lifecycle events
   useEffect(() => {
@@ -212,31 +276,33 @@ export function NoteView({ tab, paneId, active }) {
       )
     if (mode === 'board') return <Board handle={handle} readOnly={readOnly} />
     return (
-      <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`} ref={mode === 'read' ? undefined : setInnerEl}>
-        {mode !== 'read' && <div className="nc-origin" ref={setOriginEl} />}
-        {prefs.inlineTitle && <InlineTitle tab={tab} title={title} readOnly={readOnly || foreign} view={view} />}
-        {readOnly && (
-          <div className="note-banner">
-            <Eye /> You have view-only access to this note.
-          </div>
-        )}
-        {mode === 'read' ? (
-          <Reader handle={handle} onStats={setStats} readOnly={readOnly} />
-        ) : (
-          <Editor
-            handle={handle}
-            tabId={tab.id}
-            mode={mode}
-            readOnly={readOnly}
-            onStats={setStats}
-            onViewReady={setView}
-            line={tab.line}
-            heading={heading}
-            key={`${handle.key}:${handle.generation}`}
-          />
-        )}
-        <LinkedMentions tab={tab} />
-      </div>
+      <ZoomFrame zoom={zoom} reflow={mode === 'read'}>
+        <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`} ref={mode === 'read' ? undefined : setInnerEl}>
+          {mode !== 'read' && <div className="nc-origin" ref={setOriginEl} />}
+          {prefs.inlineTitle && <InlineTitle tab={tab} title={title} readOnly={readOnly || foreign} view={view} />}
+          {readOnly && (
+            <div className="note-banner">
+              <Eye /> You have view-only access to this note.
+            </div>
+          )}
+          {mode === 'read' ? (
+            <Reader handle={handle} onStats={setStats} readOnly={readOnly} />
+          ) : (
+            <Editor
+              handle={handle}
+              tabId={tab.id}
+              mode={mode}
+              readOnly={readOnly}
+              onStats={setStats}
+              onViewReady={setView}
+              line={tab.line}
+              heading={heading}
+              key={`${handle.key}:${handle.generation}`}
+            />
+          )}
+          <LinkedMentions tab={tab} />
+        </div>
+      </ZoomFrame>
     )
   }
 

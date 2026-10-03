@@ -15,6 +15,7 @@ import * as A from '../lib/actions.js'
 import { renderMarkdown } from '../lib/render.js'
 import { usePrefs } from '../store/prefs.js'
 import { useUI } from '../store/ui.js'
+import { useNoteZoom } from '../store/zoom.js'
 import { setAnnotations, annotationAt } from '../editor/annotations.js'
 import { useBoardStore, useCanvasCtx, pickImageFiles } from './BoardCanvas.jsx'
 import { CanvasController } from './controller.js'
@@ -51,6 +52,12 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
   const handle = useLayerHandle(tab.ws, tab.path)
   const store = useBoardStore(handle)
   const prefs = usePrefs()
+  // The note is shown scaled by `zoom` (see ZoomFrame in NoteView). Canvas
+  // elements live inside it, so they are placed in unscaled "world" pixels; the
+  // browser and CodeMirror report screen pixels, which are `zoom` times larger.
+  const zoom = useNoteZoom((z) => z.zoom)
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
   const trackerRef = useRef(new AnchorTracker())
   const ctlRef = useRef(null)
   const panRef = useRef(0)
@@ -71,7 +78,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     (x) => {
       panRef.current = x
       setPanState(x)
-      if (innerEl) innerEl.style.transform = x ? `translateX(${Math.round(x)}px)` : ''
+      if (innerEl) innerEl.style.transform = x ? `translateX(${Math.round(x / zoomRef.current)}px)` : ''
     },
     [innerEl],
   )
@@ -85,20 +92,22 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     const o = originEl.getBoundingClientRect()
     const content = view.contentDOM.getBoundingClientRect()
     const editor = view.dom.getBoundingClientRect()
+    const z = zoomRef.current
     const g = {
+      z,
       ox: o.left,
       oy: o.top,
-      docTop: view.documentTop - o.top,
-      colLeft: content.left - o.left,
-      colRight: content.right - o.left,
-      textTop: innerEl ? innerEl.getBoundingClientRect().top - o.top : 0,
-      textBottom: editor.bottom - o.top,
+      docTop: (view.documentTop - o.top) / z,
+      colLeft: (content.left - o.left) / z,
+      colRight: (content.right - o.left) / z,
+      textTop: innerEl ? (innerEl.getBoundingClientRect().top - o.top) / z : 0,
+      textBottom: (editor.bottom - o.top) / z,
     }
     geomRef.current = g
     return g
   }, [])
 
-  const geom = () => measure() || geomRef.current || { ox: 0, oy: 0, docTop: 0, colLeft: 0, colRight: 740, textTop: 0, textBottom: 0 }
+  const geom = () => measure() || geomRef.current || { z: 1, ox: 0, oy: 0, docTop: 0, colLeft: 0, colRight: 740, textTop: 0, textBottom: 0 }
 
   const syncText = useCallback(() => {
     const t = trackerRef.current
@@ -111,8 +120,8 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
 
   const toWorld = useCallback(
     (cx, cy) => {
-      const g = measure() || geomRef.current || { ox: 0, oy: 0 }
-      return { x: cx - g.ox, y: cy - g.oy }
+      const g = measure() || geomRef.current || { ox: 0, oy: 0, z: 1 }
+      return { x: (cx - g.ox) / g.z, y: (cy - g.oy) / g.z }
     },
     [measure],
   )
@@ -151,12 +160,16 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         // publish/main.js measures the same things from its own DOM.
         const gapOf = (r) => Math.min(8, Math.max(2, (view.defaultLineHeight - (r.bottom - r.top)) / 2))
         const col = [g.colLeft, g.colRight]
+        // a screen rect in world pixels
+        const world = (r) => ({ left: (r.left - g.ox) / g.z, right: (r.right - g.ox) / g.z, top: (r.top - g.oy) / g.z, bottom: (r.bottom - g.oy) / g.z })
+        const sa = view.coordsAtPos(from, 1)
+        const sb = view.coordsAtPos(to, -1)
         let rect = null
-        const a = view.coordsAtPos(from, 1)
-        const b = view.coordsAtPos(to, -1)
-        if (a && b) {
-          const rows = Math.abs(a.top - b.top) < 4 ? { x: a.left - g.ox, w: Math.max(4, b.right - a.left) } : { x: g.colLeft, w: g.colRight - g.colLeft }
-          rect = { ...rows, y: a.top - g.oy, h: Math.max(4, b.bottom - a.top), ga: a.top - g.oy - gapOf(a), gb: b.bottom - g.oy + gapOf(b), col }
+        if (sa && sb) {
+          const a = world(sa)
+          const b = world(sb)
+          const rows = Math.abs(a.top - b.top) < 4 ? { x: a.left, w: Math.max(4, b.right - a.left) } : { x: g.colLeft, w: g.colRight - g.colLeft }
+          rect = { ...rows, y: a.top, h: Math.max(4, b.bottom - a.top), ga: a.top - gapOf(a), gb: b.bottom + gapOf(b), col }
         } else {
           const top = view.lineBlockAt(from).top
           const bottom = view.lineBlockAt(to).bottom
@@ -176,7 +189,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     let pending = null
     const host = {
       toWorld,
-      zoom: () => 1,
+      zoom: () => zoomRef.current,
       panBy: (dx, dy) => {
         setPan(panRef.current + dx)
         if (scrollEl) scrollEl.scrollTop -= dy
@@ -185,7 +198,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       visibleRect: () => {
         const r = scrollEl.getBoundingClientRect()
         const a = toWorld(r.left, r.top)
-        return { x: a.x, y: a.y, w: r.width, h: r.height }
+        return { x: a.x, y: a.y, w: r.width / zoomRef.current, h: r.height / zoomRef.current }
       },
       visibleCenter: () => {
         const r = scrollEl.getBoundingClientRect()
@@ -206,8 +219,8 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       openFile: (p) => ctx.openFile(p),
       isTextArea: (cx, cy) => {
         const g = geom()
-        const x = cx - g.ox
-        const y = cy - g.oy
+        const x = (cx - g.ox) / g.z
+        const y = (cy - g.oy) / g.z
         return x >= g.colLeft - 10 && x <= g.colRight + 10 && y >= g.textTop && y <= g.textBottom
       },
       anchorFor: (y) => {
@@ -230,7 +243,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       },
       textAnchorAt: (cx, cy) => {
         const g = geom()
-        const x = cx - g.ox
+        const x = (cx - g.ox) / g.z
         if (x < g.colLeft - 4 || x > g.colRight + 4) return null
         const pos = view.posAtCoords({ x: cx, y: cy }, false)
         if (pos == null) return null
@@ -295,8 +308,8 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     const g = geomRef.current
     if (!ctl || !scrollEl || !g) return null
     const r = scrollEl.getBoundingClientRect()
-    const left = r.left - g.ox
-    const right = r.right - g.ox
+    const left = (r.left - g.ox) / g.z
+    const right = (r.right - g.ox) / g.z
     let before = 0
     let after = 0
     let nearestLeft = null
@@ -404,6 +417,12 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       scrollEl.removeEventListener('scroll', onScroll)
     }
   }, [scrollEl, innerEl, bump, bubble, updateBubble])
+
+  // zoomed: the pan (kept in screen pixels) and every measurement are redone
+  useEffect(() => {
+    setPan(panRef.current)
+    bump()
+  }, [zoom, setPan, bump])
 
   // layer content changed → anchors may be new
   useEffect(() => {
@@ -721,7 +740,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     const anchor = refRange(range)
     const g = measure()
     const a = view.coordsAtPos(range.from, 1)
-    const y = a ? a.top - g.oy - 18 : g.docTop + view.lineBlockAt(range.from).top
+    const y = a ? (a.top - g.oy) / g.z - 18 : g.docTop + view.lineBlockAt(range.from).top
     const w = kind === 'sticky' ? 200 : 250
     const h = kind === 'sticky' ? 150 : 130
     const spot = ctl.freeSpot(g.colRight + 56, y, w, h)
@@ -769,7 +788,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     const anchor = refRange(range)
     const g = measure()
     const b = view.coordsAtPos(range.to, -1)
-    const y = b ? (b.top + b.bottom) / 2 - g.oy : 0
+    const y = b ? ((b.top + b.bottom) / 2 - g.oy) / g.z : 0
     const arrow = {
       id: newElementId(),
       type: 'arrow',
@@ -801,12 +820,12 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
   const revealX = (x1, x2) => {
     const r = scrollEl.getBoundingClientRect()
     const g = measure()
-    const left = r.left - g.ox + 16
-    const right = r.right - g.ox - 16
+    const left = (r.left - g.ox) / g.z + 16
+    const right = (r.right - g.ox) / g.z - 16
     let shift = 0
     if (x2 > right) shift = right - x2
     else if (x1 < left) shift = left - x1
-    if (shift) animatePan(panRef.current + shift)
+    if (shift) animatePan(panRef.current + shift * g.z)
   }
   const animatePan = (to) => {
     const from = panRef.current
@@ -842,7 +861,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     <>
       {portalHost && createPortal(
         <>
-          <CanvasLayer ctl={ctl} ctx={ctx} zoom={1} />
+          <CanvasLayer ctl={ctl} ctx={ctx} zoom={zoom} />
           <CanvasExtent ctl={ctl} />
         </>,
         portalHost,

@@ -674,6 +674,7 @@ export function ShortcutsModal() {
     ['Undo / redo', 'Mod Z / Mod ⇧ Z'],
     ['New whiteboard', 'Alt B'],
     ['Canvas tools on a note', 'Alt C'],
+    ['Zoom the note in / out / back to 100%', 'Mod = / Mod - / Mod 0'],
   ]
   // canvas keys work on whiteboards, and on notes once you click the canvas (outside the text)
   const canvas = [

@@ -588,6 +588,23 @@ button.status-item:hover {
 .status-spacer {
   flex: 1;
 }
+.status-zoom {
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+}
+.status-zoom .status-item {
+  padding: 0 5px;
+}
+.status-zoom .status-zoom-value {
+  min-width: 42px;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+button.status-item:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 .spin {
   animation: spin 1s linear infinite;
 }
