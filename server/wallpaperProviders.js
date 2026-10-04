@@ -438,6 +438,8 @@ const wikimedia = {
     // the featured feed carries one picture of the day per date; a page is 8 days
     const days = Array.from({ length: 8 }, (_, i) => ymd(now() - ((page - 1) * 8 + i) * DAY))
     const feeds = await Promise.allSettled(days.map((d) => get(`https://en.wikipedia.org/api/rest_v1/feed/featured/${d.replaceAll('-', '/')}`)))
+    const limited = feeds.find((f) => f.status === 'rejected' && f.reason?.kind === 'limit')
+    if (limited) throw limited.reason
     if (feeds.every((f) => f.status === 'rejected')) throw feeds[0].reason
     const daily = feeds.flatMap((f, i) => (f.status === 'fulfilled' && isObj(f.value?.image) ? [{ date: days[i], image: f.value.image }] : []))
     return {
@@ -511,6 +513,9 @@ const met = {
     const found = await get(`${base}/search?${qs({ q: q || 'landscape', hasImages: true, isPublicDomain: true, isHighlight: q ? '' : true })}`)
     const ids = Array.isArray(found.objectIDs) ? found.objectIDs.filter(Number.isInteger) : []
     const objects = await Promise.allSettled(ids.slice((page - 1) * PER_PAGE, page * PER_PAGE).map((id) => get(`${base}/objects/${id}`)))
+    // a page that ran into the limits is not passed on, or kept, half empty: it is tried again later
+    const limited = objects.find((o) => o.status === 'rejected' && o.reason?.kind === 'limit')
+    if (limited) throw limited.reason
     if (objects.length && objects.every((o) => o.status === 'rejected')) throw objects[0].reason
     return {
       items: collect(

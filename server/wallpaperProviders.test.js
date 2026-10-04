@@ -367,10 +367,11 @@ test('a page with nothing usable on it, where more follow, is skipped and the an
 })
 
 test('skipping empty pages is capped: a long run of them is handed back as an empty page with more to come', async () => {
-  const { w, calls } = metWith(() => false)
+  const { w, calls, advance } = metWith(() => false)
   const r = await w.search('met', '', 1)
   assert.deepEqual([r.items.length, r.page, r.more], [0, 3, true]) // the page asked for and two more
   assert.equal(calls.filter((c) => c.url.pathname.endsWith('/search')).length, 3)
+  advance(1000) // the Met allows 80 requests a second: the three pages above used most of that
   const last = await w.search('met', '', 6) // the last page: nothing follows, so nothing more is looked at
   assert.deepEqual([last.items.length, last.page, last.more], [0, 6, false])
 })
@@ -492,4 +493,35 @@ test('a report that failed can be sent again, and a source that does not ask is 
   await rejects(w.track('pexels', 'whatever', 'ann'), 503) // not configured: refused, and no request made
   assert.equal(calls.filter((c) => c.url.hostname === 'api.pexels.com').length, 0)
   await w.track('picsum', '10', 'ann') // nothing to report for this source
+})
+
+test('a Met page that runs into the limits half way is tried again later, not passed on or kept half empty', async () => {
+  const ids = Array.from({ length: 100 }, (_, i) => 2000 + i)
+  const releases = []
+  const { w, advance } = setup((url) => {
+    if (url.pathname.endsWith('/search')) return json({ total: ids.length, objectIDs: ids })
+    const id = Number(url.pathname.split('/').pop())
+    return new Promise((resolve) => releases.push(() => resolve(json({ objectID: id, isPublicDomain: true, primaryImage: `https://images.metmuseum.org/CRDImages/ep/original/${id}.jpg`, primaryImageSmall: `https://images.metmuseum.org/CRDImages/ep/web-large/${id}.jpg`, title: `Work ${id}` }))))
+  })
+  // three pages at once want 72 object requests: six can be in flight and 48 can wait
+  const searches = ['a', 'b', 'c'].map((q) => w.search('met', q, 1).then((r) => r, (e) => e))
+  await tick(50)
+  while (releases.length) {
+    releases.shift()()
+    await tick(1)
+  }
+  const results = await Promise.all(searches)
+  const failed = results.filter((r) => r instanceof WallpaperError)
+  assert.ok(failed.length >= 1 && failed.every((e) => e.status === 429), 'at least one was asked to try again later')
+  for (const r of results.filter((r) => !(r instanceof WallpaperError))) assert.equal(r.items.length, 24, 'what is passed on is never half a page')
+  // and the one that failed is not remembered: asked again with room to spare, it is whole
+  const q = ['a', 'b', 'c'][results.indexOf(failed[0])]
+  advance(1000) // the Met allows 80 requests a second
+  const again = w.search('met', q, 1)
+  await tick(20)
+  while (releases.length) {
+    releases.shift()()
+    await tick(1)
+  }
+  assert.equal((await again).items.length, 24)
 })

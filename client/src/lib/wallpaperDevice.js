@@ -48,7 +48,9 @@ export function claimWallpaper(userId) {
     last = localStorage.getItem(OWNER) || ''
   } catch {}
   const id = String(userId)
-  const other = last !== id
+  // the same person again in this page (profile changes sign them in again too) changes nothing, even where
+  // localStorage cannot say who it was
+  const other = owner !== id && last !== id
   if (other) forgetWallpaper()
   owner = id
   try {

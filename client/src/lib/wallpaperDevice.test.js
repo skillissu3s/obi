@@ -103,3 +103,18 @@ test('a browser without IndexedDB still signs people out', async () => {
   assert.equal(local.get('obi:wp'), undefined)
   globalThis.indexedDB = idb
 })
+
+test('the same person signing in again in the same page keeps their picture even where localStorage cannot remember them', async () => {
+  const keep = globalThis.localStorage
+  globalThis.localStorage = { getItem: () => { throw new Error('blocked') }, setItem: () => { throw new Error('blocked') }, removeItem: () => { throw new Error('blocked') } }
+  assert.equal(claimWallpaper('frank'), true, 'the first time there is no telling')
+  await settle()
+  await writeDevicePicture('frank-picture')
+  assert.equal(claimWallpaper('frank'), false)
+  await settle()
+  assert.equal(await readDevicePicture(), 'frank-picture')
+  assert.equal(claimWallpaper('gina'), true, 'somebody else still starts clean')
+  await settle()
+  assert.equal(files.size, 0)
+  globalThis.localStorage = keep
+})
