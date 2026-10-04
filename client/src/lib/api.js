@@ -66,7 +66,11 @@ export const api = {
   resetPasswordVerify: (ticket, code, password) => request('POST', '/api/auth/password/reset/verify', { ticket, code, password }),
   changeEmail: (email, password) => request('POST', '/api/auth/email', { email, password }),
   verifyEmail: (ticket, code) => request('POST', '/api/auth/email/verify', { ticket, code }),
-  logout: () => request('POST', '/api/auth/logout', {}),
+  logout: () =>
+    request('POST', '/api/auth/logout', {}).then((r) => {
+      window.dispatchEvent(new CustomEvent('obi:signout')) // whatever the app keeps of this person in the browser can go
+      return r
+    }),
   signup: (body) => request('POST', '/api/auth/signup', body),
   checkInvite: (token) => request('GET', `/api/auth/invite/${encodeURIComponent(token)}`),
   updateMe: (body) => request('PATCH', '/api/auth/me', body),

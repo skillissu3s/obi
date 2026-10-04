@@ -42,7 +42,7 @@ wallpaperRouter.post(
   handle(async (req) => {
     const id = text(req.body?.id, 80)
     if (!/^[\w.:-]+$/.test(id)) throw new WallpaperError(400, 'Missing picture id')
-    await wallpapers.track(text(req.body?.provider, 40), id)
+    await wallpapers.track(text(req.body?.provider, 40), id, req.user.id)
     return { ok: true }
   }),
 )

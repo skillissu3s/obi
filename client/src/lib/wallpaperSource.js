@@ -4,7 +4,9 @@
 // stays in this browser's IndexedDB.
 import { api } from './api.js'
 import { usePrefs, applyPrefs } from '../store/prefs.js'
-import { normalizeWallpaper, dayKey, pickNext, setOwnImage, getOwnImage } from './wallpaper.js'
+import { confirmDialog } from '../store/ui.js'
+import { normalizeWallpaper, dayKey, pickNext, rotationDue, setOwnImage, getOwnImage } from './wallpaper.js'
+import { readDevicePicture, writeDevicePicture, deleteDevicePicture } from './wallpaperDevice.js'
 
 // ---------- photos ----------
 
@@ -12,13 +14,23 @@ export const wallpaperProviders = () => api.get('/api/wallpapers/providers').the
 
 export const searchWallpapers = (provider, q, page, signal) => api.get(`/api/wallpapers/search?${new URLSearchParams({ provider, q, page })}`, { signal })
 
+// Some sources hand over the full-size original, which can take a while: after this the picture is used
+// anyway and the browser carries on fetching it, the provider's colour showing in the meantime.
+const PRELOAD_MS = 20000
+// Resolves true when the picture is ready, false when it cannot be loaded, 'slow' when it is still on its way.
 const preload = (url) =>
   new Promise((resolve) => {
     const img = new Image()
-    img.onload = () => resolve(true)
-    img.onerror = () => resolve(false)
+    const slow = setTimeout(() => resolve('slow'), PRELOAD_MS)
+    img.onload = () => (clearTimeout(slow), resolve(true))
+    img.onerror = () => (clearTimeout(slow), resolve(false))
     img.src = url
   })
+
+// Leaving a picture from this device deletes it from the browser, so anything that would is asked about first.
+export const confirmLeavingOwn = async () =>
+  usePrefs.getState().wallpaper.kind !== 'own' ||
+  confirmDialog({ title: 'Replace your picture?', message: 'The picture from your device is removed from this browser. You can choose it again from your files.', confirmText: 'Replace' })
 
 // The one way the background is changed: merged with what is there and checked.
 // Leaving a picture from this device lets go of it.
@@ -32,7 +44,8 @@ export function setWallpaper(patch) {
 // Makes a found photo the background. The picture is fetched first so the
 // current one stays up until the new one can replace it.
 export async function chooseWallpaper(item, { q, providerName }) {
-  if (!(await preload(item.url))) throw new Error('That picture would not load. Try another.')
+  if (!(await confirmLeavingOwn())) return
+  if ((await preload(item.url)) === false) throw new Error('That picture would not load. Try another.')
   setWallpaper({
     kind: 'image',
     image: { providerName, ...item },
@@ -59,43 +72,42 @@ export async function shuffleWallpaper(mode = 'launch') {
   await chooseWallpaper(next, { q: pool.q, providerName: found.providerName })
 }
 
-// At start-up: change the picture if it is due. Quiet about trouble, and it
-// leaves a data-saving or offline device alone.
-export function rotateWallpaperOnStart() {
+// Change the picture if it is due: at start-up and whenever the tab comes back into view, which is when a day
+// has most likely gone by. Quiet about trouble, and it leaves a data-saving or offline device alone.
+let rotating = false
+let watching = false
+function rotateIfDue() {
   const w = usePrefs.getState().wallpaper
-  if (w.rotate === 'off' || w.kind !== 'image' || !w.pool) return
+  let session = null
+  try {
+    session = sessionStorage.getItem('obi:wp-rotated')
+  } catch {}
+  if (rotating || !rotationDue(w, dayKey(), !!session)) return
   if (navigator.onLine === false || navigator.connection?.saveData || matchMedia('(prefers-reduced-data: reduce)').matches) return
-  if (w.rotate === 'daily' ? w.rotatedOn === dayKey() : sessionStorage.getItem('obi:wp-rotated')) return
   try {
     sessionStorage.setItem('obi:wp-rotated', '1')
   } catch {}
-  shuffleWallpaper(w.rotate).catch(() => {})
+  rotating = true
+  shuffleWallpaper(w.rotate)
+    .catch(() => {})
+    .finally(() => (rotating = false))
+}
+export function rotateWallpaperOnStart() {
+  rotateIfDue()
+  if (watching) return
+  watching = true
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && rotateIfDue())
 }
 
 // ---------- a picture from this device ----------
 
 const OWN_SIDE = 2560
-const store = (mode, run) =>
-  new Promise((resolve, reject) => {
-    const open = indexedDB.open('obi-wallpaper', 1)
-    open.onupgradeneeded = () => open.result.createObjectStore('files')
-    open.onerror = () => reject(open.error)
-    open.onsuccess = () => {
-      const db = open.result
-      const req = run(db.transaction('files', mode).objectStore('files'))
-      req.onsuccess = () => {
-        db.close()
-        resolve(req.result)
-      }
-      req.onerror = () => reject(req.error)
-    }
-  })
 
 // Reads the picture kept on this device, if any, and shows it.
 export async function loadOwnWallpaper() {
   if (usePrefs.getState().wallpaper.kind !== 'own' || getOwnImage()) return
   try {
-    const blob = await store('readonly', (s) => s.get('own'))
+    const blob = await readDevicePicture()
     if (blob) setOwnImage({ url: URL.createObjectURL(blob) })
   } catch {}
   applyPrefs()
@@ -109,20 +121,23 @@ export async function saveOwnWallpaper(file) {
   })
   const scale = Math.min(1, OWN_SIDE / Math.max(bitmap.width, bitmap.height))
   const canvas = new OffscreenCanvas(Math.round(bitmap.width * scale), Math.round(bitmap.height * scale))
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  const paint = canvas.getContext('2d')
+  paint.fillStyle = '#fff' // JPEG has no transparency: what a picture leaves clear would turn black
+  paint.fillRect(0, 0, canvas.width, canvas.height)
+  paint.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
   const average = new OffscreenCanvas(1, 1).getContext('2d')
   average.drawImage(canvas, 0, 0, 1, 1)
   const color = `#${[...average.getImageData(0, 0, 1, 1).data.slice(0, 3)].map((n) => n.toString(16).padStart(2, '0')).join('')}`
   const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.88 })
-  await store('readwrite', (s) => s.put(blob, 'own'))
+  await writeDevicePicture(blob)
   if (getOwnImage()) URL.revokeObjectURL(getOwnImage().url)
   setOwnImage({ url: URL.createObjectURL(blob) })
   setWallpaper({ kind: 'own', value: color })
 }
 
 async function removeOwnWallpaper() {
-  await store('readwrite', (s) => s.delete('own')).catch(() => {})
+  await deleteDevicePicture().catch(() => {})
   if (getOwnImage()) URL.revokeObjectURL(getOwnImage().url)
   setOwnImage(null)
 }

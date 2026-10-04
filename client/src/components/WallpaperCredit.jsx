@@ -4,8 +4,12 @@ export function WallpaperCredit({ image }) {
   if (!image) return null
   const link = (href, label) => (href ? <a href={href} target="_blank" rel="noopener noreferrer">{label}</a> : label)
   return (
-    <span className="wp-credit">
-      {image.author && <>Photo by {link(image.authorUrl, image.author)} on </>}
+    <span className="wp-credit" title={`${image.author ? `Photo by ${image.author} on ` : ''}${image.providerName}${image.license ? ` · ${image.license}` : ''}`}>
+      {image.author && (
+        <>
+          Photo by <span className="wp-author">{link(image.authorUrl, image.author)}</span> on{' '}
+        </>
+      )}
       {link(image.sourceUrl, image.providerName)}
       {image.license && ` · ${image.license}`}
     </span>

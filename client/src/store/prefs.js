@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { api } from '../lib/api.js'
 import { debounce } from '../lib/util.js'
 import { DEFAULT_WALLPAPER, normalizeWallpaper, applyWallpaper } from '../lib/wallpaper.js'
+import { claimWallpaper, forgetWallpaper } from '../lib/wallpaperDevice.js'
 
 // Full colour themes. `dark`/`light` are only used to draw the preview swatches —
 // the real colours live in base.css under [data-palette='…'].
@@ -100,14 +101,17 @@ export const usePrefs = create((set, get) => ({
     applyPrefs(all)
     if (remote) saveRemote(all)
   },
-  hydrate(remotePrefs) {
-    if (!remotePrefs) return
+  // A background kept in this browser is its person's: when somebody else signs in, it is forgotten
+  // (the device picture and the first-paint cache with it) and they start from the one they saved.
+  hydrate(remotePrefs, userId) {
+    const newcomer = userId != null && claimWallpaper(userId)
+    if (!remotePrefs) return newcomer && get().set({ wallpaper: DEFAULT_WALLPAPER }, { remote: false })
     const incoming = migrate({ ...remotePrefs })
     const merged = {
       ...snapshot(get()),
       ...incoming,
       graph: { ...DEFAULT_PREFS.graph, ...(remotePrefs.graph || {}) },
-      wallpaper: remotePrefs.wallpaper ? normalizeWallpaper(remotePrefs.wallpaper) : get().wallpaper,
+      wallpaper: remotePrefs.wallpaper ? normalizeWallpaper(remotePrefs.wallpaper) : newcomer ? DEFAULT_WALLPAPER : get().wallpaper,
     }
     set(merged)
     try {
@@ -115,7 +119,13 @@ export const usePrefs = create((set, get) => ({
     } catch {}
     applyPrefs(merged)
   },
+  // signing out takes the background out of the browser with it; it stays in the saved preferences
+  forgetWallpaper() {
+    forgetWallpaper()
+    get().set({ wallpaper: DEFAULT_WALLPAPER }, { remote: false })
+  },
 }))
+window.addEventListener('obi:signout', () => usePrefs.getState().forgetWallpaper())
 
 function snapshot(state) {
   const out = {}

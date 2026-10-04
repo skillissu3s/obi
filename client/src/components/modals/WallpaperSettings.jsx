@@ -4,8 +4,8 @@ import { Segmented, Spinner } from '../ui.jsx'
 import { WallpaperCredit } from '../WallpaperCredit.jsx'
 import { usePrefs } from '../../store/prefs.js'
 import { toast } from '../../store/ui.js'
-import { COLOURS, GRADIENTS, DEFAULT_WALLPAPER, PANEL_MIN, isPhoto, wallpaperVars, getOwnImage } from '../../lib/wallpaper.js'
-import { wallpaperProviders, searchWallpapers, chooseWallpaper, shuffleWallpaper, saveOwnWallpaper, setWallpaper } from '../../lib/wallpaperSource.js'
+import { COLOURS, GRADIENTS, DEFAULT_WALLPAPER, PANEL_MIN, plateFloor, isPhoto, wallpaperVars, getOwnImage } from '../../lib/wallpaper.js'
+import { wallpaperProviders, searchWallpapers, chooseWallpaper, shuffleWallpaper, saveOwnWallpaper, setWallpaper, confirmLeavingOwn } from '../../lib/wallpaperSource.js'
 
 // Settings → Appearance → Background: a live preview, where the picture comes
 // from, and how it sits behind the app.
@@ -17,6 +17,9 @@ const TABS = [
   { value: 'own', label: 'Your image' },
 ]
 const TAB_OF = { none: 'none', colour: 'colours', gradient: 'colours', image: 'photos', own: 'own' }
+
+// Leaving a picture from this device deletes it, so a change of background that does asks first.
+const change = async (patch) => (await confirmLeavingOwn()) && setWallpaper(patch)
 
 // the same markup as a setting in Settings.jsx
 function Row({ name, desc, children }) {
@@ -56,7 +59,8 @@ export function WallpaperSettings() {
         <Segmented
           value={tab}
           options={TABS}
-          onChange={(v) => {
+          onChange={async (v) => {
+            if (v === 'none' && !(await confirmLeavingOwn())) return
             setTab(v)
             if (v === 'none') setWallpaper({ kind: 'none' })
           }}
@@ -76,11 +80,11 @@ function Colours({ w }) {
     <>
       <div className="wp-swatches">
         {COLOURS.map((c) => (
-          <button key={c} className={`wp-swatch ${w.kind === 'colour' && w.value === c ? 'active' : ''}`} style={{ background: c }} title={c} aria-label={`Colour ${c}`} onClick={() => setWallpaper({ kind: 'colour', value: c })} />
+          <button key={c} className={`wp-swatch ${w.kind === 'colour' && w.value === c ? 'active' : ''}`} style={{ background: c }} title={c} aria-label={`Colour ${c}`} onClick={() => change({ kind: 'colour', value: c })} />
         ))}
         <label className={`wp-swatch wp-custom ${custom ? 'active' : ''}`} title="Any colour">
           <Pipette />
-          <input type="color" value={w.kind === 'colour' ? w.value : '#336699'} onChange={(e) => setWallpaper({ kind: 'colour', value: e.target.value })} />
+          <input type="color" value={w.kind === 'colour' ? w.value : '#336699'} onChange={(e) => change({ kind: 'colour', value: e.target.value })} />
         </label>
       </div>
       <div className="wp-swatches">
@@ -91,7 +95,7 @@ function Colours({ w }) {
             style={{ backgroundColor: g.color, backgroundImage: g.image }}
             title={g.name}
             aria-label={`Gradient ${g.name}`}
-            onClick={() => setWallpaper({ kind: 'gradient', value: g.id })}
+            onClick={() => change({ kind: 'gradient', value: g.id })}
           />
         ))}
       </div>
@@ -99,7 +103,9 @@ function Colours({ w }) {
   )
 }
 
-const EMPTY = { items: [], page: 0, more: false, loading: false, error: '', name: '' }
+// blank: pages in a row that came back with nothing in them. A few are looked past by themselves.
+const EMPTY = { items: [], page: 0, more: false, loading: false, error: '', name: '', blank: 0 }
+const MAX_BLANK = 3
 
 function Photos({ w }) {
   const [providers, setProviders] = useState(null)
@@ -131,9 +137,10 @@ function Photos({ w }) {
   // a newer request makes any older one still on its way irrelevant
   function load(page) {
     const mine = ++latest.current
-    setList((l) => ({ ...l, loading: true, error: '', ...(page === 1 && { items: [], more: false, page: 0 }) }))
+    setList((l) => ({ ...l, loading: true, error: '', ...(page === 1 && { items: [], more: false, page: 0, blank: 0 }) }))
     searchWallpapers(provider, q, page).then(
-      (r) => mine === latest.current && setList((l) => ({ items: page === 1 ? r.items : [...l.items, ...r.items], page, more: r.more, loading: false, error: '', name: r.providerName })),
+      // the server may have passed over empty pages: `r.page` is the one the pictures came from
+      (r) => mine === latest.current && setList((l) => ({ items: page === 1 ? r.items : [...l.items, ...r.items], page: r.page ?? page, more: r.more, loading: false, error: '', name: r.providerName, blank: r.items.length ? 0 : l.blank + 1 })),
       (e) => mine === latest.current && setList((l) => ({ ...l, loading: false, error: e.message })),
     )
   }
@@ -144,11 +151,15 @@ function Photos({ w }) {
 
   // more as the end of the grid scrolls into view
   useEffect(() => {
-    if (!list.more || list.loading || list.error) return
+    // after a few blank pages in a row the More button is left to the person
+    if (!list.more || list.loading || list.error || list.blank >= MAX_BLANK) return
+    // nothing on that page, so there is nothing to scroll to: look at the next one
+    if (list.blank) return void load(list.page + 1)
+    if (!sentinel.current) return
     const io = new IntersectionObserver(([e]) => e.isIntersecting && load(list.page + 1), { rootMargin: '300px' })
     io.observe(sentinel.current)
     return () => io.disconnect()
-  }, [list.more, list.loading, list.error, list.page])
+  }, [list.more, list.loading, list.error, list.page, list.blank])
 
   async function pick(item) {
     setPicking(item.id)
@@ -196,7 +207,7 @@ function Photos({ w }) {
           {q ? `Results for “${q}”.` : `${current.featured}.`} {current.licenseNote}
         </p>
       )}
-      {(list.items.length > 0 || list.loading || list.error) && (
+      {(list.items.length > 0 || list.loading || list.error || list.more) && (
         <div className="wp-scroll">
           <div className="wp-grid">
             {list.items.map((item) => (
@@ -231,7 +242,7 @@ function Photos({ w }) {
           </div>
         </div>
       )}
-      {!list.loading && !list.error && list.page === 1 && !list.items.length && <p className="setting-desc wp-hint">Nothing found.</p>}
+      {!list.loading && !list.error && !list.more && list.page > 0 && !list.items.length && <p className="setting-desc wp-hint">Nothing found.</p>}
     </>
   )
 }
@@ -298,7 +309,10 @@ function Controls({ w }) {
           {range('blur', 0, 40)}
         </Row>
       )}
-      <Row name="Panel transparency" desc={`${100 - w.panelOpacity}%. Sidebars, bars and notes. Notes never go clearer than reading them comfortably allows.`}>
+      <Row
+        name="Panel transparency"
+        desc={`${100 - Math.max(w.panelOpacity, plateFloor(w.dim))}%. Sidebars, bars, notes, tasks and calendars. None goes clearer than reading it comfortably allows${w.panelOpacity < plateFloor(w.dim) ? ', which depends on the dim' : ''}.`}
+      >
         {range('panelOpacity', 0, 100 - PANEL_MIN, (v) => 100 - v, (v) => 100 - v)}
       </Row>
       {photo && (
@@ -348,7 +362,7 @@ function Controls({ w }) {
         </>
       )}
       <Row name="Reset" desc="Back to no background, with every setting here at its default.">
-        <button className="btn" onClick={() => setWallpaper(DEFAULT_WALLPAPER)}>
+        <button className="btn" onClick={() => change(DEFAULT_WALLPAPER)}>
           <RotateCcw /> Reset
         </button>
       </Row>

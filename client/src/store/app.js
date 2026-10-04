@@ -44,7 +44,7 @@ export const useApp = create((set, get) => ({
     set({ user })
     if (user) {
       conn.setUser(user)
-      usePrefs.getState().hydrate(user.settings?.prefs)
+      usePrefs.getState().hydrate(user.settings?.prefs, user.id)
     }
   },
 

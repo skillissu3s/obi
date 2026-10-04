@@ -97,7 +97,7 @@ test('unsplash: editorial list, search, attribution links and the download ping'
 
   await w.track('unsplash', 'Dwu85P9SOIk')
   assert.equal(calls.at(-1).url.pathname, '/photos/Dwu85P9SOIk/download')
-  await rejects(w.track('unsplash', '../../me'), 400)
+  await rejects(w.track('unsplash', '../../me'), 404)
 })
 
 test('pexels: curated and search, key sent bare in Authorization', async () => {
@@ -201,19 +201,20 @@ test('flickr: only commercial-use licences, and a rejected key is named', async 
   await rejects(bad.w.search('flickr', '', 1), 502, /rejected the API key set on this server \(FLICKR_API_KEY\)/)
 })
 
-test('bing: image of the day, two pages at most', async () => {
+test('bing: image of the day; the archive holds one page of eight', async () => {
   const { w, calls } = setup(() =>
     json({ images: [{ urlbase: '/th?id=OHR.Matterhorn_EN-US1234', title: 'Dawn', copyright: 'Matterhorn at dawn, Zermatt (© Jane Doe/Getty Images)', copyrightlink: 'https://www.bing.com/search?q=matterhorn', startdate: '20261003' }, { urlbase: 'https://evil.example/x' }] }),
   )
   const r = await w.search('bing', '', 1)
   assert.equal(calls[0].url.searchParams.get('n'), '8')
+  assert.equal(calls[0].url.searchParams.get('idx'), '0')
   assert.equal(r.items.length, 1)
   assert.equal(r.items[0].id, 'OHR.Matterhorn_EN-US1234')
   assert.equal(r.items[0].url, 'https://www.bing.com/th?id=OHR.Matterhorn_EN-US1234_1920x1080.jpg')
   assert.equal(r.items[0].author, 'Jane Doe/Getty Images')
-  assert.equal(r.more, true)
-  const later = await w.search('bing', '', 3)
-  assert.deepEqual(later, { providerName: 'Bing', items: [], more: false })
+  assert.equal(r.more, false) // idx 8 and up would return nothing, or the same pictures again
+  const later = await w.search('bing', '', 2)
+  assert.deepEqual(later, { providerName: 'Bing', items: [], more: false, page: 2 })
   assert.equal(calls.length, 1)
 })
 
@@ -249,7 +250,7 @@ test('wikimedia: picture of the day per date, search limited to featured picture
   assert.equal(search.get('gsrsearch'), 'alps filetype:bitmap incategory:"Featured pictures on Wikimedia Commons"')
   assert.deepEqual(found.items.map((i) => i.title), ['First', 'Second'])
   assert.equal(found.items[1].author, 'Ann & Bo')
-  assert.equal(found.items[1].thumb, 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1/Second.jpg/480px-Second.jpg')
+  assert.equal(found.items[1].thumb, 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1/Second.jpg/500px-Second.jpg')
   assert.equal(found.more, true)
 })
 
@@ -266,7 +267,7 @@ test('art institute: public domain only, IIIF links, artworks without an image s
   const r = await w.search('aic', 'seurat', 1)
   assert.equal(calls[0].url.searchParams.get('query[term][is_public_domain]'), 'true')
   assert.equal(r.items.length, 1)
-  assert.equal(r.items[0].url, 'https://www.artic.edu/iiif/2/2d484387-2509-5e8e-2c43-22f9981972eb/full/1686,/0/default.jpg')
+  assert.equal(r.items[0].url, 'https://www.artic.edu/iiif/2/2d484387-2509-5e8e-2c43-22f9981972eb/full/843,/0/default.jpg')
   assert.equal(r.items[0].author, 'Georges Seurat')
   assert.equal(r.items[0].sourceUrl, 'https://www.artic.edu/artworks/27992')
   assert.equal(r.more, true)
@@ -339,4 +340,188 @@ test('results are cached for a while, then fetched again', async () => {
   advance(16 * 60 * 1000)
   await w.search('picsum', '', 1)
   assert.equal(calls.length, 3)
+})
+
+// ---------- an empty page does not stall the grid ----------
+
+// a Met whose first pages hold only objects that are not usable (not public domain, or gone)
+const metWith = (usable) => {
+  const ids = Array.from({ length: 24 * 6 }, (_, i) => 1000 + i)
+  return setup((url) => {
+    if (url.pathname.endsWith('/search')) return json({ total: ids.length, objectIDs: ids })
+    const id = Number(url.pathname.split('/').pop())
+    return json({ objectID: id, isPublicDomain: usable(id), primaryImage: `https://images.metmuseum.org/CRDImages/ep/original/${id}.jpg`, primaryImageSmall: `https://images.metmuseum.org/CRDImages/ep/web-large/${id}.jpg`, title: `Work ${id}` })
+  })
+}
+
+test('a page with nothing usable on it, where more follow, is skipped and the answer says which page it came from', async () => {
+  const { w } = metWith((id) => id >= 1000 + 24) // everything on page 1 is unusable
+  const r = await w.search('met', '', 1)
+  assert.equal(r.page, 2)
+  assert.equal(r.items.length, 24)
+  assert.equal(r.more, true)
+  // asking for the page after the one it reported goes on from there, without repeating
+  const next = await w.search('met', '', r.page + 1)
+  assert.equal(next.page, 3)
+  assert.ok(!next.items.some((i) => r.items.some((j) => j.id === i.id)))
+})
+
+test('skipping empty pages is capped: a long run of them is handed back as an empty page with more to come', async () => {
+  const { w, calls, advance } = metWith(() => false)
+  const r = await w.search('met', '', 1)
+  assert.deepEqual([r.items.length, r.page, r.more], [0, 3, true]) // the page asked for and two more
+  assert.equal(calls.filter((c) => c.url.pathname.endsWith('/search')).length, 3)
+  advance(1000) // the Met allows 80 requests a second: the three pages above used most of that
+  const last = await w.search('met', '', 6) // the last page: nothing follows, so nothing more is looked at
+  assert.deepEqual([last.items.length, last.page, last.more], [0, 6, false])
+})
+
+test('a page that does have pictures is passed on as asked for', async () => {
+  const { w } = metWith(() => true)
+  const r = await w.search('met', '', 2)
+  assert.equal(r.page, 2)
+  assert.equal(r.items.length, 24)
+})
+
+// ---------- what this server spends of a provider's limits ----------
+
+test('each source is held to its own published limit, however many people ask, and recovers with time', async () => {
+  const { w, calls, advance } = setup(() => json({ hits: [], totalHits: 0 }), { PIXABAY_API_KEY: 'px' })
+  for (let i = 0; i < 100; i++) await w.search('pixabay', `word${i}`, 1) // 100 requests a minute
+  assert.equal(calls.length, 100)
+  await rejects(w.search('pixabay', 'one more', 1), 429, /request limit/)
+  assert.equal(calls.length, 100, 'the provider is not asked at all')
+  // other sources are not affected
+  await w.search('picsum', '', 1)
+  advance(30 * 1000) // half a minute earns half the limit back
+  for (let i = 0; i < 50; i++) await w.search('pixabay', `later${i}`, 1)
+  await rejects(w.search('pixabay', 'again', 1), 429)
+  assert.equal(calls.filter((c) => c.url.hostname === 'pixabay.com').length, 150)
+})
+
+test('a limit that depends on the key: NASA with its own key, Unsplash once approved', async () => {
+  const none = () => json([])
+  const demo = setup(none)
+  for (let i = 1; i <= 30; i++) await demo.w.search('nasa', '', i)
+  await rejects(demo.w.search('nasa', '', 31), 429)
+  const keyed = setup(none, { NASA_API_KEY: 'k' })
+  for (let i = 1; i <= 50; i++) await keyed.w.search('nasa', '', i) // a free key allows 1,000 an hour
+  assert.equal(keyed.calls.length, 50)
+
+  const few = setup(none, { UNSPLASH_ACCESS_KEY: 'k' })
+  for (let i = 1; i <= 50; i++) await few.w.search('unsplash', '', i)
+  await rejects(few.w.search('unsplash', 'x', 1), 429)
+  const approved = setup(none, { UNSPLASH_ACCESS_KEY: 'k', UNSPLASH_REQUESTS_PER_HOUR: '5000' })
+  for (let i = 1; i <= 50; i++) await approved.w.search('unsplash', '', i)
+  await approved.w.search('unsplash', 'x', 1)
+  assert.equal(approved.calls.length, 51)
+})
+
+const tick = (ms = 20) => new Promise((r) => setTimeout(r, ms))
+
+test('only a few requests go to providers at once, the rest wait their turn and all are answered', async () => {
+  let active = 0
+  let peak = 0
+  const releases = []
+  const { w, calls } = setup(
+    () =>
+      new Promise((resolve) => {
+        active++
+        peak = Math.max(peak, active)
+        releases.push(() => {
+          active--
+          resolve(json([{ id: '1', author: 'A', url: 'https://x' }]))
+        })
+      }),
+  )
+  const searches = Array.from({ length: 20 }, (_, i) => w.search('picsum', '', i + 1))
+  await tick()
+  assert.equal(calls.length, 6, 'six in flight, fourteen waiting')
+  while (releases.length) {
+    releases.shift()()
+    await tick(1)
+  }
+  const answers = await Promise.all(searches)
+  assert.equal(answers.length, 20)
+  assert.ok(peak <= 6, `at most six at once, saw ${peak}`)
+  assert.equal(calls.length, 20)
+})
+
+test('so many waiting that the queue is full is answered with "slow down" rather than piling up', async () => {
+  const releases = []
+  const { w } = setup(() => new Promise((resolve) => releases.push(() => resolve(json([])))))
+  // picsum is held to 60 requests a minute: 55 distinct pages of it stay under that, and over 6 + 48 at once
+  const searches = Array.from({ length: 6 + 48 + 1 }, (_, i) => w.search('picsum', '', i + 1).catch((e) => e))
+  await tick()
+  const last = await Promise.race([searches[54], tick(50).then(() => 'still waiting')])
+  assert.ok(last instanceof WallpaperError && last.status === 429, String(last))
+  while (releases.length) {
+    releases.shift()()
+    await tick(1)
+  }
+  await Promise.all(searches)
+})
+
+// ---------- telling Unsplash about a picture ----------
+
+test('a picture is only reported if this server offered it, and once for each person', async () => {
+  const { w, calls } = setup((url) => (url.pathname.endsWith('/download') ? json({ url: 'https://x' }) : json([unsplashPhoto])), { UNSPLASH_ACCESS_KEY: 'k1' })
+  const pings = () => calls.filter((c) => c.url.pathname.endsWith('/download')).length
+
+  await rejects(w.track('unsplash', 'Dwu85P9SOIk', 'ann'), 404) // nothing was offered yet
+  await rejects(w.track('unsplash', 'never-seen', 'ann'), 404)
+  assert.equal(pings(), 0)
+
+  await w.search('unsplash', '', 1)
+  await w.track('unsplash', 'Dwu85P9SOIk', 'ann')
+  await w.track('unsplash', 'Dwu85P9SOIk', 'ann') // choosing it again does not count again
+  assert.equal(pings(), 1)
+  await w.track('unsplash', 'Dwu85P9SOIk', 'bob') // someone else using it is another use
+  assert.equal(pings(), 2)
+  await rejects(w.track('unsplash', 'never-seen', 'bob'), 404)
+  assert.equal(pings(), 2)
+})
+
+test('a report that failed can be sent again, and a source that does not ask is left alone', async () => {
+  let fail = true
+  const { w, calls } = setup((url) => (url.pathname.endsWith('/download') ? (fail ? json({}, 500) : json({ url: 'https://x' })) : json([unsplashPhoto])), { UNSPLASH_ACCESS_KEY: 'k1' })
+  await w.search('unsplash', '', 1)
+  await rejects(w.track('unsplash', 'Dwu85P9SOIk', 'ann'), 502)
+  fail = false
+  await w.track('unsplash', 'Dwu85P9SOIk', 'ann')
+  assert.equal(calls.filter((c) => c.url.pathname.endsWith('/download')).length, 2)
+  await rejects(w.track('pexels', 'whatever', 'ann'), 503) // not configured: refused, and no request made
+  assert.equal(calls.filter((c) => c.url.hostname === 'api.pexels.com').length, 0)
+  await w.track('picsum', '10', 'ann') // nothing to report for this source
+})
+
+test('a Met page that runs into the limits half way is tried again later, not passed on or kept half empty', async () => {
+  const ids = Array.from({ length: 100 }, (_, i) => 2000 + i)
+  const releases = []
+  const { w, advance } = setup((url) => {
+    if (url.pathname.endsWith('/search')) return json({ total: ids.length, objectIDs: ids })
+    const id = Number(url.pathname.split('/').pop())
+    return new Promise((resolve) => releases.push(() => resolve(json({ objectID: id, isPublicDomain: true, primaryImage: `https://images.metmuseum.org/CRDImages/ep/original/${id}.jpg`, primaryImageSmall: `https://images.metmuseum.org/CRDImages/ep/web-large/${id}.jpg`, title: `Work ${id}` }))))
+  })
+  // three pages at once want 72 object requests: six can be in flight and 48 can wait
+  const searches = ['a', 'b', 'c'].map((q) => w.search('met', q, 1).then((r) => r, (e) => e))
+  await tick(50)
+  while (releases.length) {
+    releases.shift()()
+    await tick(1)
+  }
+  const results = await Promise.all(searches)
+  const failed = results.filter((r) => r instanceof WallpaperError)
+  assert.ok(failed.length >= 1 && failed.every((e) => e.status === 429), 'at least one was asked to try again later')
+  for (const r of results.filter((r) => !(r instanceof WallpaperError))) assert.equal(r.items.length, 24, 'what is passed on is never half a page')
+  // and the one that failed is not remembered: asked again with room to spare, it is whole
+  const q = ['a', 'b', 'c'][results.indexOf(failed[0])]
+  advance(1000) // the Met allows 80 requests a second
+  const again = w.search('met', q, 1)
+  await tick(20)
+  while (releases.length) {
+    releases.shift()()
+    await tick(1)
+  }
+  assert.equal((await again).items.length, 24)
 })

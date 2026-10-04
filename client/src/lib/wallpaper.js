@@ -7,10 +7,10 @@ import { formatDate } from './util.js'
 export const DEFAULT_WALLPAPER = {
   kind: 'none', // none | colour | gradient | image (a photo from a source) | own (a file on this device)
   value: '', // colour and own: a hex colour (own: the picture's average); gradient: a preset id
-  image: null, // { provider, providerName, id, url, thumb, author, authorUrl, sourceUrl, license? }
+  image: null, // { provider, providerName, id, url, thumb, author, authorUrl, sourceUrl, color?, license? }
   blur: 0, // px, pictures only
   dim: 35, // % of the theme's own background laid over the picture
-  panelOpacity: 60, // % — how solid the panels (sidebar, bars, and the notes within the limit below) stay
+  panelOpacity: 60, // % — how solid the panels (sidebar, bars, notes, tasks, calendar) stay, within the floor below
   fit: 'cover', // cover | contain | tile
   position: 'center', // top | center | bottom: which part of a cropped picture stays in view
   rotate: 'off', // off | launch | daily
@@ -19,12 +19,13 @@ export const DEFAULT_WALLPAPER = {
 }
 
 export const PANEL_MIN = 35
-// Where the notes are read, the theme's own background always covers at least
-// this much of the picture, the dim counted. That keeps body text at WCAG AA
-// contrast even over a pure white or pure black photo.
-const PANE_COVER = 0.72
-// the least solid the notes may be, given the dim
-export const paneFloor = (dim) => Math.max(0, Math.round(100 * (1 - (1 - PANE_COVER) / (1 - dim / 100))))
+// Everything that carries text (the notes, the Tasks and Calendar pages, the sidebar, the bars) is covered by at
+// least this much of the theme's own background, the dim counted. With the secondary text colours that
+// styles/wallpaper.css lifts over a picture, that keeps body text at WCAG AA and secondary text at 3:1 even over
+// a pure white picture in a dark theme or a pure black one in a light theme.
+const PLATE_COVER = 0.8
+// the least solid those may be, given the dim
+export const plateFloor = (dim) => Math.max(0, Math.round(100 * (1 - (1 - PLATE_COVER) / (1 - dim / 100))))
 
 export const COLOURS = ['#0f172a', '#1e293b', '#3b0764', '#064e3b', '#7f1d1d', '#78350f', '#e2e8f0', '#fef3c7', '#dbeafe', '#fce7f3']
 
@@ -70,6 +71,7 @@ function normalizeImage(i) {
     author: text(i.author, 120),
     authorUrl: httpsUrl(i.authorUrl),
     sourceUrl: httpsUrl(i.sourceUrl),
+    ...(is(HEX, i.color) && { color: i.color.toLowerCase() }), // the provider's average colour, shown until the picture is there
     ...(i.license && { license: text(i.license, 60) }),
   }
 }
@@ -116,8 +118,10 @@ export function wallpaperVars(w, own = null) {
     if (!g) return null
     image = g.image
     color = g.color
-  } else if (w.kind === 'image' && w.image) image = `url(${JSON.stringify(w.image.url)})`
-  else if (w.kind === 'own') {
+  } else if (w.kind === 'image' && w.image) {
+    image = `url(${JSON.stringify(w.image.url)})`
+    color = w.image.color || color
+  } else if (w.kind === 'own') {
     color = w.value
     if (own) image = `url(${JSON.stringify(own.url)})`
   } else return null
@@ -126,8 +130,9 @@ export function wallpaperVars(w, own = null) {
     '--wp-color': color,
     '--wp-blur': `${isPhoto(w) ? w.blur : 0}px`,
     '--wp-dim': `${w.dim}%`,
-    '--wp-panel': `${w.panelOpacity}%`,
-    '--wp-pane': `${Math.max(w.panelOpacity, paneFloor(w.dim))}%`,
+    // the Panel setting, never below the floor: for the frame (sidebar, bars) and for the pages (notes, tasks, calendar)
+    '--wp-panel': `${Math.max(w.panelOpacity, plateFloor(w.dim))}%`,
+    '--wp-pane': `${Math.max(w.panelOpacity, plateFloor(w.dim))}%`,
     '--wp-size': { cover: 'cover', contain: 'contain', tile: 'auto' }[w.fit],
     '--wp-repeat': w.fit === 'tile' ? 'repeat' : 'no-repeat',
     '--wp-pos': `center ${w.position}`,
@@ -141,6 +146,13 @@ export function setOwnImage(o) {
 export const getOwnImage = () => ownImage
 
 let applied = ''
+// Forgets what the first paint reads, and that the page already shows what it shows: the next apply writes it again.
+export function clearWallpaperCache() {
+  applied = ''
+  try {
+    localStorage.removeItem('obi:wp')
+  } catch {}
+}
 // Puts the background on the page. Also keeps what the first paint needs in
 // localStorage, so the next load starts with the background already there.
 export function applyWallpaper(w) {
@@ -164,6 +176,15 @@ export function applyWallpaper(w) {
 // ---------- changing it by itself ----------
 
 export const dayKey = (d = new Date()) => formatDate(d, 'YYYY-MM-DD')
+
+// Whether the picture should change now. Daily only ever moves forward: a day that is not after the one it last
+// changed on (another time zone, a clock set back) leaves it be, so two devices on different dates cannot keep
+// swapping it between them. A date far ahead can only be a clock that was wrong, so it is not waited for.
+export function rotationDue(w, today = dayKey(), changedThisSession = false) {
+  if (w.kind !== 'image' || !w.pool) return false
+  if (w.rotate === 'launch') return !changedThisSession
+  return w.rotate === 'daily' && (today > w.rotatedOn || Date.parse(w.rotatedOn) - Date.parse(today) > 2 * 86400000)
+}
 
 // The next picture from a list, never the one already showing. Daily picks the
 // same one all day; otherwise it is chosen at random.

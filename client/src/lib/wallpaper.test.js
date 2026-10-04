@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { DEFAULT_WALLPAPER, GRADIENTS, paneFloor, normalizeWallpaper, wallpaperVars, pickNext } from './wallpaper.js'
+import { DEFAULT_WALLPAPER, GRADIENTS, plateFloor, normalizeWallpaper, wallpaperVars, pickNext, rotationDue } from './wallpaper.js'
 
 const photo = {
   provider: 'unsplash',
@@ -85,19 +85,24 @@ test('a picture URL cannot break out of the CSS it is written into', () => {
   assert.match(css, /^url\("[^"\\]*"\)$/)
 })
 
-test('however see-through the panels and however little the dim, the notes keep the theme background over at least 72% of the picture', () => {
+test('however see-through the panels and however little the dim, everything that carries text keeps the theme background over at least 80% of the picture', () => {
   for (const dim of [0, 20, 35, 50, 72, 80]) {
     for (const panelOpacity of [35, 60, 100]) {
       const v = wallpaperVars(normalizeWallpaper({ kind: 'colour', value: '#ffffff', dim, panelOpacity }))
-      assert.equal(v['--wp-panel'], `${panelOpacity}%`)
-      const pane = parseFloat(v['--wp-pane']) / 100
-      // what the picture lets through: the dim first, then the pane over it
-      assert.ok(1 - (1 - dim / 100) * (1 - pane) >= 0.715, `dim ${dim}, panels ${panelOpacity}: pane ${pane}`)
-      assert.ok(pane >= panelOpacity / 100, 'and never less solid than the panels were asked to be')
+      // what the picture lets through: the dim first, then the panel over it
+      for (const plate of ['--wp-panel', '--wp-pane']) {
+        const solid = parseFloat(v[plate]) / 100
+        assert.ok(1 - (1 - dim / 100) * (1 - solid) >= 0.795, `dim ${dim}, panels ${panelOpacity}: ${plate} ${solid}`)
+        assert.ok(solid >= panelOpacity / 100, 'and never less solid than the panels were asked to be')
+      }
     }
   }
-  assert.equal(paneFloor(0), 72)
-  assert.equal(paneFloor(80), 0, 'a heavy dim needs no extra cover')
+  assert.equal(plateFloor(0), 80)
+  assert.equal(plateFloor(35), 69)
+  assert.equal(plateFloor(80), 0, 'a heavy dim needs no extra cover')
+  // at the defaults the floor already applies, to the sidebar and bars as well as the notes
+  const v = wallpaperVars({ ...DEFAULT_WALLPAPER, kind: 'colour', value: '#ffffff' })
+  assert.deepEqual([v['--wp-panel'], v['--wp-pane']], ['69%', '69%'])
 })
 
 test('pickNext: never the picture already showing; daily holds still all day', () => {
@@ -112,4 +117,39 @@ test('pickNext: never the picture already showing; daily holds still all day', (
   assert.notEqual(pickNext(items, null, 'daily', '2026-10-04').id, today.id)
   // the same id from another source is another picture
   assert.equal(pickNext([{ provider: 'q', id: 'a' }], { provider: 'p', id: 'a' }, 'launch').id, 'a')
+})
+
+test("the provider's average colour holds the place until the picture is there, and only a real colour is kept", () => {
+  const w = normalizeWallpaper({ kind: 'image', image: { ...photo, color: '#0C2840' } })
+  assert.equal(w.image.color, '#0c2840')
+  assert.equal(wallpaperVars(w)['--wp-color'], '#0c2840')
+  assert.equal(wallpaperVars(normalizeWallpaper({ kind: 'image', image: photo }))['--wp-color'], 'transparent')
+  for (const bad of ['red', 'url(x)', '#12', 7, null]) assert.ok(!('color' in normalizeWallpaper({ kind: 'image', image: { ...photo, color: bad } }).image), String(bad))
+  assert.deepEqual(normalizeWallpaper(w), w)
+})
+
+test('rotationDue: daily only moves forward, and "each launch" once a session', () => {
+  const pool = { provider: 'unsplash', q: '' }
+  const daily = (rotatedOn) => ({ ...DEFAULT_WALLPAPER, kind: 'image', image: photo, pool, rotate: 'daily', rotatedOn })
+  assert.equal(rotationDue(daily('2026-10-03'), '2026-10-04'), true, 'the next day')
+  assert.equal(rotationDue(daily('2026-10-04'), '2026-10-04'), false, 'the same day')
+  assert.equal(rotationDue(daily(''), '2026-10-04'), true, 'never changed yet')
+  assert.equal(rotationDue(daily('2026-12-31'), '2027-01-01'), true, 'across a year')
+  // a day that is not after the one it last changed on: another time zone, or a clock set back
+  assert.equal(rotationDue(daily('2026-10-05'), '2026-10-04'), false)
+  assert.equal(rotationDue(daily('2026-10-04'), '2026-10-03'), false)
+  // two devices a day apart do not take turns: the one that is behind waits for the other
+  const ahead = daily('2026-10-04')
+  assert.equal(rotationDue(ahead, '2026-10-03'), false)
+  assert.equal(rotationDue(ahead, '2026-10-04'), false)
+  assert.equal(rotationDue(ahead, '2026-10-05'), true)
+  // a date years ahead was a wrong clock: it is not waited for
+  assert.equal(rotationDue(daily('2030-01-01'), '2026-10-04'), true)
+
+  const launch = { ...daily(''), rotate: 'launch' }
+  assert.equal(rotationDue(launch, '2026-10-04', false), true)
+  assert.equal(rotationDue(launch, '2026-10-04', true), false)
+  assert.equal(rotationDue({ ...launch, rotate: 'off' }, '2026-10-04'), false)
+  assert.equal(rotationDue({ ...launch, pool: null }, '2026-10-04'), false)
+  assert.equal(rotationDue({ ...DEFAULT_WALLPAPER, kind: 'colour', value: '#112233', rotate: 'daily', pool }, '2026-10-04'), false)
 })
