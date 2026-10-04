@@ -1,6 +1,6 @@
 {
   "name": "obi-notes",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Self-hosted, real-time, GitHub-backed note taking app",
   "type": "module",

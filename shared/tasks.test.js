@@ -544,3 +544,16 @@ test('several tasks of a note edited at once: a checklist and its tasks, stale l
 
   assert.equal(MAX_TASK_EDITS, 1000)
 })
+
+test('a repeating task on the last line of a note with Windows line endings keeps them consistent', () => {
+  // the last line has no ending of its own: completing the task makes it no longer last, and undoing makes it last again
+  const note = '- [ ] a\r\n- [ ] b 🔁 every week 📅 2026-10-05'
+  const done = applyTaskEdit(note, { line: 1, title: 'b', patch: { status: 'x' }, today })
+  const lines = done.text.split('\n')
+  assert.equal(lines.length, 3)
+  assert.ok(lines.slice(0, -1).every((l) => l.endsWith('\r')), 'every line but the last ends in CRLF')
+  assert.ok(!lines[2].endsWith('\r'))
+  const back = applyTaskEdit(done.text, { line: 1, title: 'b', patch: { status: ' ', done: null }, today, dropNext: true })
+  assert.equal(back.dropped, true)
+  assert.equal(back.text, note)
+})

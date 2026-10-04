@@ -359,7 +359,10 @@ function spawnedLines(lines, at, end, was, today) {
   const head = editTaskLine(reopened, { status: 'x' }, { today: task.done || today }).next
   if (!head) return 0
   const want = spawnedBy(lines, at, end, head)
-  return want.every((l, i) => lines[end + 1 + i] === l) ? want.length : 0
+  // at the very end of a note with Windows line endings the last line has none (see editAt)
+  const toEnd = end + 1 + want.length === lines.length
+  const bare = (l) => (toEnd ? l.replace(/\r$/, '') : l)
+  return want.every((l, i) => (i === want.length - 1 ? bare(lines[end + 1 + i]) === bare(l) : lines[end + 1 + i] === l)) ? want.length : 0
 }
 
 // Changes the task at `at` of `lines`, which are changed in place. Gives what
@@ -370,16 +373,23 @@ function editAt(lines, at, { patch, today, dropNext = false }) {
   const r = editTaskLine(was, patch, { today })
   lines[at] = r.line
   const end = blockEnd(lines, at)
+  // the last line of a note has no line ending of its own: in a note with Windows
+  // ones, the line that stops being last takes one and the one that becomes last gives it up
+  const atEnd = end === lines.length - 1
+  const crlf = lines.some((l) => l.endsWith('\r'))
   let by = 0
   let dropped
   if (r.next) {
     const added = spawnedBy(lines, at, end, r.next)
     lines.splice(end + 1, 0, ...added)
+    if (atEnd && crlf) lines[end] += '\r'
     by = added.length
   } else if (dropNext) {
     by = -spawnedLines(lines, at, end, was, today)
     dropped = by < 0
+    const toEnd = end + 1 - by === lines.length
     lines.splice(end + 1, -by)
+    if (dropped && toEnd) lines[end] = lines[end].replace(/\r$/, '')
   }
   return { result: { line: at, task: parseTask(r.line), next: r.next ? parseTask(r.next) : null, dropped }, from: end + 1, by }
 }
