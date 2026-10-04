@@ -7,7 +7,7 @@ import { toast, confirmDialog, promptDialog, useUI } from '../store/ui.js'
 import { basename, dirname, stripExt, joinPath, isNote, safeName, extname } from '@shared/paths.js'
 import { isBoardPath, emptyBoard } from '@shared/board.js'
 import { formatDate, isoDate, dateOfIso, downloadUrl, copyText } from './util.js'
-import { previewEdit, todayIso } from '@shared/tasks.js'
+import { MAX_TASK_EDITS, previewEdit, todayIso } from '@shared/tasks.js'
 import { fetchNote } from './render.js'
 import { conn } from './socket.js'
 
@@ -584,31 +584,85 @@ export function allTasks() {
   return out
 }
 
+// Shows changes ({ task, patch }) to tasks as if they were made, until the server
+// says (a note at a time, so a lot of them are one change of the index)
+function previewTasks(items) {
+  const s = app()
+  const today = todayIso()
+  const byNote = new Map()
+  for (const { task, patch } of items) {
+    const at = s.notes.get(task.path)?.tasks?.findIndex((t) => t.line === task.line && t.text === task.text) ?? -1
+    if (at >= 0) (byNote.get(task.path) ?? byNote.set(task.path, new Map()).get(task.path)).set(at, patch)
+  }
+  for (const [path, patches] of byNote) {
+    const meta = s.notes.get(path)
+    const preview = (t, i) => {
+      try {
+        return patches.has(i) ? previewEdit(t, patches.get(i), { today }) : t
+      } catch {
+        return t // only a head start: the server says why if the change is no good
+      }
+    }
+    s.updateNoteIndex(path, { ...meta, tasks: meta.tasks.map(preview) })
+  }
+}
+
 /**
  * Changes a task — { status, due, scheduled, start, priority, recurrence, title };
  * a field set to null is cleared. The note's line is rewritten on the server
  * and the new state comes back through the index like any other edit; until then
  * the change shows as if it had. `dropNext` takes back the completion of a
- * repeating task. Returns the server's answer, or null if it didn't work
- * (already toasted).
+ * repeating task. `ws` is the workspace the task is in, when that may not be the
+ * one that is open by now. Returns the server's answer, or null if it didn't
+ * work (already toasted).
  */
-export async function updateTask(task, patch, { dropNext = false } = {}) {
-  const s = app()
+export async function updateTask(task, patch, { dropNext = false, ws = app().wsId } = {}) {
   try {
-    const meta = s.notes.get(task.path)
-    const at = meta?.tasks?.findIndex((t) => t.line === task.line && t.text === task.text) ?? -1
-    if (at >= 0) {
-      try {
-        s.updateNoteIndex(task.path, { ...meta, tasks: meta.tasks.map((t, i) => (i === at ? previewEdit(t, patch, { today: todayIso() }) : t)) })
-      } catch {} // only a head start: the server says why if the change is no good
-    }
-    return await api.updateTask(s.wsId, { path: task.path, line: task.line, title: task.text, patch, today: todayIso(), dropNext })
+    if (ws === app().wsId) previewTasks([{ task, patch }])
+    return await api.updateTask(ws, { path: task.path, line: task.line, title: task.text, patch, today: todayIso(), dropNext })
   } catch (e) {
     toast.error(e)
     // most likely the note changed under us: reload what we show
-    s.refreshIndex()
+    if (ws === app().wsId) app().refreshIndex()
     return null
   }
+}
+
+/**
+ * Changes many tasks at once — `items` are { task, patch, dropNext }, as for
+ * updateTask — with a note's tasks written in one go. Returns the server's answer
+ * for each, in order, or null for one that didn't work; those are toasted once.
+ */
+export async function updateTasks(items, { ws = app().wsId } = {}) {
+  if (ws === app().wsId) previewTasks(items)
+  const results = []
+  let failure = null
+  for (let i = 0; i < items.length; i += MAX_TASK_EDITS) {
+    const chunk = items.slice(i, i + MAX_TASK_EDITS)
+    let answers = []
+    try {
+      const body = { items: chunk.map(({ task, patch, dropNext }) => ({ path: task.path, line: task.line, title: task.text, patch, dropNext })), today: todayIso() }
+      answers = (await api.updateTasks(ws, body)).results
+    } catch (e) {
+      failure ??= e.message
+    }
+    chunk.forEach((_, n) => {
+      const r = answers[n]
+      if (r && !r.error) results.push(r)
+      else {
+        failure ??= r?.error
+        results.push(null)
+      }
+    })
+  }
+  const failed = results.filter((r) => !r).length
+  if (failed) {
+    failure ??= "The tasks couldn't be changed"
+    toast.error(failed === 1 ? failure : `${failed} of ${items.length} changes didn't go through: ${failure}`)
+    // most likely the notes changed under us: reload what we show
+    if (ws === app().wsId) app().refreshIndex()
+  }
+  return results
 }
 
 /**

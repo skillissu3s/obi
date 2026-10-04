@@ -341,9 +341,24 @@
   padding: 4px 24px 20px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+/* more columns than there is room for: the side they run on to fades out, so the cut-off one reads as "scroll" (TaskBoard.jsx says which) */
+.pl-board[data-more-start],
+.pl-board[data-more-end] {
+  --fade-start: 0px;
+  --fade-end: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+}
+.pl-board[data-more-start] {
+  --fade-start: 32px;
+}
+.pl-board[data-more-end] {
+  --fade-end: 32px;
 }
 .pl-col {
-  flex: 1 0 268px;
+  flex: 1 0 248px;
   max-width: 340px;
   display: flex;
   flex-direction: column;

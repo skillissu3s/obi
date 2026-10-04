@@ -47,7 +47,10 @@ function Section({ section, lists, depths, today, ws, canEdit, onOpen }) {
   )
 }
 
+const ROWS = 300 // rows a list draws before "Show more": each is markdown to render, and a workspace can have a note for every few tasks
+
 function TaskList({ cards, tasks, model, group, done, today, ws, canEdit, onOpen }) {
+  const [budget, setBudget] = useState(ROWS)
   const sections = useMemo(() => {
     if (group === 'note') {
       // all of a note's tasks, in the order they are written, so subtasks follow their parents
@@ -61,7 +64,24 @@ function TaskList({ cards, tasks, model, group, done, today, ws, canEdit, onOpen
     for (const t of cards) columns.get(columnOf(t, group, today))?.tasks.push(t)
     return [...columns.values()].filter((s) => s.tasks.length).map((s) => ({ ...s, tasks: s.tasks.sort(s.id === 'done' ? compareFinished : compareTasks) }))
   }, [cards, tasks, group, done, today])
-  return sections.map((s) => <Section key={`${group}:${s.id}`} section={s} lists={model.lists} depths={model.depths} today={today} ws={ws} canEdit={canEdit} onOpen={onOpen} />)
+  // as many sections as fit the budget (the first rows of each), and the rest on request
+  let rows = 0
+  let count = 0
+  while (count < sections.length && rows < budget) rows += Math.min(sections[count++].tasks.length, PAGE)
+  const rest = sections.length - count
+  const unit = group === 'note' ? 'note' : 'group'
+  return (
+    <>
+      {sections.slice(0, count).map((s) => (
+        <Section key={`${group}:${s.id}`} section={s} lists={model.lists} depths={model.depths} today={today} ws={ws} canEdit={canEdit} onOpen={onOpen} />
+      ))}
+      {rest > 0 && (
+        <button type="button" className="pl-more" onClick={() => setBudget(budget + ROWS)}>
+          Show {rest} more {rest === 1 ? unit : `${unit}s`}
+        </button>
+      )}
+    </>
+  )
 }
 
 export function TasksView() {

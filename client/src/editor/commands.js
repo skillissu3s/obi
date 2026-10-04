@@ -79,7 +79,7 @@ export const toggleTask = (view) => {
     const line = state.doc.line(n)
     const done = toggleTaskLine(line.text, { today: todayIso() })
     if (done) {
-      changes.push(...taskChanges(line, done))
+      changes.push(...taskChanges(state.doc, line, done))
       continue
     }
     const list = /^(\s*)([-*+]|\d+[.)])\s+/.exec(line.text)

@@ -93,6 +93,7 @@ export const api = {
   search: (id, query, opts) => request('GET', `${W(id)}/search${q({ q: query })}`, undefined, opts),
   backlinks: (id, path) => request('GET', `${W(id)}/backlinks${q({ path })}`),
   updateTask: (id, body) => request('POST', `${W(id)}/tasks/update`, body),
+  updateTasks: (id, body) => request('POST', `${W(id)}/tasks/update-many`, body),
   addTask: (id, body) => request('POST', `${W(id)}/tasks/add`, body),
   history: (id, path) => request('GET', `${W(id)}/history${q({ path })}`),
   version: (id, path, vid, vpath) => request('GET', `${W(id)}/history/version${q({ path, id: vid, vpath })}`),

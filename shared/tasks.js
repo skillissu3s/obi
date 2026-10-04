@@ -9,6 +9,8 @@
 // calendar and the server all go through it, so a task behaves the same whichever
 // way it is changed.
 
+import { parseNote } from './parse.js'
+
 // ---------- dates (ISO yyyy-mm-dd strings, worked out in UTC so no zone or DST can shift a day) ----------
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/
@@ -284,12 +286,17 @@ export class TaskChangedError extends Error {
   }
 }
 
+// The lines of a note that the index reads as tasks: not an example that looks
+// like one in a code block, a math block or a comment
+const taskLinesOf = (text) => new Set(parseNote(text).tasks.map((t) => t.line))
+
 // Where the task the index called (`line`, `title`) is now. The note may have
 // changed since the line number was read, so `title` must still match; if the
 // line moved, the task is found by its title as long as that is unambiguous.
-function findTask(lines, line, title) {
+// Only a line in `indexed` (see taskLinesOf) can be it.
+function findTask(lines, indexed, line, title) {
   const is = (n) => {
-    const t = lines[n] != null && parseTask(lines[n])
+    const t = indexed.has(n) && parseTask(lines[n])
     return !!t && (title == null || t.text === title)
   }
   if (is(line)) return line
@@ -298,26 +305,142 @@ function findTask(lines, line, title) {
   return hits[0]
 }
 
+const indentOf = (line) => /^\s*/.exec(line)[0].length
+
+// The last line of what is nested under the task at `at`: the lines below it
+// that are indented further, with the blank lines between them
+function blockEnd(lines, at) {
+  const indent = indentOf(lines[at])
+  let end = at
+  for (let n = at + 1; n < lines.length; n++) {
+    if (!/\S/.test(lines[n])) continue
+    if (indentOf(lines[n]) <= indent) break
+    end = n
+  }
+  return end
+}
+
+// a checklist item as it is in a new occurrence: open again, without the stamp of having been finished
+function reopen(line) {
+  const t = parseTask(line)
+  return t && t.status !== ' ' ? editTaskLine(line, { status: ' ' }).line : line
+}
+
+// What completing the task at `at` writes below its checklist (which ends at
+// `end`): its next occurrence, `head`, with a fresh copy of that checklist
+const spawnedBy = (lines, at, end, head) => [head, ...lines.slice(at + 1, end + 1).map(reopen)]
+
 /**
- * Edits the task at `line` in a note's text. Returns { text, line, task, next }.
- * `dropNext` is for taking back the completion of a repeating task: the next
- * occurrence that completing it wrote just below, if it is still untouched, goes
- * again with the reopening.
+ * Where the next occurrence of a repeating task goes, and what goes there: the
+ * task at `at` of `lines` has just been completed, and `next` (from
+ * editTaskLine) is its next occurrence. That goes below the task's checklist —
+ * what is nested under it — not right under the task, together with a copy of
+ * that checklist, open again. Returns { after, lines }: `lines` follow line `after`.
+ */
+export function nextBlock(lines, at, next) {
+  const end = blockEnd(lines, at)
+  return { after: end, lines: spawnedBy(lines, at, end, next) }
+}
+
+/** nextBlock, put into `lines` */
+export function insertNext(lines, at, next) {
+  const block = nextBlock(lines, at, next)
+  lines.splice(block.after + 1, 0, ...block.lines)
+}
+
+// How many lines below the checklist of the task at `at` (which ends at `end`)
+// are what completing it wrote there: all of them, exactly as they were written,
+// or none. `was` is the completed line as it stands now, from which what its
+// completion wrote is worked out again.
+function spawnedLines(lines, at, end, was, today) {
+  const task = parseTask(was)
+  if (!task || !isDone(task.status)) return 0
+  const reopened = editTaskLine(was, { status: ' ' }).line
+  const head = editTaskLine(reopened, { status: 'x' }, { today: task.done || today }).next
+  if (!head) return 0
+  const want = spawnedBy(lines, at, end, head)
+  return want.every((l, i) => lines[end + 1 + i] === l) ? want.length : 0
+}
+
+// Changes the task at `at` of `lines`, which are changed in place. Gives what
+// applyTaskEdit does (but the text), and where that left the lines: those from
+// `from` on have moved by `by`.
+function editAt(lines, at, { patch, today, dropNext = false }) {
+  const was = lines[at]
+  const r = editTaskLine(was, patch, { today })
+  lines[at] = r.line
+  const end = blockEnd(lines, at)
+  let by = 0
+  let dropped
+  if (r.next) {
+    const added = spawnedBy(lines, at, end, r.next)
+    lines.splice(end + 1, 0, ...added)
+    by = added.length
+  } else if (dropNext) {
+    by = -spawnedLines(lines, at, end, was, today)
+    dropped = by < 0
+    lines.splice(end + 1, -by)
+  }
+  return { result: { line: at, task: parseTask(r.line), next: r.next ? parseTask(r.next) : null, dropped }, from: end + 1, by }
+}
+
+/**
+ * Edits the task at `line` in a note's text. Returns { text, line, task, next,
+ * dropped }. `next` is the next occurrence of a repeating task that was
+ * completed: it goes below the task's checklist (see nextBlock).
+ * `dropNext` is for taking back the completion of a repeating task: what
+ * completing it wrote (the next occurrence, and the copy of the checklist) goes
+ * with the reopening, but only if all of it is still there as it was written;
+ * `dropped` says whether it was. If the note was changed meanwhile it stays.
  */
 export function applyTaskEdit(text, { line, title, patch, today, dropNext = false }) {
   const lines = text.split('\n')
-  const at = findTask(lines, line, title)
-  const r = editTaskLine(lines[at], patch, { today })
-  lines[at] = r.line
-  if (r.next) lines.splice(at + 1, 0, r.next)
-  else if (dropNext && isRepeatOf(lines[at + 1], r.line)) lines.splice(at + 1, 1)
-  return { text: lines.join('\n'), line: at, task: parseTask(r.line), next: r.next ? parseTask(r.next) : null }
+  const at = findTask(lines, taskLinesOf(text), line, title)
+  const { result } = editAt(lines, at, { patch, today, dropNext })
+  return { text: lines.join('\n'), ...result }
 }
 
-function isRepeatOf(line, of) {
-  const a = line != null && parseTask(line)
-  const b = parseTask(of)
-  return !!a && isOpen(a.status) && isOpen(b.status) && a.text === b.text && !!a.recurrence && a.recurrence === b.recurrence
+/** How many tasks one request to change several of them may name */
+export const MAX_TASK_EDITS = 1000
+
+const failure = (e) => {
+  if (!(e instanceof TaskChangedError || e instanceof RangeError)) throw e
+  return { error: e.message, status: e instanceof RangeError ? 400 : e.status }
+}
+
+/**
+ * Edits several tasks of one note at once: `items` are { line, title, patch,
+ * dropNext }, each as for applyTaskEdit and found in the note as it is now.
+ * Returns { text, results }, a result for each item in its order — what
+ * applyTaskEdit gives (but the text), with the line its task is on in the text
+ * that comes back — or { error, status } for one that can't be done, while the
+ * others still are.
+ */
+export function applyTaskEdits(text, items, { today } = {}) {
+  const lines = text.split('\n')
+  const indexed = taskLinesOf(text)
+  const results = new Array(items.length)
+  const found = []
+  items.forEach((item, i) => {
+    try {
+      found.push({ i, at: findTask(lines, indexed, item.line, item.title) })
+    } catch (e) {
+      results[i] = failure(e)
+    }
+  })
+  // from the bottom up, so what a task writes below itself moves none of those still to do
+  found.sort((a, b) => b.at - a.at)
+  const made = []
+  for (const { i, at } of found) {
+    try {
+      const { result, from, by } = editAt(lines, at, { ...items[i], today })
+      for (const m of made) if (m.line >= from) m.line += by
+      made.push((results[i] = result))
+    } catch (e) {
+      results[i] = failure(e)
+    }
+  }
+  return { text: lines.join('\n'), results }
 }
 
 /**
@@ -327,7 +450,7 @@ function isRepeatOf(line, of) {
  */
 export function addSubtask(text, { line, title }, taskLine) {
   const lines = text.split('\n')
-  const at = findTask(lines, line, title)
+  const at = findTask(lines, taskLinesOf(text), line, title)
   const parent = TASK_LINE.exec(lines[at].replace(/\r$/, ''))
   const nested = (n) => /\S/.test(lines[n] ?? '') && /^\s*/.exec(lines[n])[0].length > parent[1].length
   let end = at
@@ -487,6 +610,26 @@ export function taskTree(tasks) {
     if (!isOpen(task.status)) list.done++
   }
   return { roots, lists }
+}
+
+/**
+ * The checklist of the task at `line`, whichever task that is (taskTree has
+ * those of the top-level ones): `tasks` are its note's, in line order. The same
+ * { items, done, total } as taskTree gives, depths counted from that task; null
+ * if nothing is nested under it.
+ */
+export function checklistOf(tasks, line) {
+  const depths = new Map([[line, 0]])
+  const list = { items: [], done: 0, total: 0 }
+  for (const task of tasks) {
+    const parent = depths.get(task.parent)
+    if (parent == null) continue
+    depths.set(task.line, parent + 1)
+    list.items.push({ task, depth: parent + 1 })
+    list.total++
+    if (!isOpen(task.status)) list.done++
+  }
+  return list.total ? list : null
 }
 
 // ---------- tags and filters ----------

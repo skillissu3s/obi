@@ -313,7 +313,8 @@ export function CalendarView() {
   }, [mode, selected, treeMap])
 
   const onKeyDown = (e) => {
-    if (e.defaultPrevented || e.target.closest('input, select, textarea, button')) return
+    // (a dialog or card open from here is a child in React's tree, but not in the page's: its keys are its own)
+    if (e.defaultPrevented || !e.currentTarget.contains(e.target) || e.target.closest('input, select, textarea, button')) return
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key]
     if (step) setSelected((d) => addDays(d, step))
     else if (e.key === 'PageUp' || e.key === 'PageDown') go(e.key === 'PageUp' ? -1 : 1)

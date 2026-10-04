@@ -1,11 +1,11 @@
 // What the Tasks and Calendar pages share: the workspace's tasks ready to show,
 // the filters, dragging a task from one place to another, and changing tasks
 // with a way back.
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { dateKeyOf, dropPatch, isOpen, matchTask, splitTags, taskTree, todayIso, undoPatch } from '@shared/tasks.js'
 import { useApp } from '../store/app.js'
 import { usePlanner } from '../store/planner.js'
-import { toast } from '../store/ui.js'
+import { toast, useToasts } from '../store/ui.js'
 import * as A from './actions.js'
 import { dueLabel, plainSnippet } from './util.js'
 
@@ -46,8 +46,33 @@ function build(version) {
   return { version, all, cards, byPath, lists, depths, tags }
 }
 
+// The index can change many times a second — a bulk change is written note after
+// note — and working out the tasks again after each would take longer than the
+// writing. So the pages follow it at once when it has been quiet for a moment, and
+// otherwise at most every SETTLE ms. (Opening another workspace is followed at once.)
+const SETTLE = 120
+let seen = useApp.getState().version
+let seenAt = 0
+let wait = 0
+const followers = new Set()
+function follow() {
+  clearTimeout(wait)
+  wait = 0
+  seenAt = Date.now()
+  seen = useApp.getState().version
+  followers.forEach((f) => f())
+}
+useApp.subscribe((s, before) => {
+  if (s.version === seen) return
+  const left = seenAt + SETTLE - Date.now()
+  if (s.wsId !== before.wsId || left <= 0) follow()
+  else if (!wait) wait = setTimeout(follow, left)
+})
+const onIndex = (f) => (followers.add(f), () => followers.delete(f))
+const indexVersion = () => seen
+
 export function useTasks() {
-  const version = useApp((s) => s.version)
+  const version = useSyncExternalStore(onIndex, indexVersion)
   if (cache.version !== version) cache = build(version)
   return cache
 }
@@ -185,25 +210,40 @@ const nameOf = (task) => {
   return title.length > 42 ? `${title.slice(0, 41)}…` : title
 }
 
+const BULK = 20 // changes from which the person is told it is being done
+
 /**
  * Changes tasks — `patchOf(task)` is each one's change, or null to leave it — and
- * says so in a toast that takes it all back.
+ * says so in a toast that takes it all back. That is done in the workspace the
+ * change was made in, whichever is open by the time it is clicked.
  */
 export async function changeTasks(tasks, patchOf, message) {
-  const made = []
-  // a few at a time: changes to one note queue up on the server anyway
-  for (let i = 0; i < tasks.length; i += 6) {
-    await Promise.all(
-      tasks.slice(i, i + 6).map(async (task) => {
-        const patch = patchOf(task)
-        const result = patch && (await A.updateTask(task, patch))
-        if (result) made.push({ task, patch, result })
-      }),
-    )
+  const ws = useApp.getState().wsId
+  const items = tasks.flatMap((task) => {
+    const patch = patchOf(task)
+    return patch ? [{ task, patch }] : []
+  })
+  if (!items.length) return
+  const busy = items.length >= BULK ? toast.info(`Changing ${items.length} tasks…`, { timeout: 0 }) : null
+  let results
+  try {
+    results = await A.updateTasks(items, { ws })
+  } finally {
+    if (busy) useToasts.getState().dismiss(busy)
   }
+  const made = items.flatMap((item, i) => (results[i] ? [{ ...item, result: results[i] }] : []))
   if (!made.length) return
-  const undo = () => Promise.all(made.map(({ task, patch, result }) => A.updateTask({ ...task, line: result.line }, undoPatch(task, patch), { dropNext: !!result.next })))
-  toast.info(message, { timeout: 8000, action: { label: 'Undo', run: undo } })
+  const undo = async () => {
+    const back = await A.updateTasks(
+      made.map(({ task, patch, result }) => ({ task: { ...task, line: result.line, text: result.task.text }, patch: undoPatch(task, patch), dropNext: !!result.next })),
+      { ws },
+    )
+    // (what the completion wrote was changed since: it stays, as the person's)
+    const kept = back.filter((r, i) => made[i].result.next && r?.dropped === false).length
+    if (kept) toast.info(kept === 1 ? 'The next occurrence has been changed since, so it was left in the note' : `${kept} next occurrences have been changed since, so they were left in the note`)
+  }
+  // (what didn't go through has been toasted: the message is only for what did)
+  toast.info(made.length < items.length ? `Changed ${made.length} of ${items.length} tasks` : message, { timeout: 8000, action: { label: 'Undo', run: undo } })
 }
 
 /** Drops `task` on a column of a board: the field the column is about changes */
