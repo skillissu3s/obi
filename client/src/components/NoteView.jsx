@@ -60,16 +60,22 @@ function useHandleState(handle) {
 // is instead, as browser zoom does.
 function ZoomFrame({ zoom, reflow, children }) {
   const ref = useRef(null)
-  const [height, setHeight] = useState(0)
+  const [size, setSize] = useState({ height: 0, room: 0, column: 0 }) // layout px: the note, the pane it scrolls in, the column inside it
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return undefined
-    const measure = () => setHeight(el.offsetHeight)
+    const scroller = el?.closest('.note-scroll')
+    if (!el || !scroller) return undefined
+    const measure = () => setSize({ height: el.offsetHeight, room: scroller.clientWidth, column: el.firstElementChild?.offsetWidth || 0 })
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    ro.observe(scroller)
     return () => ro.disconnect()
   }, [])
+  const { height, room, column } = size
+  // scaled about its middle, a column wider than the pane overflows both edges, and
+  // the left one can't be scrolled to: start it at the left edge instead
+  const shift = Math.max(0, (column * zoom - room) / 2)
 
   // keep the same part of the page under the pointer (or in the middle)
   const prev = useRef(zoom)
@@ -86,7 +92,7 @@ function ZoomFrame({ zoom, reflow, children }) {
     zoom === 1
       ? undefined
       : {
-          transform: `scale(${zoom})`,
+          transform: `translateX(${shift}px) scale(${zoom})`,
           transformOrigin: '50% 0',
           marginBottom: (zoom - 1) * height,
           ...(reflow ? { width: `${100 / zoom}%`, marginInline: 'auto' } : null),
