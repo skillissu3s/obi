@@ -17,7 +17,11 @@ export function TaskFilters({ tags, stacked = false }) {
   const done = usePlanner((s) => s.done)
   const set = usePlanner((s) => s.set)
   const count = useFilterCount()
-  const shown = [...selected.filter((t) => !tags.some(([name]) => name.toLowerCase() === t.toLowerCase())).map((t) => [t, null]), ...tags.slice(0, MAX_TAGS)]
+  // the most used, and in front of them the tags that are selected but not among those (rarely used, or no longer on any open task)
+  const top = tags.slice(0, MAX_TAGS)
+  const counts = new Map(tags.map(([name, n]) => [name.toLowerCase(), n]))
+  const inTop = new Set(top.map(([name]) => name.toLowerCase()))
+  const shown = [...selected.filter((t) => !inTop.has(t.toLowerCase())).map((t) => [t, counts.get(t.toLowerCase()) ?? null]), ...top]
 
   return (
     <div className={`pl-filters ${stacked ? 'stacked' : ''}`}>

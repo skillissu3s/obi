@@ -1,6 +1,6 @@
 // The tasks as a board: a column for each value of what they are grouped by.
 // Dragging a card to another column changes that field on its line.
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { boardColumns, columnFields, columnOf, compareFinished, compareTasks, dateKeyOf } from '@shared/tasks.js'
 import * as A from '../lib/actions.js'
@@ -133,6 +133,23 @@ function Column({ col, group, tasks, lists, today, ws, canEdit, onOpen }) {
 /** `cards`: the tasks to show; `lists`: their checklists (see lib/planner.js) */
 export function TaskBoard({ cards, lists, group, done, today, ws, canEdit, onOpen }) {
   const columns = boardColumns(group, { done })
+  const board = useRef(null)
+  // a board wider than its room says so: the side with more to scroll to fades out (see planner.css)
+  useLayoutEffect(() => {
+    const el = board.current
+    const edges = () => {
+      el.toggleAttribute('data-more-start', el.scrollLeft > 1)
+      el.toggleAttribute('data-more-end', el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+    }
+    edges()
+    el.addEventListener('scroll', edges, { passive: true })
+    const watch = new ResizeObserver(edges)
+    watch.observe(el)
+    return () => {
+      el.removeEventListener('scroll', edges)
+      watch.disconnect()
+    }
+  }, [columns.length])
   const byColumn = useMemo(() => {
     const out = new Map(columns.map((c) => [c.id, []]))
     for (const t of cards) out.get(columnOf(t, group, today))?.push(t)
@@ -141,7 +158,7 @@ export function TaskBoard({ cards, lists, group, done, today, ws, canEdit, onOpe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, group, done, today])
   return (
-    <div className="pl-board">
+    <div className="pl-board" ref={board}>
       {columns.map((col) => (
         <Column key={`${group}:${col.id}`} col={col} group={group} tasks={byColumn.get(col.id)} lists={lists} today={today} ws={ws} canEdit={canEdit} onOpen={onOpen} />
       ))}

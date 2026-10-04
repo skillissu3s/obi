@@ -2,7 +2,7 @@
 // line. Opened from a card, a row or a chip on either page.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Flag, FileText, ListChecks, X } from 'lucide-react'
-import { PRIORITIES, addDays, cleanTag, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
+import { PRIORITIES, addDays, checklistOf, cleanTag, isIsoDate, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
 import { basename, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
@@ -63,25 +63,44 @@ function Field({ label, children }) {
   )
 }
 
+// A date typed into a date input goes through every state on the way: a year of
+// one digit, a day missing. Only a whole date is one (the year has four digits).
+const isWholeDate = (v) => isIsoDate(v) && v >= '1000'
+
 function DateField({ value, onChange, today }) {
+  const [typed, setTyped] = useState(null) // what the input holds while it is being typed into
   const quick = [
     ['Today', today],
     ['Tomorrow', addDays(today, 1)],
     ['Next week', addDays(today, 7)],
   ]
+  const set = (v) => {
+    setTyped(null)
+    onChange(v)
+  }
   return (
     <div className="td-date">
       <div className="td-date-row">
-        <input type="date" className="input" value={value || ''} onChange={(e) => onChange(e.target.value || null)} />
+        <input
+          type="date"
+          className="input"
+          value={typed ?? value ?? ''}
+          onChange={(e) => {
+            // (emptying it, or any part of it, is not clearing the date: that is the button)
+            setTyped(e.target.value)
+            if (isWholeDate(e.target.value) && e.target.value !== value) onChange(e.target.value)
+          }}
+          onBlur={() => setTyped(null)}
+        />
         {value && (
-          <button type="button" className="icon-btn sm" title="Clear the date" aria-label="Clear the date" onClick={() => onChange(null)}>
+          <button type="button" className="icon-btn sm" title="Clear the date" aria-label="Clear the date" onClick={() => set(null)}>
             <X />
           </button>
         )}
       </div>
       <div className="td-quick">
         {quick.map(([label, to]) => (
-          <button key={label} type="button" className={`te-quick ${value === to ? 'on' : ''}`} onClick={() => onChange(to)}>
+          <button key={label} type="button" className={`te-quick ${value === to ? 'on' : ''}`} onClick={() => set(to)}>
             {label}
           </button>
         ))}
@@ -292,7 +311,7 @@ function TaskDialog({ at, onClose }) {
                 else if (next !== words) change({ title: joinTags(next, tags) })
               }}
             />
-            <Checklist task={task} list={model.lists.get(taskKey(task))} today={today} />
+            <Checklist task={task} list={checklistOf(model.byPath.get(task.path), task.line)} today={today} />
           </fieldset>
         </div>
 
