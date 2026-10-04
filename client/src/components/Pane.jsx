@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, Plus, FileText, Network, ListChecks, CalendarDays, Home as HomeIcon, SplitSquareHorizontal, Pin, PinOff, Copy, MoreHorizontal, Shapes } from 'lucide-react'
 import { useLayout } from '../store/layout.js'
 import { useApp } from '../store/app.js'
@@ -21,7 +21,14 @@ export function Pane({ pane, isActive, multi }) {
   const panes = useLayout((s) => s.panes)
   const pending = useApp((s) => s.pending)
   const dragIdx = useRef(null)
+  const barRef = useRef(null)
   const activeTab = pane.tabs.find((t) => t.id === pane.active)
+
+  // with more tabs than fit, the one that comes to the front (or that a link
+  // opened in place, with a new title) may be off the end of the bar
+  useEffect(() => {
+    barRef.current?.querySelector('.tab.active')?.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+  }, [pane.active, pane.tabs.length, activeTab?.kind, activeTab?.path])
 
   const tabMenu = (e, tab, idx) => {
     useUI.getState().showContextMenu(e, [
@@ -36,7 +43,7 @@ export function Pane({ pane, isActive, multi }) {
 
   return (
     <div className={`pane ${isActive ? '' : 'inactive'}`} onMouseDown={() => useLayout.getState().focusPane(pane.id)}>
-      <div className="tabbar">
+      <div className="tabbar" ref={barRef}>
         {pane.tabs.map((tab, idx) => {
           const Icon = tab.kind === 'note' && isBoardPath(tab.path) ? Shapes : KIND_ICON[tab.kind] || FileText
           const busy = tab.kind === 'note' ? pending[`${tab.ws}:${tab.path}`] : null

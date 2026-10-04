@@ -440,6 +440,8 @@
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+  /* a tab scrolled into view stops short of the sticky actions at the right */
+  scroll-padding-inline: 6px 44px;
 }
 .tabbar::-webkit-scrollbar {
   display: none;
@@ -958,6 +960,19 @@ button.status-item:disabled {
   }
   .overlay {
     padding-top: 6vh;
+  }
+  /* The settings dialog's close button floats over its top right corner, where
+     the section tabs run: they scroll in the strip that is left of it instead of
+     going under it. The shadow keeps the strip's colour behind the button, and
+     the rule under the strip moves to the body so it still runs the full width. */
+  .settings-modal .settings-nav {
+    width: auto;
+    margin-right: 46px;
+    border-bottom: 0;
+    box-shadow: 46px 0 0 var(--bg-sidebar);
+  }
+  .settings-modal .settings-body {
+    border-top: 1px solid var(--border);
   }
   .tree-row {
     height: 36px;

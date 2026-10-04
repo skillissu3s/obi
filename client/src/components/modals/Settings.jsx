@@ -341,6 +341,14 @@ function AccountSection({ user }) {
 
 function AppearanceSection() {
   const prefs = usePrefs()
+  // The mode in use comes off the page, and System follows the device: it can
+  // flip while this is open (applyPrefs says so), so draw again when it does.
+  const [, redraw] = useState(0)
+  useEffect(() => {
+    const again = () => redraw((n) => n + 1)
+    window.addEventListener('obi:theme', again)
+    return () => window.removeEventListener('obi:theme', again)
+  }, [])
   const mode = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
   return (
     <>
