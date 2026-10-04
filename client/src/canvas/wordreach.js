@@ -10,7 +10,9 @@
  * height `to`. Words are what a reader sees, so a trailing space or an
  * indentation never counts; `ignore` is a selector for text that is not words
  * (the editor's remote cursor labels). `world` turns a DOMRect into world
- * pixels { left, right, top, bottom }.
+ * pixels { left, right, top, bottom }. Every word counts wherever it is, even
+ * where the page clips it; textEnd (shared/boardgeom.js) limits the reach to the
+ * text column, the same for both sides.
  */
 export function wordReach(root, { world, pitch, ignore }) {
   const range = document.createRange()

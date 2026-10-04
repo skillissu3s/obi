@@ -14,6 +14,7 @@ import { HardDrive } from 'lucide-react'
 import { dapi } from '../lib/desktop.js'
 import { cloudStatusText } from './Desktop.jsx'
 import { toast } from '../store/ui.js'
+import { isNote } from '@shared/paths.js'
 
 // Desktop: how this vault stands with the cloud. Offline is shown, never an
 // error: everything is kept here and goes up when the connection is back.
@@ -175,7 +176,8 @@ export function StatusBar() {
           <WallpaperCredit image={photoCredit} />
         </span>
       )}
-      {tab?.kind === 'note' && <ZoomChip />}
+      {/* markdown notes only: a whiteboard zooms by itself (its own controls) */}
+      {tab?.kind === 'note' && isNote(tab.path) && <ZoomChip />}
       {tab?.kind === 'note' && tab.ws === wsId && treeMap.get(tab.path)?.mtime > 0 && (
         <span className="status-item desktop-only" title={new Date(treeMap.get(tab.path).mtime).toLocaleString()}>
           Edited {timeAgo(treeMap.get(tab.path).mtime)}

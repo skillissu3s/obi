@@ -13,20 +13,24 @@ const inRow = ([x, y]) => y > 200 && y < 219 && x > 100 && x < 620
 // how far along the gap the line runs: the last of the points on it
 const runEnd = (points, gy) => Math.max(...points.filter((p) => p[1] === gy).map((p) => p[0]))
 
-// Rows of text 24px apart, 19px tall, all starting at x = 0; rights[r] is where
-// the words of row r end. reach is what the editor and the published page
-// measure: the words on the rows next to a gap and on those down to the target.
+// Rows of text 24px apart, 19px tall; rights[r] is where the words of row r end
+// and lefts[r] where they start (at x = 0, the edge of the column, unless said
+// otherwise). reach is what the editor and the published page measure: the
+// words on the rows next to a gap and on those down to the target, as far as
+// they go, however far past the column that is.
 const LH = 24
 const rowTop = (r) => 200 + LH * r
-const reachOf = (rights) => (from, to) => {
+const reachOf = (rights, lefts = []) => (from, to) => {
   const lo = Math.min(from - LH, to)
   const hi = Math.max(from + LH, to)
-  const hit = rights.filter((_, r) => rowTop(r) + 9.5 >= lo && rowTop(r) + 9.5 <= hi)
-  return hit.length ? [0, Math.max(...hit)] : null
+  const hit = rights.map((right, r) => [lefts[r] ?? 0, right, r]).filter(([, , r]) => rowTop(r) + 9.5 >= lo && rowTop(r) + 9.5 <= hi)
+  return hit.length ? [Math.min(...hit.map((h) => h[0])), Math.max(...hit.map((h) => h[1]))] : null
 }
-const phrase = (rights, r, a, b) => ({
-  shape: 'rect', text: true, x: a, y: rowTop(r), w: b - a, h: 19, ga: rowTop(r) - 2.5, gb: rowTop(r) + 21.5, col: [0, 620], reach: reachOf(rights),
+const phrase = (rights, r, a, b, lefts) => ({
+  shape: 'rect', text: true, x: a, y: rowTop(r), w: b - a, h: 19, ga: rowTop(r) - 2.5, gb: rowTop(r) + 21.5, col: [0, 620], reach: reachOf(rights, lefts),
 })
+// how far out to the left the line runs along the gap: the first of the points on it
+const runStart = (points, gy) => Math.min(...points.filter((p) => p[1] === gy).map((p) => p[0]))
 
 test('a line leaving text goes under it and along the gap between lines, out past the column', () => {
   const { points, handles } = resolve(arrow(), text, sticky(676, 160))
@@ -117,6 +121,39 @@ test('only the rows beside the gap and down to the other end count', () => {
   assert.equal(runEnd(resolve(arrow(), u, sticky(676, 500)).points, u.gb), 610)
 })
 
+test('going out to the left clears the words where they start, not the edge of the column', () => {
+  // an indented list or a quote: the words of the rows start at x = 40
+  const lefts = [40, 40, 40]
+  const t = phrase([400, 450, 300], 0, 60, 160, lefts)
+  const { points } = resolve(arrow(), t, sticky(-300, 260))
+  assert.equal(runStart(points, t.gb), 30, 'ten left of where the words start')
+  // the leftmost words on the rows it passes count, and no rows beyond the other end
+  const u = phrase([400, 450, 300], 0, 60, 160, [40, 60, 15])
+  assert.equal(runStart(resolve(arrow(), u, sticky(-300, 155)).points, u.gb), 30, 'rows 0 and 1: the words start at 40')
+  assert.equal(runStart(resolve(arrow(), u, sticky(-300, 260)).points, u.gb), 5, 'down to row 2, which starts at 15')
+  // the same text and a sticky on the other side: the right end of the words, as before
+  assert.equal(runEnd(resolve(arrow(), t, sticky(676, 260)).points, t.gb), 460)
+})
+
+test('text beyond the column is not on show, so the line does not run out past the column for it', () => {
+  // a long line of code or a wide table under the phrase: the page scrolls it inside the column
+  const long = phrase([220, 1350], 0, 34, 109)
+  const { points } = resolve(arrow(), long, sticky(676, 220))
+  assert.equal(runEnd(points, long.gb), 630, 'ten past the edge of the column, no further')
+  assert.ok(points.every((p) => p[0] < 676), 'and never past its sticky and back again')
+  assert.ok(!points.some(inRow))
+  // the phrase's own row is the one that runs on
+  const own = phrase([5000], 0, 34, 109)
+  assert.equal(runEnd(resolve(arrow(), own, sticky(676, 400)).points, own.gb), 630)
+  assert.ok(resolve(arrow(), own, sticky(676, 400)).points[0][0] <= 109, 'it starts under the phrase')
+  // and to the left, where the words may start beyond the column too
+  const left = phrase([400, 450], 0, 60, 160, [-700, -900])
+  assert.equal(runStart(resolve(arrow(), left, sticky(-300, 260)).points, left.gb), -10)
+  const nowhere = phrase([5000, 5000], 0, 60, 160, [900, 900])
+  const odd = resolve(arrow(), nowhere, sticky(-300, 260)).points
+  assert.ok(odd.every((p) => p.every(Number.isFinite)) && odd.every((p) => p[0] <= 640 && p[0] >= -320), 'text wholly past the column cannot send the line anywhere odd')
+})
+
 test('with no measurement of the words the line runs out to the column', () => {
   assert.equal(runEnd(resolve(arrow(), text, sticky(676, 400)).points, 224), 630)
 })
@@ -127,6 +164,14 @@ test('a phrase on a wrapped paragraph starts under words, not past the end of th
   const { points } = resolve(arrow(), t, sticky(676, 400))
   assert.ok(points[0][0] <= 140, 'under the last row')
   assert.equal(runEnd(points, t.gb), 150)
+})
+
+test('it starts under the words beside the gap, then runs on past longer rows further down', () => {
+  // a two-row phrase over short rows, with a long row lower down on the way to the sticky
+  const t = { ...phrase([600, 140, 140, 600], 1, 0, 620), y: rowTop(0), h: 43, ga: rowTop(0) - 2.5, gb: rowTop(1) + 21.5 }
+  const { points } = resolve(arrow(), t, sticky(676, 400))
+  assert.equal(points[0][0], 140, 'under the short rows, not out beyond them')
+  assert.equal(runEnd(points, t.gb), 610, 'and on to past the long row')
 })
 
 test('reversing an arrow reverses its points', () => {
@@ -160,10 +205,15 @@ test('whatever the geometry, the curve never loops, hooks back, overshoots or cu
   const pick = (list) => list[Math.floor(rand() * list.length)]
   for (let i = 0; i < 4000; i++) {
     const rows = 1 + Math.floor(rand() * 8)
-    const rights = Array.from({ length: rows }, () => (rand() < 0.4 ? 600 + rand() * 20 : 30 + rand() * 450))
+    // a few rows run on past the column (code, tables: the page scrolls them inside it), some start further in
+    const rights = Array.from({ length: rows }, () => (rand() < 0.1 ? 700 + rand() * 4000 : rand() < 0.4 ? 600 + rand() * 20 : 60 + rand() * 420))
+    const lefts = rights.map((r) => (rand() < 0.35 ? rand() * Math.min(140, r - 50) : rand() < 0.05 ? -rand() * 800 : 0))
+    // what shows of a row is what lies in the column
+    const shows = (r) => [Math.max(lefts[r], 0), Math.min(rights[r], 620)]
     const row = Math.floor(rand() * rows)
-    const a = rand() * (rights[row] - 20)
-    const t = phrase(rights, row, a, a + 10 + rand() * (rights[row] - a - 10))
+    const [shownL, shownR] = shows(row)
+    const a = shownL + rand() * (shownR - shownL - 20)
+    const t = phrase(rights, row, a, a + 10 + rand() * (shownR - a - 10), lefts)
     // the other end: a sticky (or a free point) clear of the column, near or far, above, level or below
     const out = rand() < 0.7 ? 1 : -1
     const w = pick([30, 200, 400])
@@ -177,7 +227,7 @@ test('whatever the geometry, the curve never loops, hooks back, overshoots or cu
     const el = arrow({ ...(free && { x: cx, y: cy, points: [[0, 0], [0, 0]] }), ...(start ? { end: other } : { start: other, end: { anchor: 1 } }) })
     const { points: raw, handles } = resolve(el, t, target)
     const points = start ? raw : [...raw].reverse()
-    const where = `case ${i}: ${JSON.stringify({ rights, row, a, out, cx, cy, w, h, free, start })}`
+    const where = `case ${i}: ${JSON.stringify({ rights, lefts, row, a, out, cx, cy, w, h, free, start })}`
     assert.equal(handles?.length, 2, where)
 
     // work in the line's own frame: u runs the way out, v away from the text
@@ -191,7 +241,7 @@ test('whatever the geometry, the curve never loops, hooks back, overshoots or cu
     // it leaves the text on the gap, in the gap, and goes only as far as the words it could cut
     assert.equal(points[0][1], gy, where)
     const reach = t.reach(gy, cy)
-    const far = out > 0 ? reach[1] : -reach[0]
+    const far = out > 0 ? Math.min(reach[1], 620) : -Math.max(reach[0], 0)
     const onGap = []
     for (const p of f) if (Math.abs(p[1]) < 1e-9) onGap.push(p[0]); else break
     const end = onGap.at(-1)
@@ -218,7 +268,8 @@ test('whatever the geometry, the curve never loops, hooks back, overshoots or cu
     for (let r = 0; r < rows; r++) {
       const mid = rowTop(r) + 9.5
       if (mid < Math.min(gy - LH, cy) || mid > Math.max(gy + LH, cy)) continue
-      for (const p of sampleSmooth(points, 12)) assert.ok(!(p[0] > 0 && p[0] < rights[r] && p[1] > rowTop(r) && p[1] < rowTop(r) + 19), `${where}: cuts row ${r}`)
+      const [shownL, shownR] = shows(r)
+      for (const p of sampleSmooth(points, 12)) assert.ok(!(p[0] > shownL && p[0] < shownR && p[1] > rowTop(r) && p[1] < rowTop(r) + 19), `${where}: cuts row ${r}`)
     }
   }
 })

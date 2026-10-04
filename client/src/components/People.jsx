@@ -33,8 +33,9 @@ function openFile(path) {
 }
 
 // Who else is in the workspace, and where. The people in this note come first
-// with where their caret is; the rest say which file they have open.
-function PeopleList({ collab, onClose }) {
+// with where their caret is; the rest say which file they have open (`label`
+// heads them: everyone listed is "elsewhere" only when there is a note to be in).
+function PeopleList({ collab, onClose, label = 'Elsewhere in this workspace' }) {
   const { here, elsewhere, followed, jump, follow } = collab
   return (
     <>
@@ -63,7 +64,7 @@ function PeopleList({ collab, onClose }) {
           )}
         </Row>
       ))}
-      {elsewhere.length > 0 && <div className="people-label">Elsewhere in this workspace</div>}
+      {elsewhere.length > 0 && <div className="people-label">{label}</div>}
       {elsewhere.map((p) => {
         const path = p.paths[0]
         return (
@@ -138,7 +139,7 @@ export function WorkspacePeople({ people }) {
       </button>
       {anchor && (
         <Popover anchor={anchor} onClose={close} className="people-pop">
-          <PeopleList collab={collab} onClose={close} />
+          <PeopleList collab={collab} onClose={close} label="People in this workspace" />
         </Popover>
       )}
     </>
