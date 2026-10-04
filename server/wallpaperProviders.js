@@ -14,7 +14,17 @@ const TIMEOUT_MS = 8000
 const MAX_BYTES = 2 * 1024 * 1024
 const CACHE_MS = 15 * 60 * 1000
 const CACHE_ENTRIES = 200
-const DAY = 86400000
+const SECOND = 1000
+const MINUTE = 60 * SECOND
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+// A page with nothing usable on it is skipped, but only this many in a row per request.
+const MAX_SKIPPED = 2
+// Requests to providers in flight at once, across every user; more wait their turn, up to a limit.
+const MAX_CONCURRENT = 6
+const MAX_QUEUED = 48
+// Pictures remembered as offered by this server, and who has already been counted for one.
+const REMEMBERED = 5000
 
 export class WallpaperError extends Error {
   constructor(status, message) {
@@ -116,6 +126,8 @@ const unsplash = {
   supportsSearch: true,
   featured: 'Popular editorial photos',
   licenseNote: 'Free to use under the Unsplash License. Photographer and Unsplash credit is required and shown here.',
+  rate: [50, HOUR], // until Unsplash approves the app for production; UNSPLASH_REQUESTS_PER_HOUR says how many it then allows
+  rateEnv: 'UNSPLASH_REQUESTS_PER_HOUR',
   api: ['api.unsplash.com'],
   images: ['images.unsplash.com', 'plus.unsplash.com'],
   async search({ get, key, appName }, { q, page }) {
@@ -155,6 +167,7 @@ const pexels = {
   supportsSearch: true,
   featured: 'Curated photos',
   licenseNote: 'Free to use under the Pexels License. Credit to the photographer and Pexels is shown here.',
+  rate: [200, HOUR],
   api: ['api.pexels.com'],
   images: ['images.pexels.com'],
   async search({ get, key }, { q, page }) {
@@ -188,6 +201,7 @@ const pixabay = {
   featured: "Editor's choice",
   licenseNote: 'Free under the Pixabay Content License. Credit is not required but is shown here.',
   ttl: DAY, // Pixabay asks for results to be cached for 24 hours
+  rate: [100, MINUTE],
   api: ['pixabay.com'],
   images: ['pixabay.com'],
   async search({ get, key }, { q, page }) {
@@ -219,6 +233,7 @@ const wallhaven = {
   supportsSearch: true,
   featured: 'Top this month',
   licenseNote: 'Wallpapers are uploaded by Wallhaven members, who are not named in the API. Only safe-for-work pictures are shown.',
+  rate: [45, MINUTE],
   api: ['wallhaven.cc'],
   images: ['w.wallhaven.cc', 'th.wallhaven.cc'],
   async search({ get, key }, { q, page }) {
@@ -251,7 +266,9 @@ const nasa = {
   supportsSearch: false,
   featured: 'Astronomy Picture of the Day',
   licenseNote: 'Images from NASA are usually free to use; some belong to their photographers, who are named here.',
-  ttl: 6 * 60 * 60 * 1000, // DEMO_KEY allows about 30 requests an hour
+  ttl: 6 * HOUR, // DEMO_KEY allows about 30 requests an hour
+  rate: [30, HOUR],
+  keyedRate: [1000, HOUR],
   api: ['api.nasa.gov'],
   images: ['nasa.gov'],
   async search({ get, key, now }, { page }) {
@@ -282,6 +299,7 @@ const flickr = {
   supportsSearch: true,
   featured: 'Interesting landscapes',
   licenseNote: 'Only Creative Commons and public-domain photos that allow commercial use. The photographer and licence are shown; follow the licence terms when you share a screenshot.',
+  rate: [3600, HOUR],
   api: ['www.flickr.com'],
   images: ['staticflickr.com'],
   async search({ get, key }, { q, page }) {
@@ -336,11 +354,13 @@ const bing = {
   supportsSearch: false,
   featured: 'Image of the day',
   licenseNote: "Microsoft's daily images are meant for personal use as a wallpaper.",
+  rate: [30, MINUTE], // nothing published: kept gentle
   api: ['www.bing.com'],
   images: ['bing.com'],
   async search({ get }, { page }) {
-    if (page > 2) return { items: [], more: false }
-    const data = await get(`https://www.bing.com/HPImageArchive.aspx?${qs({ format: 'js', idx: (page - 1) * 8, n: 8, mkt: 'en-US' })}`)
+    // the archive only reaches back eight pictures (idx 0-7); asking past that gets nothing or the same ones again
+    if (page > 1) return { items: [], more: false }
+    const data = await get(`https://www.bing.com/HPImageArchive.aspx?${qs({ format: 'js', idx: 0, n: 8, mkt: 'en-US' })}`)
     return {
       items: collect(
         bing,
@@ -357,12 +377,13 @@ const bing = {
           title: r.title,
         }),
       ),
-      more: page < 2,
+      more: false,
     }
   },
 }
 
-// Commons thumbnails come in fixed widths; this swaps the width in a thumbnail link
+// Commons only makes thumbnails at a fixed set of widths (20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840) and
+// refuses any other; this swaps the width in a thumbnail link, so only those are used here
 const commonsThumb = (u, w) => (typeof u === 'string' ? u.replace(/\/\d+px-([^/]+)$/, `/${w}px-$1`) : u)
 
 const wikimedia = {
@@ -373,6 +394,7 @@ const wikimedia = {
   supportsSearch: true,
   featured: 'Picture of the day',
   licenseNote: 'Free-licensed or public-domain files. The author and licence shown here are the ones to credit.',
+  rate: [200, MINUTE], // "be gentle"
   api: ['en.wikipedia.org', 'commons.wikimedia.org'],
   images: ['upload.wikimedia.org'],
   async search({ get, now }, { q, page }) {
@@ -400,7 +422,7 @@ const wikimedia = {
           const info = rows(r.imageinfo)[0] || {}
           return {
             id: r.pageid,
-            thumb: commonsThumb(info.thumburl, 480),
+            thumb: commonsThumb(info.thumburl, 500),
             url: info.thumburl,
             width: info.width,
             height: info.height,
@@ -443,6 +465,7 @@ const aic = {
   supportsSearch: true,
   featured: 'Public-domain artworks',
   licenseNote: "Public-domain artworks from the museum's open collection (CC0).",
+  rate: [60, MINUTE],
   api: ['api.artic.edu'],
   images: ['www.artic.edu'],
   async search({ get }, { q, page }) {
@@ -456,7 +479,8 @@ const aic = {
         (r) => ({
           id: r.id,
           thumb: `https://www.artic.edu/iiif/2/${r.image_id}/full/400,/0/default.jpg`,
-          url: `https://www.artic.edu/iiif/2/${r.image_id}/full/1686,/0/default.jpg`,
+          // 843px is the width the museum's image API documents for showing a picture
+          url: `https://www.artic.edu/iiif/2/${r.image_id}/full/843,/0/default.jpg`,
           width: r.thumbnail?.width,
           height: r.thumbnail?.height,
           author: String(r.artist_display ?? '').split('\n')[0],
@@ -478,6 +502,7 @@ const met = {
   supportsSearch: true,
   featured: 'Highlights, public domain',
   licenseNote: "Public-domain works from The Metropolitan Museum of Art's Open Access collection (CC0).",
+  rate: [80, SECOND],
   api: ['collectionapi.metmuseum.org'],
   images: ['images.metmuseum.org'],
   async search({ get }, { q, page }) {
@@ -514,6 +539,7 @@ const picsum = {
   supportsSearch: false,
   featured: 'Random photos',
   licenseNote: 'Photos from Unsplash, served by Lorem Picsum. The photographer is credited here.',
+  rate: [60, MINUTE], // nothing published: kept gentle
   api: ['picsum.photos'],
   images: ['picsum.photos'],
   async search({ get }, { page }) {
@@ -583,9 +609,60 @@ function createClient(fetchFn, userAgent) {
   }
 }
 
+// Lets `count` requests through per `per` ms, refilled steadily: a provider's published limit, kept to here
+// so that the people using this server cannot spend it, or push past it, between them.
+function tokenBucket([count, per], now) {
+  let tokens = count
+  let at = now()
+  return () => {
+    const t = now()
+    tokens = Math.min(count, tokens + ((t - at) * count) / per)
+    at = t
+    if (tokens < 1) return false
+    tokens--
+    return true
+  }
+}
+
+// Runs jobs with at most `max` going at once; the rest wait their turn, up to `queued` of them.
+function gate(max, queued) {
+  let active = 0
+  const waiting = []
+  return async (job) => {
+    if (active >= max) {
+      if (waiting.length >= queued) throw new Upstream('limit')
+      await new Promise((go) => waiting.push(go)) // a finished job hands its place over
+    } else active++
+    try {
+      return await job()
+    } finally {
+      if (waiting.length) waiting.shift()()
+      else active--
+    }
+  }
+}
+
+// The latest `max` keys; the oldest is forgotten first.
+function latest(max) {
+  const keys = new Set()
+  return {
+    has: (k) => keys.has(k),
+    delete: (k) => keys.delete(k),
+    add(k) {
+      keys.delete(k)
+      keys.add(k)
+      if (keys.size > max) keys.delete(keys.values().next().value)
+    },
+  }
+}
+
 export function createWallpapers({ fetch: fetchFn = globalThis.fetch, env = process.env, appName = 'Obi', now = Date.now } = {}) {
   const client = createClient(fetchFn, `${appName}/1.0 (background images; self-hosted)`)
   const cache = new Map()
+  const buckets = new Map()
+  const inFlight = gate(MAX_CONCURRENT, MAX_QUEUED)
+  const offered = latest(REMEMBERED) // `provider:id` of the pictures this server has sent out
+  const counted = latest(REMEMBERED) // `user|provider:id` of the pictures already reported to the provider
 
   const find = (id) => {
     const p = PROVIDERS.find((x) => x.id === id)
@@ -599,9 +676,19 @@ export function createWallpapers({ fetch: fetchFn = globalThis.fetch, env = proc
     return p
   }
 
+  // every request to a provider spends from that provider's bucket and takes a turn at the shared limit
+  const rateOf = (p) => {
+    const perHour = p.rateEnv ? Math.floor(Number(env[p.rateEnv])) : 0
+    return perHour > 0 ? [perHour, p.rate[1]] : (own(p) && p.keyedRate) || p.rate
+  }
+  const upstream = (p, run) => {
+    if (!buckets.has(p.id)) buckets.set(p.id, tokenBucket(rateOf(p), now))
+    return buckets.get(p.id)() ? inFlight(run) : Promise.reject(new Upstream('limit'))
+  }
+
   async function call(p, fn) {
     try {
-      return await fn({ get: (url, headers) => client(url, { headers, hosts: p.api }), key: own(p) || p.defaultKey || '', appName, now })
+      return await fn({ get: (url, headers) => upstream(p, () => client(url, { headers, hosts: p.api })), key: own(p) || p.defaultKey || '', appName, now })
     } catch (e) {
       if (e instanceof WallpaperError) throw e
       const kind = e instanceof Upstream ? e.kind : 'shape'
@@ -609,6 +696,18 @@ export function createWallpapers({ fetch: fetchFn = globalThis.fetch, env = proc
       if (kind === 'key' && own(p)) throw new WallpaperError(502, `${p.name} rejected the API key set on this server (${p.keyEnv})`)
       throw new WallpaperError(kind === 'limit' ? 429 : 502, `${p.name} ${SAID[kind === 'key' ? 'status' : kind] || 'sent something unexpected'}`)
     }
+  }
+
+  async function onePage(p, q, page) {
+    const slot = `${p.id}|${q}|${page}`
+    const hit = cache.get(slot)
+    if (hit && hit.until > now()) return hit.result
+    const found = await call(p, (ctx) => p.search(ctx, { q, page }))
+    const result = { providerName: p.name, items: found.items, more: !!found.more && page < MAX_PAGES }
+    cache.delete(slot)
+    cache.set(slot, { result, until: now() + (p.ttl || CACHE_MS) })
+    if (cache.size > CACHE_ENTRIES) cache.delete(cache.keys().next().value)
+    return result
   }
 
   return {
@@ -625,24 +724,33 @@ export function createWallpapers({ fetch: fetchFn = globalThis.fetch, env = proc
         licenseNote: p.licenseNote,
       })),
 
+    // `page` in the answer is the page the pictures came from: one with none on it, where more follow, is passed over
     async search(id, q, page) {
       const p = ready(find(id))
       q = p.supportsSearch ? q : ''
-      const slot = `${p.id}|${q}|${page}`
-      const hit = cache.get(slot)
-      if (hit && hit.until > now()) return hit.result
-      const found = await call(p, (ctx) => p.search(ctx, { q, page }))
-      const result = { providerName: p.name, items: found.items, more: !!found.more && page < MAX_PAGES }
-      cache.delete(slot)
-      cache.set(slot, { result, until: now() + (p.ttl || CACHE_MS) })
-      if (cache.size > CACHE_ENTRIES) cache.delete(cache.keys().next().value)
-      return result
+      let at = page
+      let found = await onePage(p, q, at)
+      for (let skipped = 0; !found.items.length && found.more && skipped < MAX_SKIPPED; skipped++) found = await onePage(p, q, ++at)
+      if (p.track) for (const item of found.items) offered.add(`${p.id}:${item.id}`)
+      return { ...found, page: at }
     },
 
-    // a picture was chosen: providers that want to hear about it are told
-    async track(id, photoId) {
+    // a picture was chosen: providers that want to hear about it are told, once for each person and picture,
+    // and only about pictures this server has offered
+    async track(id, photoId, who = '') {
       const p = ready(find(id))
-      if (p.track) await call(p, (ctx) => p.track(ctx, photoId))
+      if (!p.track) return
+      const key = `${p.id}:${photoId}`
+      if (!offered.has(key)) throw new WallpaperError(404, 'That picture was not offered by this server')
+      const once = `${who}|${key}`
+      if (counted.has(once)) return
+      counted.add(once)
+      try {
+        await call(p, (ctx) => p.track(ctx, photoId))
+      } catch (e) {
+        counted.delete(once)
+        throw e
+      }
     },
   }
 }
