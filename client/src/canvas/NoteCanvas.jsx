@@ -429,11 +429,15 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     }
   }, [scrollEl, innerEl, bump, bubble, updateBubble])
 
-  // zoomed: the pan (kept in screen pixels) and every measurement are redone
+  // zoomed: the pan (kept in screen pixels) and every measurement are redone.
+  // CodeMirror too: a transform on an ancestor wakes none of its observers, and
+  // zooming out at the top of a note scrolls nothing, so unasked it would keep the
+  // old scale — drawings off their lines, clicks on the wrong line.
   useEffect(() => {
     setPan(panRef.current)
+    view?.requestMeasure()
     bump()
-  }, [zoom, setPan, bump])
+  }, [zoom, view, setPan, bump])
 
   // layer content changed → anchors may be new
   useEffect(() => {
