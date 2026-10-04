@@ -118,8 +118,12 @@ function ramp(a, b, from) {
  * the gap between the lines of text (t.ga above, t.gb below) to just past the
  * words it could otherwise cut: those on the rows either side of the gap and on
  * every row down to the other end, as far as t.reach(from, to) reports them,
- * else all the way to the edge of the column (t.col). Points come back from the
- * text outwards; the last is where the line has bent towards the other end.
+ * else all the way to the edge of the column (t.col). Words are only counted
+ * within the column: what lies beyond it is not on show (a long line of code or
+ * a wide table scrolls inside the column on the published page, and the editor
+ * wraps it), so a line never goes further out than the edge of the column to
+ * clear it. Points come back from the text outwards; the last is where the line
+ * has bent towards the other end.
  */
 function textEnd(t, look, gap, route) {
   const ref = center(look)
@@ -136,7 +140,8 @@ function textEnd(t, look, gap, route) {
   const out = ref[0] > cr ? 1 : -1
   const side = below ? 1 : -1
   const at = (u, v) => [u * out, gy + v * side]
-  const far = (reach) => (out > 0 ? reach[1] : -reach[0])
+  const inCol = (u) => Math.min(cr, Math.max(cl, u))
+  const far = (reach) => (out > 0 ? inCol(reach[1]) : -inCol(reach[0]))
   // it starts under words, not past the end of them
   const u0 = Math.min(x * out, far(t.reach?.(gy, gy) || t.col))
   const words = Math.max(u0, far(t.reach?.(gy, ref[1]) || t.col))

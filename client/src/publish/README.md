@@ -67,6 +67,25 @@ the same place on both sides, `textRect` gives the layout, in world pixels:
 Measure `reach` the same way on both sides, or a line ends one place in the
 editor and another on the published page.
 
+`reach` reports every word wherever it is, but `textEnd` only counts words
+**inside `col`**: what lies beyond the column is not on show (the page scrolls a
+long line of code or a wide table inside its block), and a run that went out for
+it would shoot across the page and double back. The run along the gap never goes
+further than ten past the edge of the column. That is a clamp, not parity: the
+editor wraps code at the column where the page keeps one long row, so beside such
+a block the two sides can still end a line in slightly different places (and the
+lines below it already sit differently).
+
+Two limits of `reach`, kept on purpose (it keeps a line off the words; it is not
+a layout engine):
+
+- **Only text counts.** Images, callout and quote boxes, embeds and diagrams are
+  not words, so a bent line can still cross them.
+- **The editor sees only the lines CodeMirror has rendered** (the ones near the
+  screen). On a long note a route that passes far above or below the screen is
+  measured on fewer rows than the published page measures (the whole note), so it
+  can end in a different place there and shifts a little as you scroll.
+
 ## Also: no vertical margins on editor widgets
 
 CodeMirror measures lines and block widgets by their border box. A vertical
@@ -84,8 +103,8 @@ routes) · `client/src/canvas/layout.js` (`resolveLayout`, `measureMarkdown`) ·
 `client/src/canvas/anchors.js` · `client/src/canvas/wordreach.js` ·
 `client/src/canvas/NoteCanvas.jsx` (`env`, `anchorFor`) ·
 `client/src/canvas/ElementView.jsx` (`textStyle`) ·
-`shared/boardsvg.js` (`textBlock`, `boardToSvg`) ·
-`client/src/lib/themesnapshot.js`
+`shared/boardsvg.js` (`textBlock`, `boardToSvg`) · `shared/boardgeom.js`
+(`textEnd`) · `client/src/lib/themesnapshot.js`
 
 1. Change the matching rule on the **other** side in the same commit.
 2. Verify by eye: publish a note with a sticky next to a line, an arrow to a
