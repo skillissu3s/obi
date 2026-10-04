@@ -5,7 +5,7 @@ import {
   parseTask, editTaskLine, toggleTaskLine, applyTaskEdit, appendTask, newTaskLine, parseRecurrence, nextOccurrence,
   addDays, addMonths, daysBetween, weekdayOf, isIsoDate, bucketOf, compareTasks, priorityRank, TaskChangedError,
   addSubtask, boardColumns, columnOf, columnFields, dateKeyOf, dropPatch, undoPatch, taskTree, splitTags, joinTags,
-  hasTag, matchTask, previewEdit, cleanTag, weekStartOf, monthDays,
+  hasTag, matchTask, previewEdit, cleanTag, weekStartOf, monthDays, applyTaskEdits, checklistOf, nextBlock, insertNext, MAX_TASK_EDITS,
 } from './tasks.js'
 import { parseNote } from './parse.js'
 
@@ -301,4 +301,246 @@ test('preview: a change worked out without the note is the change the note gets'
       assert.deepEqual(previewEdit(task, patch, { today }), { ...want, line: 7, parent: 3 }, `${line} ← ${JSON.stringify(patch)}`)
     }
   }
+})
+
+// ---------- a repeating task with a checklist ----------
+
+const CHORES = '- [ ] Clean flat 🔁 every week 📅 2026-10-03\n  - [ ] kitchen\n  - [x] bathroom ✅ 2026-10-01\n  - [-] garage ❌ 2026-10-01\n- [ ] Other\n'
+const complete = (text, line, title) => applyTaskEdit(text, { line, title, patch: { status: 'x' }, today })
+const reopenIt = (text, line, title) => applyTaskEdit(text, { line, title, patch: { status: ' ' }, today, dropNext: true })
+
+test('completing a repeating task: its next occurrence goes below the checklist, with the checklist open again', () => {
+  const r = complete(CHORES, 0, 'Clean flat')
+  assert.equal(
+    r.text,
+    '- [x] Clean flat 🔁 every week 📅 2026-10-03 ✅ 2026-10-03\n  - [ ] kitchen\n  - [x] bathroom ✅ 2026-10-01\n  - [-] garage ❌ 2026-10-01\n' +
+      '- [ ] Clean flat 🔁 every week 📅 2026-10-10\n  - [ ] kitchen\n  - [ ] bathroom\n  - [ ] garage\n- [ ] Other\n',
+  )
+  assert.equal(r.next.due, '2026-10-10')
+  // as the index reads it: each occurrence has its own checklist, and only the finished one has ticks
+  const { roots, lists } = taskTree(parseNote(r.text).tasks)
+  assert.deepEqual(roots.map((t) => t.text), ['Clean flat', 'Clean flat', 'Other'])
+  assert.deepEqual([lists.get(0).done, lists.get(0).total, lists.get(4).done, lists.get(4).total], [2, 3, 0, 3])
+})
+
+test('completing a repeating task: tabs, odd indents, blank lines, notes and CRLF in the checklist', () => {
+  // tabs
+  assert.equal(
+    complete('- [ ] a 🔁 every day 📅 2026-10-03\n\t- [ ] sub\n\t\t- [x] deep ✅ 2026-10-01\nafter\n', 0, 'a').text,
+    '- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n\t- [ ] sub\n\t\t- [x] deep ✅ 2026-10-01\n- [ ] a 🔁 every day 📅 2026-10-04\n\t- [ ] sub\n\t\t- [ ] deep\nafter\n',
+  )
+  // an indented task, children indented by three and five: what is nested is whatever is indented further
+  assert.equal(
+    complete('  - [ ] a 🔁 every day 📅 2026-10-03\n     - [x] b ✅ 2026-10-01\n   - [ ] c\n  - [ ] sibling\n', 0, 'a').text,
+    '  - [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n     - [x] b ✅ 2026-10-01\n   - [ ] c\n  - [ ] a 🔁 every day 📅 2026-10-04\n     - [ ] b\n   - [ ] c\n  - [ ] sibling\n',
+  )
+  // notes and blank lines inside are kept; the blank line after the checklist stays after the new one
+  const loose = '- [ ] a 🔁 every day 📅 2026-10-03\n  - [x] one ✅ 2026-10-01\n\n  - [ ] two\n  a note about it\n\n- [ ] next\n'
+  assert.equal(
+    complete(loose, 0, 'a').text,
+    '- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n  - [x] one ✅ 2026-10-01\n\n  - [ ] two\n  a note about it\n- [ ] a 🔁 every day 📅 2026-10-04\n  - [ ] one\n\n  - [ ] two\n  a note about it\n\n- [ ] next\n',
+  )
+  // CRLF, and a note that ends without a line break
+  const crlf = '- [ ] a 🔁 every day 📅 2026-10-03\r\n  - [x] one ✅ 2026-10-01\r\n- [ ] z\r\n'
+  const c = complete(crlf, 0, 'a')
+  assert.equal(c.text, '- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\r\n  - [x] one ✅ 2026-10-01\r\n- [ ] a 🔁 every day 📅 2026-10-04\r\n  - [ ] one\r\n- [ ] z\r\n')
+  assert.equal(reopenIt(c.text, 0, 'a').text, crlf)
+  assert.equal(complete('- [ ] a 🔁 every day 📅 2026-10-03\n  - [ ] b', 0, 'a').text, '- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n  - [ ] b\n- [ ] a 🔁 every day 📅 2026-10-04\n  - [ ] b')
+  // no checklist: right below, as before
+  assert.equal(complete('- [ ] a 🔁 every day 📅 2026-10-03\n- [ ] z\n', 0, 'a').text, '- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n- [ ] a 🔁 every day 📅 2026-10-04\n- [ ] z\n')
+})
+
+test('the next occurrence of a task done in the editor or the reading view goes the same way', () => {
+  // those work on the lines of the note: toggleTaskLine says what to write, nextBlock where
+  const lines = CHORES.split('\n')
+  const r = toggleTaskLine(lines[0], { today })
+  lines[0] = r.line
+  const { after, lines: block } = nextBlock(lines, 0, r.next)
+  assert.equal(after, 3, 'after the last of the checklist')
+  assert.deepEqual(block, ['- [ ] Clean flat 🔁 every week 📅 2026-10-10', '  - [ ] kitchen', '  - [ ] bathroom', '  - [ ] garage'])
+  insertNext(lines, 0, r.next)
+  assert.equal(lines.join('\n'), complete(CHORES, 0, 'Clean flat').text, 'the same as through the server')
+  // a task with nothing nested under it: right below it
+  assert.deepEqual(nextBlock(['- [x] a', '- [ ] z'], 0, '- [ ] a'), { after: 0, lines: ['- [ ] a'] })
+  // the last line of the note, with nothing below it
+  const last = ['- [x] a', '  - [ ] b']
+  insertNext(last, 0, '- [ ] a')
+  assert.deepEqual(last, ['- [x] a', '  - [ ] b', '- [ ] a', '  - [ ] b'])
+})
+
+test('taking back the completion removes exactly what it wrote', () => {
+  for (const [note, line, title] of [
+    [CHORES, 0, 'Clean flat'],
+    ['- [ ] a 🔁 every day 📅 2026-10-03\n\t- [ ] sub\n\t\t- [x] deep ✅ 2026-10-01\nafter\n', 0, 'a'],
+    ['x\n\n  - [ ] a 🔁 every 2 weeks when done\n      - [/] half\n\n  y\n- [ ] a 🔁 every 2 weeks when done\n', 2, 'a'],
+    ['- [ ] a 🔁 every day 📅 2026-10-03', 0, 'a'],
+  ]) {
+    const done = complete(note, line, title)
+    assert.notEqual(done.text, note)
+    const back = reopenIt(done.text, line, title)
+    assert.equal(back.dropped, true)
+    assert.equal(back.text, note)
+  }
+  assert.equal(complete(CHORES, 0, 'Clean flat').dropped, undefined)
+})
+
+test('taking back the completion leaves alone whatever is not what it wrote', () => {
+  const done = complete(CHORES, 0, 'Clean flat').text
+  const spawned = done.split('\n')
+  const untouched = (text) => {
+    const r = reopenIt(text, 0, 'Clean flat')
+    assert.equal(r.dropped, false)
+    // only the reopening itself happened
+    assert.equal(r.text, text.replace('- [x] Clean flat 🔁 every week 📅 2026-10-03 ✅ 2026-10-03', '- [ ] Clean flat 🔁 every week 📅 2026-10-03'))
+  }
+  untouched(done.replace('📅 2026-10-10', '📅 2026-10-20')) // the new one was given another day
+  untouched(done.replace('- [ ] Clean flat 🔁 every week 📅 2026-10-10', '- [/] Clean flat 🔁 every week 📅 2026-10-10')) // started
+  untouched(done.replace(/  - \[ \] garage\n- \[ \] Other/, '  - [x] garage ✅ 2026-10-03\n- [ ] Other')) // an item of the new one ticked
+  untouched(done.replace(/  - \[ \] kitchen\n  - \[ \] bathroom/, '  - [ ] kitchen\n  - [ ] sink\n  - [ ] bathroom')) // one added
+  untouched(done.replace('📅 2026-10-10', '📅 2026-10-10 ⏫')) // given a priority
+  untouched(done.replace('- [ ] Clean flat 🔁', '- [ ] Clean the flat 🔁')) // retitled
+  untouched(done.replace(/  - \[ \] garage\n- \[ \] Other/, '- [ ] Other')) // an item of the new one removed
+  untouched([...spawned.slice(0, 4), ...spawned.slice(8)].join('\n')) // the new one deleted: what follows is not it
+  // the task itself was given another day since: what finishing it wrote is not what finishing it now would
+  const moved = done.replace('📅 2026-10-03 ✅', '📅 2026-10-05 ✅')
+  const left = reopenIt(moved, 0, 'Clean flat')
+  assert.equal(left.dropped, false)
+  assert.equal(left.text.split('\n').length, moved.split('\n').length)
+  // an identical repeating task right below is not mistaken for the new one
+  const twins = '- [ ] w 🔁 every week 📅 2026-10-03\n- [ ] w 🔁 every week 📅 2026-10-03\n'
+  const twice = complete(twins, 0, 'w').text
+  assert.equal(reopenIt(twice, 0, 'w').text, twins)
+  const gone = twice.replace('- [ ] w 🔁 every week 📅 2026-10-10\n', '')
+  const kept = reopenIt(gone, 0, 'w')
+  assert.equal(kept.dropped, false)
+  assert.equal(kept.text, '- [ ] w 🔁 every week 📅 2026-10-03\n- [ ] w 🔁 every week 📅 2026-10-03\n')
+  // not a completed task: nothing to take back
+  assert.equal(applyTaskEdit('- [ ] w 🔁 every week 📅 2026-10-03\n- [ ] w 🔁 every week 📅 2026-10-10\n', { line: 0, title: 'w', patch: { priority: 'low' }, today, dropNext: true }).dropped, false)
+})
+
+test('applyTaskEdit: only what the index reads as a task can be edited', () => {
+  const fenced = '# n\n\n```\n- [ ] Example\n```\n\n$$\n- [ ] Math\n$$\n\n%% hidden\n- [ ] Comment\n%%\n'
+  for (const [line, title] of [[3, 'Example'], [99, 'Example'], [7, 'Math'], [99, 'Math'], [11, 'Comment'], [99, 'Comment']]) {
+    assert.throws(() => applyTaskEdit(fenced, { line, title, patch: { status: 'x' }, today }), TaskChangedError, `${title} at ${line}`)
+  }
+  assert.throws(() => addSubtask(fenced, { line: 99, title: 'Example' }, '- [ ] new'), TaskChangedError)
+  // a real one is found past the example that looks like it
+  const both = '```\n- [ ] Example\n```\n\n- [ ] Example\n'
+  assert.equal(applyTaskEdit(both, { line: 9, title: 'Example', patch: { status: 'x' }, today }).line, 4)
+  assert.equal(applyTaskEdit(both, { line: 4, title: 'Example', patch: { status: 'x' }, today }).line, 4)
+  // front matter is not the note
+  assert.throws(() => applyTaskEdit('---\ntodo:\n  - [ ] fm\n---\n\ntext\n', { line: 2, title: 'fm', patch: { status: 'x' }, today }), TaskChangedError)
+  // whatever the index lists can be edited, where the line numbers are those of the whole note (front matter counted)
+  const messy =
+    '---\ntitle: x\n---\n\n# n\n\n```js\n- [ ] no\n```\n\n- [ ] one #t\n\t- [ ] two\r\n<!--\n- [ ] in an html comment\n-->\n%% a\n- [ ] no\n%%\n$$\n- [ ] no\n$$\n~~~\n- [ ] no\n~~~\n1. [ ] three\n'
+  const listed = parseNote(messy).tasks
+  assert.deepEqual(listed.map((t) => t.text), ['one #t', 'two', 'in an html comment', 'three'])
+  for (const t of listed) {
+    const r = applyTaskEdit(messy, { line: t.line, title: t.text, patch: { priority: 'low' }, today })
+    assert.equal(r.line, t.line, t.text)
+    assert.equal(r.text.split('\n').filter((l, n) => l !== messy.split('\n')[n]).length, 1, 'one line changed')
+    // and by its title alone, when the line has moved
+    assert.equal(applyTaskEdit(`new\n${messy}`, { line: t.line, title: t.text, patch: { priority: 'low' }, today }).line, t.line + 1, t.text)
+  }
+})
+
+test('checklists: of any task, not only a top-level one', () => {
+  const tasks = parseNote('- [ ] Root\n  - [ ] Mid\n    - [ ] Leaf one\n    - [x] Leaf two ✅ 2026-10-01\n  - [x] Mid two ✅ 2026-10-01\n- [ ] Next\n').tasks
+  const items = (line) => checklistOf(tasks, line).items.map((i) => [i.task.text, i.depth])
+  assert.deepEqual(items(0), [['Mid', 1], ['Leaf one', 2], ['Leaf two', 2], ['Mid two', 1]])
+  assert.deepEqual(items(1), [['Leaf one', 1], ['Leaf two', 1]], 'depths count from the task itself')
+  const mid = checklistOf(tasks, 1)
+  assert.deepEqual([mid.done, mid.total], [1, 2])
+  assert.equal(checklistOf(tasks, 2), null)
+  assert.equal(checklistOf(tasks, 5), null)
+  // the same as taskTree's for a top-level task
+  assert.deepEqual(checklistOf(tasks, 0), taskTree(tasks).lists.get(0))
+})
+
+test('several tasks of a note edited at once', () => {
+  const note = '# Plan\n\n- [ ] a 🔁 every day 📅 2026-10-03\n  - [x] a1 ✅ 2026-10-01\n- [ ] b 📅 2026-10-01\n- [ ] c 🔁 every week 📅 2026-10-03\n- [ ] d\n'
+  const items = [
+    { line: 2, title: 'a', patch: { status: 'x' } },
+    { line: 4, title: 'b', patch: { due: '2026-10-03' } },
+    { line: 5, title: 'c', patch: { status: 'x' } },
+    { line: 6, title: 'd', patch: { priority: 'high' } },
+    { line: 6, title: 'nope', patch: { priority: 'low' } }, // stale
+    { line: 4, title: 'b', patch: { due: '2026-02-30' } }, // not a date
+  ]
+  const r = applyTaskEdits(note, items, { today })
+  assert.equal(
+    r.text,
+    '# Plan\n\n- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n  - [x] a1 ✅ 2026-10-01\n- [ ] a 🔁 every day 📅 2026-10-04\n  - [ ] a1\n' +
+      '- [ ] b 📅 2026-10-03\n- [x] c 🔁 every week 📅 2026-10-03 ✅ 2026-10-03\n- [ ] c 🔁 every week 📅 2026-10-10\n- [ ] d ⏫\n',
+  )
+  assert.deepEqual(r.results.map((x) => x.error && x.status), [undefined, undefined, undefined, undefined, 409, 400])
+  // each result says where its task is in the text that comes back
+  const lines = r.text.split('\n')
+  for (const [i, x] of r.results.slice(0, 4).entries()) assert.equal(parseTask(lines[x.line]).text, items[i].title, items[i].title)
+  assert.deepEqual(r.results.slice(0, 4).map((x) => x.line), [2, 6, 7, 9])
+  assert.equal(r.results[0].next.due, '2026-10-04')
+  // and the lines it reports are good for taking it back in one go, which restores the note
+  const back = applyTaskEdits(
+    r.text,
+    [
+      { line: r.results[0].line, title: 'a', patch: { status: ' ' }, dropNext: true },
+      { line: r.results[1].line, title: 'b', patch: { due: '2026-10-01' } },
+      { line: r.results[2].line, title: 'c', patch: { status: ' ' }, dropNext: true },
+      { line: r.results[3].line, title: 'd', patch: { priority: null } },
+    ],
+    { today },
+  )
+  assert.equal(back.text, note)
+  assert.deepEqual(back.results.map((x) => x.dropped), [true, undefined, true, undefined])
+  // twins that repeat: the line of the second is right even though the first wrote a line above it
+  const twins = '- [ ] w 🔁 every week 📅 2026-10-03\n- [ ] w 🔁 every week 📅 2026-10-03\n'
+  const both = applyTaskEdits(twins, [{ line: 0, title: 'w', patch: { status: 'x' } }, { line: 1, title: 'w', patch: { status: 'x' } }], { today })
+  assert.deepEqual(both.results.map((x) => x.line), [0, 2])
+  assert.equal(both.text, '- [x] w 🔁 every week 📅 2026-10-03 ✅ 2026-10-03\n- [ ] w 🔁 every week 📅 2026-10-10\n- [x] w 🔁 every week 📅 2026-10-03 ✅ 2026-10-03\n- [ ] w 🔁 every week 📅 2026-10-10\n')
+})
+
+test('several tasks of a note edited at once: a checklist and its tasks, stale lines, taking back what is not as written', () => {
+  // a repeating task and one of its own checklist, in one go: the copy has the item open again
+  const nested = '- [ ] a 🔁 every day 📅 2026-10-03\n  - [ ] b 🔁 every day 📅 2026-10-03\n  - [ ] c\n- [ ] z\n'
+  const r = applyTaskEdits(
+    nested,
+    [{ line: 0, title: 'a', patch: { status: 'x' } }, { line: 1, title: 'b', patch: { status: 'x' } }],
+    { today },
+  )
+  assert.equal(
+    r.text,
+    '- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n  - [x] b 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\n  - [ ] b 🔁 every day 📅 2026-10-04\n  - [ ] c\n' +
+      '- [ ] a 🔁 every day 📅 2026-10-04\n  - [ ] b 🔁 every day 📅 2026-10-03\n  - [ ] b 🔁 every day 📅 2026-10-04\n  - [ ] c\n- [ ] z\n',
+  )
+  assert.deepEqual(r.results.map((x) => x.line), [0, 1], 'what the first wrote below the checklist moves neither')
+
+  // lines that are out of date are found by their words, in one note and one pass
+  const stale = applyTaskEdits('new\n\nx\n- [ ] a\n- [ ] b\n- [ ] c\n', [{ line: 0, title: 'c', patch: { priority: 'low' } }, { line: 1, title: 'a', patch: { priority: 'high' } }, { line: 2, title: 'b', patch: { status: 'x' } }], { today })
+  assert.deepEqual(stale.results.map((x) => x.line), [5, 3, 4])
+  assert.equal(stale.text, 'new\n\nx\n- [ ] a ⏫\n- [x] b ✅ 2026-10-03\n- [ ] c 🔽\n')
+
+  // all of them wrong: nothing changes, and each says why
+  const none = applyTaskEdits('- [ ] a\n', [{ line: 0, title: 'x', patch: {} }, { line: 0, title: 'a', patch: { due: 'soon' } }], { today })
+  assert.equal(none.text, '- [ ] a\n')
+  assert.deepEqual(none.results.map((x) => x.status), [409, 400])
+
+  // CRLF
+  const crlf = applyTaskEdits('- [ ] a 🔁 every day 📅 2026-10-03\r\n  - [ ] b\r\n', [{ line: 0, title: 'a', patch: { status: 'x' } }], { today })
+  assert.equal(crlf.text, '- [x] a 🔁 every day 📅 2026-10-03 ✅ 2026-10-03\r\n  - [ ] b\r\n- [ ] a 🔁 every day 📅 2026-10-04\r\n  - [ ] b\r\n')
+
+  // taking back several completions, one of which was changed since: only that one's next occurrence stays, the rest go
+  const two = '- [ ] a 🔁 every day 📅 2026-10-03\n  - [ ] a1\n- [ ] b 🔁 every day 📅 2026-10-03\n  - [ ] b1\n'
+  const done = applyTaskEdits(two, [{ line: 0, title: 'a', patch: { status: 'x' } }, { line: 2, title: 'b', patch: { status: 'x' } }], { today })
+  const changed = done.text.replace('  - [ ] b1\n- [ ] b 🔁 every day 📅 2026-10-04', '  - [ ] b1\n- [ ] b 🔁 every day 📅 2026-10-09')
+  assert.notEqual(changed, done.text)
+  const [ra, rb] = done.results
+  const back = applyTaskEdits(
+    changed,
+    [{ line: ra.line, title: 'a', patch: { status: ' ' }, dropNext: true }, { line: rb.line, title: 'b', patch: { status: ' ' }, dropNext: true }],
+    { today },
+  )
+  assert.deepEqual(back.results.map((x) => x.dropped), [true, false])
+  assert.equal(back.text, '- [ ] a 🔁 every day 📅 2026-10-03\n  - [ ] a1\n- [ ] b 🔁 every day 📅 2026-10-03\n  - [ ] b1\n- [ ] b 🔁 every day 📅 2026-10-09\n  - [ ] b1\n')
+
+  assert.equal(MAX_TASK_EDITS, 1000)
 })

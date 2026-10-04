@@ -4,7 +4,7 @@ import { syntaxTree } from '@codemirror/language'
 import { renderMarkdown, renderInline, fetchNote, extractSection, loadKatex, renderMermaid } from '../lib/render.js'
 import { IMAGE_EXT, AUDIO_EXT, VIDEO_EXT, extname, basename, stripExt } from '@shared/paths.js'
 import { splitFrontmatter } from '@shared/parse.js'
-import { toggleTaskLine, todayIso } from '@shared/tasks.js'
+import { nextBlock, toggleTaskLine, todayIso } from '@shared/tasks.js'
 import { computeChanges } from '@shared/textdiff.js'
 
 export const editorCtx = Facet.define({ combine: (v) => v[0] || {} })
@@ -64,10 +64,13 @@ class CheckboxWidget extends WidgetType {
 
 // The edit that turns a task line into `r` (from shared/tasks.js), as small as
 // it can be so that someone typing on the same line is not trampled.
-export function taskChanges(line, r) {
+export function taskChanges(doc, line, r) {
   const changes = computeChanges(line.text, r.line).map((c) => ({ from: line.from + c.from, to: line.from + c.to, insert: c.insert }))
-  // a repeating task done: its next occurrence goes on the line below
-  if (r.next) changes.push({ from: line.to, insert: `\n${r.next}` })
+  // a repeating task done: its next occurrence goes below its checklist, with a copy of that
+  if (r.next) {
+    const block = nextBlock(doc.toJSON(), line.number - 1, r.next)
+    changes.push({ from: doc.line(block.after + 1).to, insert: block.lines.map((l) => `\n${l}`).join('') })
+  }
   return changes
 }
 
@@ -76,7 +79,7 @@ export function toggleTaskAt(view, pos) {
   const line = view.state.doc.lineAt(pos)
   const r = toggleTaskLine(line.text, { today: todayIso() })
   if (!r) return false
-  view.dispatch({ changes: taskChanges(line, r) })
+  view.dispatch({ changes: taskChanges(view.state.doc, line, r) })
   return true
 }
 

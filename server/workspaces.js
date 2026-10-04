@@ -15,7 +15,7 @@ import { cloudStatus } from './cloudsync.js'
 import { extname, isNote, basename, dirname, safeName, joinPath } from '../shared/paths.js'
 import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
 import { scanDir } from './fsutil.js'
-import { addSubtask, applyTaskEdit, appendTask, newTaskLine, isIsoDate, toggleTaskLine, TaskChangedError } from '../shared/tasks.js'
+import { MAX_TASK_EDITS, addSubtask, applyTaskEdit, applyTaskEdits, appendTask, insertNext, newTaskLine, isIsoDate, toggleTaskLine, TaskChangedError } from '../shared/tasks.js'
 import path from 'node:path'
 
 export const wsRouter = express.Router()
@@ -327,7 +327,8 @@ const taskDay = (v) => {
 
 // Edits one task: { path, line, title, patch: { status, due, scheduled, start, priority, recurrence, title }, today, dropNext }.
 // `title` is what the client last saw on that line, so a note that changed in
-// between is never edited blindly. `dropNext`: this undoes finishing a repeating task.
+// between is never edited blindly. `dropNext`: this undoes finishing a repeating
+// task; `dropped` in the answer says whether what finishing it wrote could go.
 wsRouter.post('/:id/tasks/update', async (req, res) => {
   const p = safePath(req.body?.path)
   notePathAccess(req, 'editor', p)
@@ -349,7 +350,61 @@ wsRouter.post('/:id/tasks/update', async (req, res) => {
     if (e instanceof RangeError) throw new HttpError(400, e.message)
     throw e
   }
-  res.json({ line: result.line, task: result.task, next: result.next })
+  res.json({ line: result.line, task: result.task, next: result.next, dropped: result.dropped })
+})
+
+// Edits many tasks at once: { items: [{ path, line, title, patch, dropNext }], today }, each item as for
+// an update and checked as one. The tasks of a note are changed in one write. Answers { results }, one for
+// each item in its order: { line, task, next, dropped } or, for one that couldn't be done, { error, status };
+// the others are done all the same.
+wsRouter.post('/:id/tasks/update-many', async (req, res) => {
+  const { items } = req.body || {}
+  if (!Array.isArray(items) || !items.length || items.length > MAX_TASK_EDITS) throw new HttpError(400, `Between 1 and ${MAX_TASK_EDITS} changes are required`)
+  const today = taskDay(req.body.today)
+  const results = new Array(items.length)
+  const byPath = new Map() // note → the indexes of its items
+  const allowed = new Map() // note → why it can't be changed, or null
+  const fail = (i, e) => (results[i] = { error: e.message, status: e.status })
+  items.forEach((item, i) => {
+    try {
+      const p = safePath(item?.path)
+      if (!allowed.has(p)) {
+        try {
+          notePathAccess(req, 'editor', p)
+          allowed.set(p, null)
+        } catch (e) {
+          if (!(e instanceof HttpError)) throw e
+          allowed.set(p, e)
+        }
+      }
+      if (allowed.get(p)) throw allowed.get(p)
+      if (!Number.isInteger(item.line) || item.line < 0 || !item.patch || typeof item.patch !== 'object') throw new HttpError(400, 'A task line and a change are required')
+      ;(byPath.get(p) ?? byPath.set(p, []).get(p)).push(i)
+    } catch (e) {
+      if (!(e instanceof HttpError)) throw e
+      fail(i, e)
+    }
+  })
+  const rt = byPath.size ? await getRuntime(req.ws.id) : null
+  for (const [p, at] of byPath) {
+    try {
+      await rt.updateNote(
+        p,
+        (text) => {
+          const edits = at.map((i) => ({ line: items[i].line, title: items[i].title, patch: items[i].patch, dropNext: items[i].dropNext === true }))
+          const r = applyTaskEdits(text, edits, { today })
+          at.forEach((i, n) => (results[i] = r.results[n]))
+          return r.text
+        },
+        { userId: req.user.id },
+      )
+    } catch (e) {
+      // (a note that can't be written is one of the failures; the others are not held up by it)
+      if (!(e instanceof HttpError)) console.error('[error]', req.method, req.originalUrl, p, e)
+      for (const i of at) fail(i, e instanceof HttpError ? e : { message: 'That note could not be saved', status: 500 })
+    }
+  }
+  res.json({ results })
 })
 
 // The checkbox, from before tasks had more to them
@@ -366,7 +421,7 @@ wsRouter.post('/:id/tasks/toggle', async (req, res) => {
       const r = toggleTaskLine(lines[line] ?? '', { today: taskDay(req.body?.today) })
       if (!r) throw new HttpError(409, 'The task has changed, please refresh')
       lines[line] = r.line
-      if (r.next) lines.splice(line + 1, 0, r.next)
+      if (r.next) insertNext(lines, line, r.next)
       task = r.line
       return lines.join('\n')
     },

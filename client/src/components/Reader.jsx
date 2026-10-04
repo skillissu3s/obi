@@ -4,7 +4,7 @@ import { openLink, openTagSearch } from '../lib/actions.js'
 import { copyText } from '../lib/util.js'
 import { toast } from '../store/ui.js'
 import { useApp } from '../store/app.js'
-import { toggleTaskLine as toggleLine, todayIso } from '@shared/tasks.js'
+import { insertNext, toggleTaskLine as toggleLine, todayIso } from '@shared/tasks.js'
 import { applyToYText } from '@shared/textdiff.js'
 
 export function Properties({ frontmatter }) {
@@ -151,6 +151,6 @@ export function toggleTaskLine(handle, line) {
   const r = toggleLine(lines[line] ?? '', { today: todayIso() })
   if (!r) return
   lines[line] = r.line
-  if (r.next) lines.splice(line + 1, 0, r.next)
+  if (r.next) insertNext(lines, line, r.next)
   applyToYText(handle.ytext, lines.join('\n'))
 }
