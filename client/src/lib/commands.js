@@ -175,9 +175,14 @@ export function buildCommands() {
           useApp.getState().revealPath(note.path)
           layout.setLeftTab('files')
         } },
-      { id: 'zoom-in', name: 'Zoom in on the note', icon: ZoomIn, hotkey: 'Mod+=', alt: 'Mod+Shift+=', group: 'View', run: () => useNoteZoom.getState().step(1) },
-      { id: 'zoom-out', name: 'Zoom out on the note', icon: ZoomOut, hotkey: 'Mod+-', group: 'View', run: () => useNoteZoom.getState().step(-1) },
-      { id: 'zoom-reset', name: 'Reset the note zoom to 100%', icon: ZoomIn, hotkey: 'Mod+0', group: 'View', run: () => useNoteZoom.getState().reset() },
+      // markdown notes only: a whiteboard has its own zoom, on these same keys
+      ...(isNote(note.path)
+        ? [
+            { id: 'zoom-in', name: 'Zoom in on the note', icon: ZoomIn, hotkey: 'Mod+=', alt: 'Mod+Shift+=', group: 'View', run: () => useNoteZoom.getState().step(1) },
+            { id: 'zoom-out', name: 'Zoom out on the note', icon: ZoomOut, hotkey: 'Mod+-', group: 'View', run: () => useNoteZoom.getState().step(-1) },
+            { id: 'zoom-reset', name: 'Reset the note zoom to 100%', icon: ZoomIn, hotkey: 'Mod+0', group: 'View', run: () => useNoteZoom.getState().reset() },
+          ]
+        : []),
       { id: 'insert-template', name: 'Insert template…', icon: Copy, group: 'Note', run: () => ui.openPalette('templates') },
       // editor commands
       { id: 'bold', name: 'Format: bold', icon: Bold, hotkey: 'Mod+B', group: 'Format', run: ed(toggleWrap('**')) },
