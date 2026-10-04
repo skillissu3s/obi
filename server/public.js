@@ -166,7 +166,7 @@ function boardPageHtml(data) {
   return empty ? '<p class="board-missing">This whiteboard is empty.</p>' : `<figure class="board">${svg}</figure>`
 }
 
-const CSP = "default-src 'self'; img-src 'self' https: data: blob:; media-src 'self' https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; frame-src 'self'"
+const CSP = "default-src 'self'; img-src 'self' https: data: blob:; media-src 'self' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; frame-src 'self'"
 
 publicRouter.get('/:slug', async (req, res) => {
   const data = await loadPublished(req.params.slug)
