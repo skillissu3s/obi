@@ -12,6 +12,8 @@ change the matching rule on the other side in the same commit:
 
 - `client/src/styles/editor.css` — `.obi-editor`, the live preview `.cm-lp-*`
   rules, and spacing on editor widgets (never vertical margins)
+- `client/src/editor/listHang.js` — the hanging indent of wrapped list items
+  (mirrored by `hangListItems` in `publish/main.js`)
 - `client/src/publish/publish.css`, `client/src/publish/main.js`
 - `shared/markdown.js` — the `sourceLines` parts
 - `server/public.js` — the published page and its routes

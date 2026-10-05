@@ -40,12 +40,37 @@ is what this contract guards.
    preview.** Heading `padding-top`/size/line-height, the code block's padding,
    the quote's border and indent, the bullet/number widths, the hairline rule —
    each rule in `publish.css` names the `.cm-lp-*` class it copies.
+   - **A wrapped list item hangs**: its later rows start under its text, not
+     under the bullet. Both sides *measure* the width before the text from their
+     own DOM and give the item `padding-left: w; text-indent: -w` —
+     `editor/listHang.js` (`.cm-lp-hang`) and `hangListItems` in `main.js`. Only
+     an item that is one line of text gets it (not one whose paragraph runs
+     over several source lines, holds a second block, or sits in a quote), on
+     both sides alike.
+   - **An empty item** (`- ` alone) is one line with its bullet, as in the editor.
+   - **A task's checkbox** is sized in the text's em (`font-size: inherit`, a
+     form control's default is smaller), and the space after `[ ]` stays, so
+     the task's text starts at the same x.
 5. **x = 0 is the left edge of the text column**, y is measured from the
    column's top. The editor's `.cm-line` has 2px of horizontal padding; so
    does `#content`.
 6. **Markdown text blocks use the editor font** — never the hand-drawn font's
    1.25× size boost or its line-height. `ElementView.textStyle`,
    `layout.measureMarkdown` and `boardsvg.textBlock` all follow this.
+
+## Also: drawings that touch are pinned together
+
+Each element is pinned to the line beside its top. A picture drawn in pieces
+(a shaft, then a separate arrowhead, then a box) would otherwise be pinned to
+several lines, and a line typed between them would pull it apart. So when an
+element is drawn, added, pasted or moved, every element it touches (within
+`TOUCH` px, or bound to it by an arrow) is pinned with it to the line at the
+group's top — `client/src/canvas/pinning.js`, used by `reanchor` in the
+controller. A note opened in the editor also repins any group still pinned to
+several lines (`repinSplitGroups`), without moving anything.
+
+This only changes what is stored (`anchor` and `dy`, as before), never how a
+pinned element is placed, so the published page needs nothing new.
 
 ## Also: lines drawn out of a phrase end where the text ends
 
@@ -96,7 +121,7 @@ below**. Put spacing inside the box (padding, or a transparent border with
 
 ## Before changing any of these files
 
-`client/src/styles/editor.css` (`.obi-editor`, `.cm-lp-*`, widget spacing) ·
+`client/src/styles/editor.css` (`.obi-editor`, `.cm-lp-*`, widget spacing) · `client/src/editor/listHang.js` ·
 `client/src/publish/publish.css` · `client/src/publish/main.js` ·
 `shared/markdown.js` (the `sourceLines` parts) · `server/public.js` (page and
 routes) · `client/src/canvas/layout.js` (`resolveLayout`, `measureMarkdown`) ·

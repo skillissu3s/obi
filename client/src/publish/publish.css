@@ -169,8 +169,29 @@ main {
 #content .obi-indent {
   white-space: pre;
 }
+/* .cm-lp-hang: publish/main.js gives a list item a hanging indent (inline
+   padding-left and a negative text-indent). text-indent is inherited, so the
+   boxes inside the item (and nested lists) keep their own — all but the item's
+   paragraph, whose first row it is — and a nested item gets its own from the script. */
+#content li:not(svg *) :not(p, li) {
+  text-indent: 0;
+}
 #content .obi-bullet {
   /* .cm-lp-bullet */
+  display: inline-block;
+  width: 0.9em;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-3);
+}
+/* An item with nothing in it yet ("- " on a line of its own) is still a line in
+   the editor, bullet and all; without this it would have no height here and
+   every line below it would sit one line higher than in the note. */
+#content li:empty:not(svg *) {
+  min-height: var(--pub-line);
+}
+#content ul > li:empty:not(svg *)::before {
+  content: '•';
   display: inline-block;
   width: 0.9em;
   text-align: center;
@@ -186,6 +207,9 @@ main {
 }
 #content .task-checkbox {
   /* .cm-lp-checkbox input */
+  /* a form control has its own small font size unless told otherwise; the
+     editor's checkbox is sized in the text's em, so this one must be too */
+  font-size: inherit;
   appearance: none;
   -webkit-appearance: none;
   width: 1.05em;

@@ -232,7 +232,62 @@ function fitMarkdownBlocks() {
   }
 }
 
+// A list item whose text wraps carries on under its own text, as it does in the
+// editor (editor/listHang.js, .cm-lp-hang in editor.css): the item gets a
+// hanging indent as wide as what comes before its text, measured here from the
+// page the same way the editor measures its line. Only an item that is one line
+// of text, outside quotes and callouts — the same items the editor indents.
+const MARKS = '.obi-indent, .obi-bullet, .obi-num, input.task-checkbox'
+const BLOCKISH = /^(H[1-6]|PRE|BLOCKQUOTE|TABLE|DIV|HR|FIGURE|DETAILS)$/
+function hangListItems() {
+  const items = [...article.querySelectorAll('li')].filter((li) => !li.closest('svg, blockquote'))
+  // measured with no indents in place: each item then starts at the column edge
+  for (const li of items) li.style.paddingLeft = li.style.textIndent = ''
+  for (const list of article.querySelectorAll('li > ul, li > ol')) list.style.marginLeft = ''
+  const leads = items.map((li) => {
+    const own = [...li.children].filter((c) => c.tagName !== 'UL' && c.tagName !== 'OL')
+    if (own.some((c) => BLOCKISH.test(c.tagName)) || own.filter((c) => c.tagName === 'P').length > 1) return 0
+    if (li.querySelector(':scope > .obi-ln, :scope > p > .obi-ln')) return 0 // the text goes on over more source lines
+    const first = firstContent(li)
+    if (!first) return 0
+    const start = li.getBoundingClientRect()
+    if (first.top >= start.top + parseFloat(getComputedStyle(li).lineHeight || '0') - 1) return 0 // the lead itself wrapped
+    return Math.round((first.left - start.left) * 100) / 100
+  })
+  items.forEach((li, i) => {
+    const lead = leads[i]
+    if (!(lead > 0)) return
+    li.style.paddingLeft = `${lead}px`
+    li.style.textIndent = `${-lead}px`
+    // the items nested in it start from the column edge again, as their own lines do in the editor
+    for (const list of li.querySelectorAll(':scope > ul, :scope > ol')) list.style.marginLeft = `${-lead}px`
+  })
+}
+
+// Where an item's text begins: the first character that isn't space, after its
+// indentation, number or bullet and checkbox (or an image, if that comes first).
+function firstContent(li) {
+  const walker = document.createTreeWalker(li, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (n) => {
+      if (n.nodeType === 1) {
+        if (n.matches(MARKS) || n.tagName === 'UL' || n.tagName === 'OL') return NodeFilter.FILTER_REJECT
+        return n.tagName === 'IMG' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+      }
+      return /\S/.test(n.data) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+    },
+  })
+  const node = walker.nextNode()
+  if (!node) return null
+  if (node.nodeType === 1) return node.getBoundingClientRect()
+  const at = node.data.search(/\S/)
+  const range = document.createRange()
+  range.setStart(node, at)
+  range.setEnd(node, at + 1)
+  return range.getClientRects()[0] || null
+}
+
 function render() {
+  hangListItems()
   fitMarkdownBlocks()
   if (!article || !data?.elements?.length) {
     if (layers) layers.under.replaceChildren(), layers.over.replaceChildren()

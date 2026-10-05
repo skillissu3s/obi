@@ -249,7 +249,10 @@ export function createMarkdown(opts = {}) {
           first.content = first.content.slice(m[0].length)
           const cb = new state.Token('html_inline', '', 0)
           const line = (li.map?.[0] ?? 0) + lineOffset
-          cb.content = `<input type="checkbox" class="task-checkbox" data-line="${line}"${checked ? ' checked' : ''}>`
+          // ⚠ LAYOUT CONTRACT: on a published page the space after "[ ]" stays, as it
+          // does in the editor (the checkbox widget replaces "- [ ]" and leaves the
+          // space), so a task's text starts at the same x on both sides
+          cb.content = `<input type="checkbox" class="task-checkbox" data-line="${line}"${checked ? ' checked' : ''}>${opts.sourceLines ? m[0].slice(3) : ''}`
           tok.children.unshift(cb)
           // find parent list and mark it
           for (let j = i - 3; j >= 0; j--) {

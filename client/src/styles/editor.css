@@ -512,6 +512,19 @@
   text-align: center;
   font-weight: 700;
 }
+/* ⚠ LAYOUT CONTRACT — a list item's wrapped rows start under its text, not
+   under the bullet. --hang is the measured width of what comes before the text
+   (editor/listHang.js); publish/main.js (hangListItems) does the same to the
+   published page's list items. The first row is where it always was: the
+   padding and the negative indent cancel out on it. */
+.obi-editor .cm-line.cm-lp-hang {
+  padding-left: calc(2px + var(--hang));
+  text-indent: calc(-1 * var(--hang));
+}
+/* text-indent is inherited: the bullet, checkbox and other boxes on the line keep their own */
+.obi-editor .cm-line.cm-lp-hang * {
+  text-indent: 0;
+}
 .cm-lp-checkbox {
   display: inline-flex;
   align-items: center;

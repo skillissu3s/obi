@@ -11,6 +11,7 @@ import { classHighlighter } from '@lezer/highlight'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import { obiMarkdownExtensions, obiTags } from './markdownExt.js'
 import { livePreview, blockWidgets, linkHandlers, editorCtx, editorFocusField, setEditorFocus } from './livePreview.js'
+import { listHang } from './listHang.js'
 import { wikiCompletion, tagCompletion, slashCompletion, emojiCompletion } from './completions.js'
 import { markdownKeymapFor } from './commands.js'
 import { annotationField } from './annotations.js'
@@ -87,7 +88,7 @@ export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFo
       }
       if (u.docChanged || u.selectionSet) onUpdate?.(u)
     }),
-    comps.mode.of(mode === 'source' ? [] : [livePreview, blockWidgets]),
+    comps.mode.of(mode === 'source' ? [] : [livePreview, blockWidgets, listHang]),
     comps.readOnly.of([]),
     comps.collab.of([]),
     comps.prefs.of(prefsExtensions(prefs)),
@@ -118,7 +119,7 @@ export function collabExtensions(handle) {
 }
 
 export function modeExtensions(mode) {
-  return mode === 'source' ? [] : [livePreview, blockWidgets]
+  return mode === 'source' ? [] : [livePreview, blockWidgets, listHang]
 }
 
 export function readOnlyExtensions(readOnly) {
