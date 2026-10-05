@@ -7,7 +7,7 @@ import { isBoardPath } from '@shared/board.js'
 import { createBoardStore } from './store.js'
 import { CanvasController } from './controller.js'
 import { CanvasLayer, useController } from './CanvasLayer.jsx'
-import { Toolbar, StyleBar } from './Toolbar.jsx'
+import { Toolbar, StyleBar, StyleBudPanel } from './Toolbar.jsx'
 import { visualBounds } from './layout.js'
 import { api } from '../lib/api.js'
 import * as A from '../lib/actions.js'
@@ -295,7 +295,7 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
   const pinch = useRef(null)
   const onPointerDown = (e) => {
     if (!ctl) return
-    if (e.target.closest('.cv-dock, .cv-hud, .board-embed-bar')) return
+    if (e.target.closest('.cv-dock, .cv-hud, .cv-style-bud, .board-embed-bar')) return
     setToolsOpen(false)
     if (e.pointerType === 'touch') {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -476,6 +476,7 @@ export function BoardCanvas({ handle, ws, path, embedded = false, onDone }) {
           <Eye size={12} /> View only
         </span>
       )}
+      <StyleBudPanel ctl={ctl} />
       <div className={`board-controls ${toolsOpen ? 'tools-open' : ''}`}>
         {(!compactControls || toolsOpen) && (
           <div className="cv-dock">

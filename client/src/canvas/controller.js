@@ -3,6 +3,7 @@ import { elementBounds, unionBounds, isLinear, normalizeLinear, simplify, absPoi
 import { DEFAULTS, val } from '@shared/boardsvg.js'
 import { newElementId, newSeed } from './store.js'
 import { resolveLayout, hitTest, inMarquee, erasedBy, bindTargetAt, visualBounds, source, measureText, measureMarkdown, handlePoints } from './layout.js'
+import { touchingGroups } from './pinning.js'
 
 export const TOOL_KEYS = {
   v: 'select', h: 'hand', r: 'rect', o: 'ellipse', d: 'diamond', a: 'arrow', l: 'line', p: 'pen', m: 'marker',
@@ -237,6 +238,7 @@ export class CanvasController {
     const final = this.anchorize(el)
     this.store.checkpoint()
     this.store.add(final)
+    this.reanchor([final.id])
     if (select) this.set({ selection: [final.id], editing: edit ? { id: final.id } : null })
     return final
   }
@@ -712,6 +714,7 @@ export class CanvasController {
         const el = normalizeLinear({ ...draft, points: pts.map((q) => q.map((n) => Math.round(n * 100) / 100)) })
         this.store.checkpoint()
         this.store.add(this.anchorize(el))
+        this.reanchor([el.id])
         break
       }
       case 'erase': {
@@ -864,18 +867,45 @@ export class CanvasController {
     return { x, y, w: Math.max(s, Math.round((r.x + r.w) / s) * s - x), h: Math.max(s, Math.round((r.y + r.h) / s) * s - y) }
   }
 
-  // re-attach elements to the note line they now sit on
+  // Re-attach elements to the note line they now sit on — together with every
+  // drawing they touch, all pinned to the line at that group's top, so new text
+  // typed beside a picture moves all of it or none of it (see pinning.js).
   reanchor(ids) {
-    if (this.mode !== 'note') return
-    const patches = []
-    for (const id of ids) {
-      const el = this.layout().byId.get(id)
-      if (!el) continue
-      const a = this.host.anchorFor?.(el.y)
-      if (a) patches.push([id, { anchor: a.anchor, dy: Math.round((el.y - a.top) * 100) / 100, y: el.y }])
-      else if (source(el).anchor) patches.push([id, { anchor: undefined, dy: undefined, y: el.y }])
-    }
+    const patches = this.pinPatches(touchingGroups(this.layout(), ids))
     if (patches.length) this.store.update(patches)
+  }
+
+  // Groups pinned to more than one line: such a group was drawn piece by piece
+  // before groups were pinned as one. Pin each to its top line, once, without
+  // moving anything or making an undo step. Nothing to do: nothing is written.
+  repinSplitGroups() {
+    if (this.mode !== 'note' || this.readOnly) return
+    const layout = this.layout()
+    const key = (el) => JSON.stringify(source(el).anchor ?? null)
+    const split = touchingGroups(layout, layout.list.map((el) => el.id)).filter((g) => g.length > 1 && new Set(g.map(key)).size > 1)
+    const patches = this.pinPatches(split)
+    if (patches.length) this.store.silentUpdate(patches)
+  }
+
+  // anchor + dy for each element of each group, from the group's top line
+  pinPatches(groups) {
+    if (this.mode !== 'note') return []
+    const round = (n) => Math.round(n * 100) / 100
+    const patches = []
+    for (const group of groups) {
+      const a = this.host.anchorFor?.(Math.min(...group.map((el) => el.y)))
+      for (const el of group) {
+        const src = source(el)
+        if (!a) {
+          if (src.anchor) patches.push([el.id, { anchor: undefined, dy: undefined, y: el.y }])
+          continue
+        }
+        const dy = round(el.y - a.top)
+        if (src.dy === dy && src.y === el.y && JSON.stringify(src.anchor) === JSON.stringify(a.anchor)) continue
+        patches.push([el.id, { anchor: a.anchor, dy, y: el.y }])
+      }
+    }
+    return patches
   }
 
   // ---------- handles ----------
@@ -1144,6 +1174,7 @@ export class CanvasController {
       const copies = cloneElements(clip, 0, this.store.maxZ() + 1).map((el) => ({ ...el, x: el.x + (at.x - (b.x + b.w / 2)), y: el.y + (at.y - (b.y + b.h / 2)) }))
       this.store.checkpoint()
       this.store.add(copies.map((c) => this.anchorize(c)))
+      this.reanchor(copies.map((c) => c.id))
       this.set({ selection: copies.map((c) => c.id), tool: 'select' })
       return true
     }

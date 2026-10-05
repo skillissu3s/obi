@@ -4,7 +4,7 @@ import {
   MousePointer2, Hand, Square, Circle, Diamond, MoveUpRight, Minus, Pencil, Highlighter, Type, Heading, StickyNote, ImagePlus, Link2,
   Frame, Eraser, Pointer, Lock, LockOpen, Copy, Trash2, Group, Ungroup, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter,
-  AlignLeft, AlignCenter, AlignRight, SlidersHorizontal, ChevronsDown, Link as LinkIcon, ArrowUpToLine, ArrowDownToLine, ChevronUp,
+  AlignLeft, AlignCenter, AlignRight, ChevronsDown, Link as LinkIcon, ArrowUpToLine, ArrowDownToLine, ChevronUp,
   ChevronDown, FileText,
 } from 'lucide-react'
 import { STROKE_COLORS, STICKY_COLORS, colorCss, fillCss, stickyCss, DEFAULTS } from '@shared/boardsvg.js'
@@ -82,7 +82,7 @@ export function Toolbar({ ctl, extra, onCollapse }) {
 
 // ---------- popovers ----------
 
-function Popover({ anchor, onClose, children }) {
+function Popover({ anchor, onClose, side = false, avoid = null, children }) {
   const ref = useRef(null)
   const [pos, setPos] = useState(null)
   useLayoutEffect(() => {
@@ -90,6 +90,19 @@ function Popover({ anchor, onClose, children }) {
     const place = () => {
       const r = anchor.getBoundingClientRect()
       const w = ref.current.offsetWidth
+      if (side) {
+        // Beside the button on a selection's corner, clear of the selection
+        // (`avoid`) so what is being styled stays in view: to the right of both
+        // if there is room, else to the left of both, from the button's top down.
+        const a = avoid?.getBoundingClientRect()
+        const right = Math.max(r.right, a?.right ?? -Infinity)
+        const leftEdge = Math.min(r.left, a?.left ?? Infinity)
+        const left = right + 8 + w <= window.innerWidth - 8 ? right + 8 : leftEdge - 8 - w >= 8 ? leftEdge - 8 - w : Math.max(8, window.innerWidth - w - 8)
+        const maxHeight = window.innerHeight - 16
+        const h = Math.min(ref.current.scrollHeight, maxHeight)
+        setPos({ left, top: Math.max(8, Math.min(r.top - 6, window.innerHeight - h - 8)), maxHeight })
+        return
+      }
       const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2))
       // Pinned by its bottom edge, just above the button it belongs to, so it
       // grows upward when its content changes (the fill pattern appears, say)
@@ -99,7 +112,7 @@ function Popover({ anchor, onClose, children }) {
     place()
     window.addEventListener('resize', place)
     return () => window.removeEventListener('resize', place)
-  }, [anchor])
+  }, [anchor, side, avoid])
   useEffect(() => {
     const down = (e) => {
       if (ref.current?.contains(e.target) || anchor?.contains(e.target)) return
@@ -123,18 +136,6 @@ function Popover({ anchor, onClose, children }) {
       {children}
     </div>,
     document.body,
-  )
-}
-
-function PopButton({ title, label, children }) {
-  const [anchor, setAnchor] = useState(null)
-  return (
-    <>
-      <button className={`cv-sbtn ${anchor ? 'open' : ''}`} title={title} onMouseDown={(e) => e.preventDefault()} onClick={(e) => setAnchor(anchor ? null : e.currentTarget)}>
-        {label}
-      </button>
-      {anchor && <Popover anchor={anchor} onClose={() => setAnchor(null)}>{typeof children === 'function' ? children(() => setAnchor(null)) : children}</Popover>}
-    </>
   )
 }
 
@@ -487,41 +488,45 @@ export function StyleBar({ ctl }) {
     const dock = rootRef.current?.closest('.cv-dock')
     setToolAnchor(dock?.querySelector('.cv-tool.active') || null)
   })
-  if (ctl.readOnly || state.editing || state.panning) return null
+  // the anchor element is looked up after render, so the span is always there
   const { sel, subjects } = styleSubjects(ctl, state)
-  if (!subjects.length) return null
-  const panel = (close) => <StylePanel ctl={ctl} tool={state.tool} sel={sel} subjects={subjects} close={close} />
-
-  // Nothing selected, drawing tool in hand: its settings, above its button.
-  if (!sel.length) {
-    const tool = state.tool
-    const hide = () => setDismissed(tool)
-    return (
-      <span ref={rootRef} style={{ display: 'contents' }}>
-        {toolAnchor && dismissed !== tool && (
-          <Popover anchor={toolAnchor} onClose={hide}>
-            {panel(hide)}
-          </Popover>
-        )}
-      </span>
-    )
-  }
-
-  const stroke = subjects.find((el) => appliesTo('stroke', el))?.stroke ?? DEFAULTS.stroke
-  const hasStroke = subjects.some((el) => appliesTo('stroke', el))
+  const tool = state.tool
+  const hide = () => setDismissed(tool)
+  // A drawing tool in hand and nothing selected: its settings, above its button.
+  // (A selection's style opens from the button on its corner: StyleBudPanel.)
+  const show = !ctl.readOnly && !state.editing && !state.panning && !sel.length && subjects.length > 0
   return (
-    <div className="cv-stylebar" ref={rootRef} onPointerDown={(e) => e.stopPropagation()}>
-      <PopButton
-        title="Style and arrangement"
-        label={
-          <>
-            {hasStroke ? <span className="cv-dot" style={{ background: colorCss(stroke) }} /> : <SlidersHorizontal />}
-            <span className="cv-sbtn-label">{sel.length > 1 ? `${sel.length} selected` : 'Style'}</span>
-          </>
-        }
-      >
-        {panel}
-      </PopButton>
-    </div>
+    <span ref={rootRef} style={{ display: 'contents' }}>
+      {show && toolAnchor && dismissed !== tool && (
+        <Popover anchor={toolAnchor} onClose={hide}>
+          <StylePanel ctl={ctl} tool={tool} sel={sel} subjects={subjects} close={hide} />
+        </Popover>
+      )}
+    </span>
+  )
+}
+
+/**
+ * A selection's style panel, opened from the small button just outside its
+ * top-right corner (StyleBud in CanvasLayer.jsx) and shown beside it. Closes
+ * when the selection changes, and stays shut until the button is pressed again.
+ */
+export function StyleBudPanel({ ctl }) {
+  const state = useController(ctl)
+  const [anchor, setAnchor] = useState(null)
+  const key = state.selection.join(',')
+  useEffect(() => setAnchor(null), [key, state.tool])
+  useEffect(() => {
+    const open = (e) => e.detail?.ctl === ctl && setAnchor((now) => (now === e.detail.anchor ? null : e.detail.anchor))
+    window.addEventListener('obi:style-bud', open)
+    return () => window.removeEventListener('obi:style-bud', open)
+  }, [ctl])
+  const { sel, subjects } = styleSubjects(ctl, state)
+  if (!anchor || !anchor.isConnected || ctl.readOnly || state.editing || !sel.length || !subjects.length) return null
+  const close = () => setAnchor(null)
+  return (
+    <Popover anchor={anchor} onClose={close} side avoid={anchor.parentElement?.querySelector('.cv-sel-box:not(.soft)')}>
+      <StylePanel ctl={ctl} tool={state.tool} sel={sel} subjects={subjects} close={close} />
+    </Popover>
   )
 }

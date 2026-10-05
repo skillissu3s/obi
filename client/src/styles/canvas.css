@@ -661,21 +661,46 @@ svg.cv-el {
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
-.cv-stylebar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border-radius: var(--radius-lg);
+/* a selection's style: the round button just outside its top-right corner,
+   counter-scaled like the handles so it is the same size at any zoom */
+.cv-style-bud {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: calc(28px * var(--inv, 1));
+  height: calc(28px * var(--inv, 1));
+  margin: calc(-14px * var(--inv, 1)) 0 0 calc(-14px * var(--inv, 1));
+  padding: 0;
+  border: none;
+  border-radius: 50%;
   background: var(--bg-elev);
-  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-strong);
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-  animation: popIn 160ms var(--ease);
+  color: var(--text-2);
+  box-shadow: 0 calc(2px * var(--inv, 1)) calc(8px * var(--inv, 1)) rgba(0, 0, 0, 0.28), 0 0 0 calc(1px * var(--inv, 1)) var(--border-strong);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  animation: fadeIn 140ms var(--ease);
+  transition: color var(--t-fast), box-shadow var(--t-fast);
 }
-.cv-stylebar::-webkit-scrollbar {
-  display: none;
+.cv-style-bud:hover,
+.cv-style-bud:focus-visible {
+  color: var(--accent-text);
+  box-shadow: 0 calc(2px * var(--inv, 1)) calc(10px * var(--inv, 1)) rgba(0, 0, 0, 0.32), 0 0 0 calc(1.5px * var(--inv, 1)) var(--accent);
+  outline: none;
+}
+.cv-style-bud svg {
+  width: calc(14px * var(--inv, 1));
+  height: calc(14px * var(--inv, 1));
+}
+/* the selection's stroke colour, as a dot on the button */
+.cv-style-bud i {
+  position: absolute;
+  right: calc(1px * var(--inv, 1));
+  bottom: calc(1px * var(--inv, 1));
+  width: calc(9px * var(--inv, 1));
+  height: calc(9px * var(--inv, 1));
+  border-radius: 50%;
+  box-shadow: 0 0 0 calc(1.5px * var(--inv, 1)) var(--bg-elev);
 }
 .cv-sbtn {
   height: 30px;

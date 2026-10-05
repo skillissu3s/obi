@@ -20,7 +20,7 @@ import { setAnnotations, annotationAt } from '../editor/annotations.js'
 import { useBoardStore, useCanvasCtx, pickImageFiles } from './BoardCanvas.jsx'
 import { CanvasController } from './controller.js'
 import { CanvasLayer, useController } from './CanvasLayer.jsx'
-import { Toolbar, StyleBar } from './Toolbar.jsx'
+import { Toolbar, StyleBar, StyleBudPanel } from './Toolbar.jsx'
 import { AnchorTracker, makeAnchor, makeLineAnchor } from './anchors.js'
 import { newElementId, newSeed } from './store.js'
 import { visualBounds, source } from './layout.js'
@@ -311,6 +311,31 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     if (ctl && env) ctl.setEnv(env)
   }, [ctl, env])
 
+  // A picture drawn piece by piece before touching drawings were pinned as one
+  // can be pinned to several lines, so new text inside it would pull it apart.
+  // Once the drawings are in and the note laid out, pin each such group to its
+  // top line (pinning.js). Nothing moves, and where there is nothing to fix,
+  // nothing is written.
+  useEffect(() => {
+    if (!ctl || !store) return
+    let done = false
+    let timer = 0
+    const check = () => {
+      if (done || store.readOnly || !store.getSnapshot().list.length) return
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        done = true
+        ctl.repinSplitGroups()
+      }, 1200)
+    }
+    check()
+    const off = store.subscribe(check)
+    return () => {
+      off()
+      clearTimeout(timer)
+    }
+  }, [ctl, store])
+
   const state = useController(ctl || DUMMY)
 
   // Drawings can sit well beside the text — off the screen on a phone, or
@@ -555,7 +580,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     // page's own scrolling (the scroll area is touch-action: pan-y)
     let swipe = null
     const onPointerDown = (e) => {
-      if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .nc-edge, .cv-pop, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
+      if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .nc-edge, .cv-pop, .cv-style-bud, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
       if (e.target.closest?.('.cv-edit, .cv-edit-frame')) return
       measure()
       const handled = ctl.onPointerDown(e)
@@ -955,6 +980,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           </button>
         </div>
       )}
+      <StyleBudPanel ctl={ctl} />
       <div className={`cv-dock ${open ? '' : 'is-tucked'}`}>
         {(open || state.selection.length > 0) && <StyleBar ctl={ctl} />}
         {open ? (

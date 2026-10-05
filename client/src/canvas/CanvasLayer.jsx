@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { SlidersHorizontal } from 'lucide-react'
+import { colorCss } from '@shared/boardsvg.js'
 import { unionBounds, isLinear, sampleSmooth, midPoint } from '@shared/boardgeom.js'
 import { ElementView } from './ElementView.jsx'
 import { visualBounds, visiblePoints, handlePoints, source } from './layout.js'
@@ -81,6 +83,7 @@ function Overlay({ ctl, state, layout, zoom, peers }) {
         })}
       {single && isLinear(single) && single.type !== 'pen' && <PointHandles el={single} show={showHandles && !single.locked} />}
       {showHandles && <ArrowBuds el={budTarget} inv={inv} />}
+      {showHandles && box && <StyleBud ctl={ctl} box={box} pad={pad} inv={inv} selected={selected} />}
       {state.marquee && <div className="cv-marquee" style={rectStyle(state.marquee)} />}
       {state.bindHint && <div className="cv-bind-hint" style={rectStyle(state.bindHint, 4 * inv)} />}
       {state.snapLines.map((l, i) => (
@@ -112,6 +115,28 @@ function ArrowBuds({ el, inv }) {
         <div key={side} className="cv-arrowbud" data-arrowbud={side} data-owner={el.id} style={{ left: x, top: y }} title="Drag to connect" />
       ))}
     </>
+  )
+}
+
+// The way into a selection's style: a small round button just outside its
+// top-right corner, clear of the corner handle and the arrow buds, the same size
+// at any zoom. StyleBudPanel (Toolbar.jsx) opens the panel beside it.
+function StyleBud({ ctl, box, pad, inv, selected }) {
+  const stroke = selected.find((el) => el.stroke && el.type !== 'image')?.stroke
+  return (
+    <button
+      type="button"
+      className="cv-style-bud"
+      data-style-bud
+      title={selected.length > 1 ? `Style ${selected.length} items` : 'Style'}
+      aria-label="Style"
+      style={{ left: box.x + box.w + pad + 22 * inv, top: box.y - pad - 6 * inv }}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={(e) => window.dispatchEvent(new CustomEvent('obi:style-bud', { detail: { ctl, anchor: e.currentTarget } }))}
+    >
+      <SlidersHorizontal />
+      {stroke && <i style={{ background: colorCss(stroke) }} />}
+    </button>
   )
 }
 
