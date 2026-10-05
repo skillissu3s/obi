@@ -18,8 +18,11 @@ let cache = { at: 0, release: null }
 
 const PLATFORMS = {
   windows: [/\.exe$/i],
-  mac: [/(universal|-mac).*\.dmg$/i, /arm64.*\.dmg$/i, /\.dmg$/i, /\.pkg$/i],
+  mac: [/(universal|-mac).*\.dmg$/i, /\.dmg$/i, /\.pkg$/i],
   linux: [/\.appimage$/i, /\.deb$/i, /\.rpm$/i],
+  // the Linux packages one by one, for a page that offers both
+  appimage: [/\.appimage$/i],
+  deb: [/\.deb$/i],
 }
 const ALIASES = { win: 'windows', win32: 'windows', macos: 'mac', osx: 'mac', darwin: 'mac' }
 
@@ -76,19 +79,28 @@ async function handle(req, res) {
     .send(page(`No ${wanted} build in the latest release`, `<p>The other platforms may be there.</p><p><a href="${release?.html_url || releasesPage}">See all downloads</a></p>`))
 }
 
-// What the intro page shows on its download button: the version and size of
-// the latest Windows build, straight from the cached release.
+// The build a platform's link hands out, as /download/<platform> picks it
+const assetFor = (release, platform) => {
+  for (const re of PLATFORMS[platform]) {
+    const hit = release?.assets?.find((a) => re.test(a.name))
+    if (hit) return { size: hit.size, name: hit.name }
+  }
+  return null
+}
+
+// What the intro page shows on its download links: the version, and the size of
+// each platform's build (null for one the latest release doesn't have).
 downloadRouter.get('/info', async (req, res) => {
   res.setHeader('Cache-Control', 'public, max-age=300')
   if (!DOWNLOAD_REPO) return res.json({ available: false })
   const release = await latestRelease()
-  const exe = release?.assets?.find((a) => PLATFORMS.windows.some((re) => re.test(a.name)))
-  if (!exe) return res.json({ available: false })
+  const builds = Object.fromEntries(['windows', 'mac', 'appimage', 'deb'].map((p) => [p, assetFor(release, p)]))
+  if (!Object.values(builds).some(Boolean)) return res.json({ available: false })
   res.json({
     available: true,
     version: String(release.tag_name || '').replace(/^v/, ''),
     publishedAt: release.published_at,
-    windows: { size: exe.size, name: exe.name },
+    ...builds,
   })
 })
 

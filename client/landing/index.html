@@ -45,7 +45,7 @@
           </p>
           <div class="cta">
             <a class="btn btn-solid" href="/register">create an account <span class="arr">→</span></a>
-            <a class="btn" href="#desktop">download for windows</a>
+            <a class="btn" id="hero-dl" href="#desktop">get the desktop app</a>
           </div>
         </div>
         <div class="wrap">
@@ -147,19 +147,32 @@
               <li>Edits on both sides merge; collisions keep both copies</li>
               <li>Optional GitHub sync — on save, on a timer, or by hand</li>
             </ul>
-            <a class="dl" href="/download/windows">
-              <span class="dl-name">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.2 10.2 4.2v7.1H3zM11.2 4.05 21 2.7v8.6h-9.8zM3 12.3h7.2v7.1L3 18.4zM11.2 12.3H21v8.6l-9.8-1.35z" /></svg>
-                download for windows
-              </span>
-              <span class="dl-meta" id="dl-meta">windows 10 / 11</span>
-              <span class="dl-arrow" aria-hidden="true">↓</span>
-            </a>
-            <ul class="soon">
-              <li>macos <span>upcoming</span></li>
-              <li>linux <span>upcoming</span></li>
-            </ul>
-            <p class="caption">Not code-signed yet: if Windows says it “protected your PC”, choose More info → Run anyway.</p>
+            <div class="dls">
+              <a class="dl" href="/download/windows" data-os="windows">
+                <span class="dl-name"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.2 10.2 4.2v7.1H3zM11.2 4.05 21 2.7v8.6h-9.8zM3 12.3h7.2v7.1L3 18.4zM11.2 12.3H21v8.6l-9.8-1.35z" /></svg> windows</span>
+                <span class="dl-meta" id="dl-windows">windows 10 / 11</span>
+                <span class="dl-arrow" aria-hidden="true">↓</span>
+              </a>
+              <a class="dl" href="/download/mac" data-os="mac">
+                <span class="dl-name"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.37 1.43c0 1.14-.49 2.27-1.18 3.08-.74.9-1.99 1.57-2.99 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.57-2.27 1.21-2.98.8-.94 2.14-1.64 3.25-1.68.03.13.05.28.05.43zm4.56 15.71c-.03.07-.46 1.58-1.52 3.12-.94 1.34-1.94 2.71-3.43 2.71-1.52 0-1.9-.88-3.63-.88-1.7 0-2.3.91-3.67.91-1.38 0-2.33-1.26-3.43-2.8C4 18.37 2.96 15.56 2.96 12.91c0-4.28 2.8-6.55 5.55-6.55 1.45 0 2.68.95 3.6.95.87 0 2.22-1.01 3.9-1.01.61 0 2.89.06 4.37 2.19-.13.09-2.38 1.37-2.38 4.19 0 3.26 2.85 4.42 2.96 4.45z" /></svg> macos</span>
+                <span class="dl-meta" id="dl-mac">apple silicon &amp; intel</span>
+                <span class="dl-arrow" aria-hidden="true">↓</span>
+              </a>
+              <div class="dl dl-multi" data-os="linux">
+                <span class="dl-name"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6" /><path d="M12 19h8" /></svg> linux</span>
+                <span class="dl-meta" id="dl-linux">x64</span>
+                <span class="dl-pick">
+                  <a href="/download/appimage">appimage ↓</a>
+                  <a href="/download/deb">.deb ↓</a>
+                </span>
+              </div>
+            </div>
+            <details class="firstrun">
+              <summary>first launch</summary>
+              <p><b>windows</b> isn't code-signed yet: if it says it “protected your PC”, choose More info → Run anyway.</p>
+              <p><b>macos</b> isn't from the App Store: open it once from System Settings → Privacy &amp; Security → Open Anyway.</p>
+              <p><b>linux</b> AppImage: make it executable and run it. The .deb: <code>sudo apt install ./Obi-Setup-*.deb</code></p>
+            </details>
           </div>
           <figure class="shot">
             <img src="./shot-desktop.png" width="720" height="520" alt="The desktop app asking where your notes should live: sync with an Obi account, or keep everything on this computer" loading="lazy" />
@@ -204,18 +217,33 @@
         <span>obi — your notes, your files</span>
         <span class="spacer"></span>
         <a href="https://github.com/skillissu3s/obi">github</a>
-        <a href="/download/windows">download</a>
+        <a href="#desktop">download</a>
         <a href="/login">sign in</a>
       </div>
     </footer>
 
     <script>
-      // the download names the build it hands out
+      // this visitor's computer: its row is marked and the hero button names it
+      ;(function () {
+        var ua = navigator.userAgent.toLowerCase()
+        var plat = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '').toLowerCase()
+        var phone = /android|iphone|ipad|ipod|mobile/.test(ua)
+        var os = phone ? null : /mac/.test(plat) ? 'mac' : /win/.test(plat) ? 'windows' : /linux|x11|cros/.test(plat + ua) ? 'linux' : null
+        if (!os) return
+        var row = document.querySelector('.dl[data-os="' + os + '"]')
+        if (row) row.classList.add('mine')
+        document.getElementById('hero-dl').textContent = 'download for ' + (os === 'mac' ? 'macos' : os)
+      })()
+      // each link names the build it hands out
       fetch('/download/info')
         .then((r) => (r.ok ? r.json() : null))
         .then((info) => {
           if (!info || !info.available) return
-          document.getElementById('dl-meta').textContent = 'v' + info.version + ' · ' + Math.round(info.windows.size / 1048576) + ' MB'
+          var mb = (b) => Math.round(b.size / 1048576) + ' MB'
+          var v = 'v' + info.version
+          if (info.windows) document.getElementById('dl-windows').textContent = v + ' · ' + mb(info.windows)
+          if (info.mac) document.getElementById('dl-mac').textContent = v + ' · ' + mb(info.mac)
+          if (info.appimage) document.getElementById('dl-linux').textContent = v + ' · x64'
         })
         .catch(() => {})
     </script>

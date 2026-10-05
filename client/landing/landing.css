@@ -378,21 +378,79 @@ h3 {
   transform: translateY(2px);
   color: var(--accent);
 }
-.soon {
+/* the rest of the downloads, under the first */
+.dls {
   display: flex;
-  gap: 20px;
-  margin: 12px 0 0;
-  padding: 0 2px;
-  list-style: none;
+  flex-direction: column;
+  gap: 8px;
+}
+/* the visitor's own computer */
+.dl.mine {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2));
+}
+.dl.mine .dl-name::after {
+  content: 'yours';
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 18px;
+}
+/* linux: one row, two packages */
+.dl-multi:hover {
+  background: none;
+}
+.dl-pick {
+  display: flex;
+  gap: 6px;
+}
+.dl-pick a {
+  padding: 2px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 5px;
+  color: var(--text-2);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 120ms, color 120ms;
+}
+.dl-pick a:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.firstrun {
+  margin-top: 14px;
   color: var(--text-3);
   font-size: 12.5px;
 }
-.soon span {
-  margin-left: 6px;
-  padding: 1px 6px;
-  border: 1px dashed var(--line-2);
-  border-radius: 4px;
-  font-size: 11px;
+.firstrun summary {
+  cursor: pointer;
+  width: max-content;
+  list-style: none;
+}
+.firstrun summary::-webkit-details-marker {
+  display: none;
+}
+.firstrun summary::before {
+  content: '+ ';
+  color: var(--accent);
+}
+.firstrun[open] summary::before {
+  content: '− ';
+}
+.firstrun p {
+  margin: 8px 0 0;
+}
+.firstrun b {
+  color: var(--text-2);
+  font-weight: 600;
+  margin-right: 4px;
+}
+.firstrun code {
+  font-size: 11.5px;
 }
 
 pre {
@@ -484,7 +542,8 @@ footer {
     order: 3;
     padding-left: 25px;
   }
-  .dl-arrow {
+  .dl-arrow,
+  .dl-pick {
     margin-left: auto;
   }
 }

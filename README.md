@@ -317,8 +317,16 @@ the server address on the sign-in screen. For development,
 `OBI_DESKTOP=1 OBI_DESKTOP_WEB=1 npm run start` serves the desktop UI to a
 browser at `/desktop-web`, with folders created under `OBI_DESKTOP_WEB_DIR`.
 
-The installers are not code-signed, so Windows SmartScreen and macOS
-Gatekeeper warn on first launch until signing is set up in `package.json → build`.
+Pushing a `vX.Y.Z` tag (matching `package.json`) builds the Windows `.exe`, a
+universal macOS `.dmg` (Apple silicon and Intel) and the Linux AppImage and
+`.deb` on GitHub Actions, and attaches them to a draft release; publishing it
+moves the intro page's download links to the new version.
+
+The installers are not signed with a paid certificate: Windows SmartScreen asks
+for *More info → Run anyway*, and macOS (the app is ad-hoc signed, not
+notarised) asks for *System Settings → Privacy & Security → Open Anyway* the
+first time. Real signing goes in `package.json → build` when you have the
+certificates.
 
 ---
 
