@@ -1,25 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Upload, Shuffle, RotateCcw, Pipette } from 'lucide-react'
+import { useRef, useState, useSyncExternalStore } from 'react'
+import { Image as ImageIcon, ImagePlus, RotateCcw, Pipette, Trash2 } from 'lucide-react'
 import { Segmented, Spinner } from '../ui.jsx'
-import { WallpaperCredit } from '../WallpaperCredit.jsx'
 import { usePrefs } from '../../store/prefs.js'
 import { toast } from '../../store/ui.js'
-import { COLOURS, GRADIENTS, DEFAULT_WALLPAPER, PANEL_MIN, plateFloor, isPhoto, wallpaperVars, getOwnImage } from '../../lib/wallpaper.js'
-import { wallpaperProviders, searchWallpapers, chooseWallpaper, shuffleWallpaper, saveOwnWallpaper, setWallpaper, confirmLeavingOwn } from '../../lib/wallpaperSource.js'
+import { COLOURS, GRADIENTS, DEFAULT_WALLPAPER, PANEL_MIN, plateFloor, isPhoto, wallpaperVars, getOwnImage, subscribeOwnImage } from '../../lib/wallpaper.js'
+import { saveOwnWallpaper, setWallpaper, backToOwnPicture, removeOwnWallpaper } from '../../lib/wallpaperSource.js'
 
-// Settings → Appearance → Background: a live preview, where the picture comes
-// from, and how it sits behind the app.
+// Settings → Appearance → Background: a live preview, a colour or your own
+// picture, and how it sits behind the app.
 
 const TABS = [
   { value: 'none', label: 'None' },
-  { value: 'colours', label: 'Colours' },
-  { value: 'photos', label: 'Photos' },
-  { value: 'own', label: 'Your image' },
+  { value: 'colour', label: 'Colour' },
+  { value: 'image', label: 'Image' },
 ]
-const TAB_OF = { none: 'none', colour: 'colours', gradient: 'colours', image: 'photos', own: 'own' }
+const TAB_OF = { none: 'none', colour: 'colour', gradient: 'colour', own: 'image' }
 
-// Leaving a picture from this device deletes it, so a change of background that does asks first.
-const change = async (patch) => (await confirmLeavingOwn()) && setWallpaper(patch)
+const useOwnImage = () => useSyncExternalStore(subscribeOwnImage, getOwnImage)
 
 // the same markup as a setting in Settings.jsx
 function Row({ name, desc, children }) {
@@ -36,6 +33,7 @@ function Row({ name, desc, children }) {
 
 export function WallpaperSettings() {
   const w = usePrefs((s) => s.wallpaper)
+  const own = useOwnImage()
   const [tab, setTab] = useState(TAB_OF[w.kind])
   return (
     <>
@@ -43,7 +41,7 @@ export function WallpaperSettings() {
         <h3 className="palette-group-title">
           <ImageIcon /> Background
         </h3>
-        <div className="wp-preview" style={wallpaperVars(w, getOwnImage()) || undefined}>
+        <div className="wp-preview" style={wallpaperVars(w, own) || undefined}>
           <div className="wp-mock-side" />
           <div className="wp-mock-page">
             <i />
@@ -51,7 +49,6 @@ export function WallpaperSettings() {
             <i />
             <i />
           </div>
-          {w.kind === 'image' && <WallpaperCredit image={w.image} />}
         </div>
       </div>
 
@@ -59,16 +56,16 @@ export function WallpaperSettings() {
         <Segmented
           value={tab}
           options={TABS}
-          onChange={async (v) => {
-            if (v === 'none' && !(await confirmLeavingOwn())) return
+          onChange={(v) => {
             setTab(v)
             if (v === 'none') setWallpaper({ kind: 'none' })
+            // your picture is still on this device: picking the tab puts it back
+            if (v === 'image' && own && w.kind !== 'own') backToOwnPicture()
           }}
         />
       </div>
-      {tab === 'colours' && <Colours w={w} />}
-      {tab === 'photos' && <Photos w={w} />}
-      {tab === 'own' && <OwnImage w={w} />}
+      {tab === 'colour' && <Colours w={w} />}
+      {tab === 'image' && <OwnImage w={w} own={own} />}
       {w.kind !== 'none' && <Controls w={w} />}
     </>
   )
@@ -78,15 +75,17 @@ function Colours({ w }) {
   const custom = w.kind === 'colour' && !COLOURS.includes(w.value)
   return (
     <>
+      <div className="wp-label">Solid</div>
       <div className="wp-swatches">
         {COLOURS.map((c) => (
-          <button key={c} className={`wp-swatch ${w.kind === 'colour' && w.value === c ? 'active' : ''}`} style={{ background: c }} title={c} aria-label={`Colour ${c}`} onClick={() => change({ kind: 'colour', value: c })} />
+          <button key={c} className={`wp-swatch ${w.kind === 'colour' && w.value === c ? 'active' : ''}`} style={{ background: c }} title={c} aria-label={`Colour ${c}`} onClick={() => setWallpaper({ kind: 'colour', value: c })} />
         ))}
-        <label className={`wp-swatch wp-custom ${custom ? 'active' : ''}`} title="Any colour">
+        <label className={`wp-swatch wp-custom ${custom ? 'active' : ''}`} title="Any colour" style={custom ? { background: w.value } : undefined}>
           <Pipette />
-          <input type="color" value={w.kind === 'colour' ? w.value : '#336699'} onChange={(e) => change({ kind: 'colour', value: e.target.value })} />
+          <input type="color" aria-label="Any colour" value={w.kind === 'colour' ? w.value : '#336699'} onChange={(e) => setWallpaper({ kind: 'colour', value: e.target.value })} />
         </label>
       </div>
+      <div className="wp-label">Gradient</div>
       <div className="wp-swatches">
         {GRADIENTS.map((g) => (
           <button
@@ -95,7 +94,7 @@ function Colours({ w }) {
             style={{ backgroundColor: g.color, backgroundImage: g.image }}
             title={g.name}
             aria-label={`Gradient ${g.name}`}
-            onClick={() => change({ kind: 'gradient', value: g.id })}
+            onClick={() => setWallpaper({ kind: 'gradient', value: g.id })}
           />
         ))}
       </div>
@@ -103,156 +102,11 @@ function Colours({ w }) {
   )
 }
 
-// blank: pages in a row that came back with nothing in them. A few are looked past by themselves.
-const EMPTY = { items: [], page: 0, more: false, loading: false, error: '', name: '', blank: 0 }
-const MAX_BLANK = 3
-
-function Photos({ w }) {
-  const [providers, setProviders] = useState(null)
-  const [loadError, setLoadError] = useState('')
-  const [provider, setProvider] = useState(w.pool?.provider || w.image?.provider || '')
-  const [input, setInput] = useState(w.pool?.q || '')
-  const [q, setQ] = useState(input)
-  const [list, setList] = useState(EMPTY)
-  const [picking, setPicking] = useState('')
-  const latest = useRef(0)
-  const sentinel = useRef(null)
-  const current = providers?.find((p) => p.id === provider)
-
-  useEffect(() => {
-    wallpaperProviders().then(
-      (all) => {
-        setProviders(all)
-        setProvider((now) => (all.some((p) => p.id === now) ? now : (all.find((p) => p.available) || all[0]).id))
-      },
-      (e) => setLoadError(e.message),
-    )
-  }, [])
-
-  useEffect(() => {
-    const t = setTimeout(() => setQ(input.trim()), 450)
-    return () => clearTimeout(t)
-  }, [input])
-
-  // a newer request makes any older one still on its way irrelevant
-  function load(page) {
-    const mine = ++latest.current
-    setList((l) => ({ ...l, loading: true, error: '', ...(page === 1 && { items: [], more: false, page: 0, blank: 0 }) }))
-    searchWallpapers(provider, q, page).then(
-      // the server may have passed over empty pages: `r.page` is the one the pictures came from
-      (r) => mine === latest.current && setList((l) => ({ items: page === 1 ? r.items : [...l.items, ...r.items], page: r.page ?? page, more: r.more, loading: false, error: '', name: r.providerName, blank: r.items.length ? 0 : l.blank + 1 })),
-      (e) => mine === latest.current && setList((l) => ({ ...l, loading: false, error: e.message })),
-    )
-  }
-  useEffect(() => {
-    if (current?.available) load(1)
-    else setList(EMPTY)
-  }, [provider, q, current?.available])
-
-  // more as the end of the grid scrolls into view
-  useEffect(() => {
-    // after a few blank pages in a row the More button is left to the person
-    if (!list.more || list.loading || list.error || list.blank >= MAX_BLANK) return
-    // nothing on that page, so there is nothing to scroll to: look at the next one
-    if (list.blank) return void load(list.page + 1)
-    if (!sentinel.current) return
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && load(list.page + 1), { rootMargin: '300px' })
-    io.observe(sentinel.current)
-    return () => io.disconnect()
-  }, [list.more, list.loading, list.error, list.page, list.blank])
-
-  async function pick(item) {
-    setPicking(item.id)
-    try {
-      await chooseWallpaper(item, { q, providerName: list.name })
-    } catch (e) {
-      toast.error(e)
-    }
-    setPicking('')
-  }
-
-  return (
-    <>
-      <div className="wp-bar">
-        <select className="select" value={provider} onChange={(e) => setProvider(e.target.value)} aria-label="Photo source">
-          {providers?.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-              {p.available ? '' : ' (needs a key)'}
-            </option>
-          ))}
-        </select>
-        {current?.supportsSearch && current.available && <input className="input" type="search" placeholder={`Search ${current.name}`} value={input} onChange={(e) => setInput(e.target.value)} />}
-      </div>
-      {loadError && <div className="wp-notice error">{loadError}</div>}
-      {!providers && !loadError && <Spinner />}
-      {current && !current.available && (
-        <div className="wp-notice">
-          <b>{current.name} isn't set up on this server.</b> Whoever runs it needs to set <code>{current.keyEnv}</code> in its environment and restart
-          {current.keyUrl && (
-            <>
-              {' '}
-              (a free key is available from{' '}
-              <a href={current.keyUrl} target="_blank" rel="noopener noreferrer">
-                {new URL(current.keyUrl).hostname}
-              </a>
-              )
-            </>
-          )}
-          .
-        </div>
-      )}
-      {current?.available && (
-        <p className="setting-desc wp-hint">
-          {q ? `Results for “${q}”.` : `${current.featured}.`} {current.licenseNote}
-        </p>
-      )}
-      {(list.items.length > 0 || list.loading || list.error || list.more) && (
-        <div className="wp-scroll">
-          <div className="wp-grid">
-            {list.items.map((item) => (
-              <button
-                key={item.id}
-                className={`wp-tile ${w.image?.provider === item.provider && w.image.id === item.id ? 'active' : ''} ${picking === item.id ? 'busy' : ''}`}
-                title={[item.title, item.author].filter(Boolean).join(' — ')}
-                disabled={!!picking}
-                onClick={() => pick(item)}
-              >
-                <img src={item.thumb} alt={item.title || item.author || ''} loading="lazy" />
-                {item.author && <span className="wp-by">{item.author}</span>}
-                {picking === item.id && <Spinner />}
-              </button>
-            ))}
-          </div>
-          <div className="wp-more" ref={sentinel}>
-            {list.loading && <Spinner />}
-            {list.error && (
-              <>
-                <span className="wp-notice error">{list.error}</span>
-                <button className="btn btn-sm" onClick={() => load(list.page + 1)}>
-                  Try again
-                </button>
-              </>
-            )}
-            {!list.loading && !list.error && list.more && (
-              <button className="btn btn-sm" onClick={() => load(list.page + 1)}>
-                More
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      {!list.loading && !list.error && !list.more && list.page > 0 && !list.items.length && <p className="setting-desc wp-hint">Nothing found.</p>}
-    </>
-  )
-}
-
-function OwnImage({ w }) {
+function OwnImage({ w, own }) {
   const file = useRef(null)
   const [busy, setBusy] = useState(false)
-  async function choose(e) {
-    const picked = e.target.files?.[0]
-    e.target.value = ''
+  const [over, setOver] = useState(false)
+  async function take(picked) {
     if (!picked) return
     setBusy(true)
     try {
@@ -262,45 +116,70 @@ function OwnImage({ w }) {
     }
     setBusy(false)
   }
+  const drop = {
+    onDragOver: (e) => {
+      if (![...e.dataTransfer.types].includes('Files')) return
+      e.preventDefault()
+      setOver(true)
+    },
+    onDragLeave: (e) => !e.currentTarget.contains(e.relatedTarget) && setOver(false),
+    onDrop: (e) => {
+      e.preventDefault()
+      setOver(false)
+      take(e.dataTransfer.files?.[0])
+    },
+  }
+  const input = (
+    <input
+      ref={file}
+      type="file"
+      accept="image/*"
+      hidden
+      onChange={(e) => {
+        const picked = e.target.files?.[0]
+        e.target.value = ''
+        take(picked)
+      }}
+    />
+  )
+  if (!own)
+    return (
+      <>
+        <button type="button" className={`wp-drop ${over ? 'over' : ''}`} disabled={busy} onClick={() => file.current.click()} {...drop}>
+          {busy ? <Spinner /> : <ImagePlus />}
+          <span className="wp-drop-title">{busy ? 'Preparing your picture…' : 'Choose an image'}</span>
+          <span className="wp-drop-hint">or drop one here · JPG, PNG, WebP</span>
+        </button>
+        {input}
+        <p className="setting-desc wp-hint">It stays on this device. It isn't synced, and it is never written into your notes or repository.</p>
+      </>
+    )
   return (
     <>
-      <div className="wp-bar">
-        <button className="btn" disabled={busy} onClick={() => file.current.click()}>
-          <Upload /> {w.kind === 'own' ? 'Choose another…' : 'Choose an image…'}
-        </button>
-        {w.kind === 'own' && (
-          <button className="btn btn-ghost" onClick={() => setWallpaper({ kind: 'none' })}>
-            Remove
+      <div className={`wp-own ${over ? 'over' : ''}`} {...drop}>
+        <button type="button" className={`wp-own-thumb ${w.kind === 'own' ? 'active' : ''}`} title="Use this picture" onClick={backToOwnPicture} style={{ backgroundImage: `url(${JSON.stringify(own.url)})` }} aria-label="Use your picture" />
+        <div className="wp-own-actions">
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => file.current.click()}>
+            {busy ? <Spinner size="sm" /> : <ImagePlus />} Replace…
           </button>
-        )}
-        <input ref={file} type="file" accept="image/*" hidden onChange={choose} />
+          <button type="button" className="btn btn-sm btn-ghost" onClick={removeOwnWallpaper}>
+            <Trash2 /> Remove
+          </button>
+          <p className="setting-desc">Kept on this device only. Drop another picture here to replace it.</p>
+        </div>
       </div>
-      <div className="wp-notice">
-        {w.kind === 'own' && !getOwnImage()
-          ? "This device doesn't have your picture yet. Choose it again here."
-          : "The picture stays in this browser. It isn't synced to your other devices, and it is never written into your notes or repository."}
-      </div>
+      {input}
     </>
   )
 }
 
 function Controls({ w }) {
-  const [busy, setBusy] = useState(false)
   const photo = isPhoto(w)
   const range = (key, min, max, to = (v) => v, from = (v) => v) => (
     <input type="range" className="range" min={min} max={max} value={from(w[key])} onChange={(e) => setWallpaper({ [key]: to(Number(e.target.value)) })} />
   )
-  async function next() {
-    setBusy(true)
-    try {
-      await shuffleWallpaper()
-    } catch (e) {
-      toast.error(e)
-    }
-    setBusy(false)
-  }
   return (
-    <>
+    <div className="wp-controls">
       <Row name="Dim" desc={`${w.dim}%. Darkens a dark theme and lightens a light one, so text stays easy to read.`}>
         {range('dim', 0, 80)}
       </Row>
@@ -341,31 +220,11 @@ function Controls({ w }) {
           />
         </Row>
       )}
-      {w.kind === 'image' && (
-        <>
-          <Row name="Change automatically" desc="Picks another from the same source. Skipped while offline or when your device asks to save data.">
-            <Segmented
-              value={w.rotate}
-              onChange={(rotate) => setWallpaper({ rotate })}
-              options={[
-                { value: 'off', label: 'Off' },
-                { value: 'launch', label: 'Each launch' },
-                { value: 'daily', label: 'Daily' },
-              ]}
-            />
-          </Row>
-          <Row name="Another picture" desc="Also in the command palette as “Shuffle background”.">
-            <button className="btn" disabled={busy} onClick={next}>
-              {busy ? <Spinner size="sm" /> : <Shuffle />} Next one
-            </button>
-          </Row>
-        </>
-      )}
       <Row name="Reset" desc="Back to no background, with every setting here at its default.">
-        <button className="btn" onClick={() => change(DEFAULT_WALLPAPER)}>
+        <button className="btn" onClick={() => setWallpaper(DEFAULT_WALLPAPER)}>
           <RotateCcw /> Reset
         </button>
       </Row>
-    </>
+    </div>
   )
 }

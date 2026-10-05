@@ -29,17 +29,6 @@ globalThis.document = {
   querySelector: () => null,
 }
 
-const photo = {
-  provider: 'pexels',
-  providerName: 'Pexels',
-  id: '2014422',
-  url: 'https://images.pexels.com/photos/2014422/pexels-photo-2014422.jpeg?w=2560',
-  thumb: 'https://images.pexels.com/photos/2014422/pexels-photo-2014422.jpeg?w=350',
-  author: 'Joey Farina',
-  authorUrl: 'https://www.pexels.com/@joey',
-  sourceUrl: 'https://www.pexels.com/photo/2014422/',
-}
-
 // what an older version left behind: no background at all, and a hand-damaged one for the other test
 stored.set('obi:prefs', JSON.stringify({ prefsVersion: 2, theme: 'light', palette: 'sand', wallpaper: { kind: 'image', image: { url: 'javascript:alert(1)' }, blur: 500, dim: 'lots' } }))
 const { usePrefs, DEFAULT_PREFS } = await import('./prefs.js')
@@ -69,14 +58,17 @@ test('preferences synced from a version without backgrounds leave the local one 
 })
 
 test('a synced background replaces the local one, checked like any stored one', () => {
-  usePrefs.getState().hydrate({ prefsVersion: 2, wallpaper: { kind: 'image', image: photo, blur: 12, dim: 120, panelOpacity: 20 } })
+  usePrefs.getState().hydrate({ prefsVersion: 2, wallpaper: { kind: 'gradient', value: 'ocean', blur: 12, dim: 120, panelOpacity: 20 } })
   const w = usePrefs.getState().wallpaper
-  assert.equal(w.kind, 'image')
-  assert.equal(w.image.author, 'Joey Farina')
+  assert.equal(w.kind, 'gradient')
   assert.equal(w.blur, 12)
   assert.equal(w.dim, 80)
   assert.equal(w.panelOpacity, 35)
-  assert.equal(setVars['--wp-image'], `url("${photo.url}")`)
+  assert.match(setVars['--wp-image'], /^linear-gradient\(/)
+
+  // a photo from an online source, as an older version could choose: those are gone, so it is no background
+  usePrefs.getState().hydrate({ prefsVersion: 2, wallpaper: { kind: 'image', image: { provider: 'pexels', id: '1', url: 'https://images.pexels.com/a.jpg' } } })
+  assert.equal(usePrefs.getState().wallpaper.kind, 'none')
 
   usePrefs.getState().hydrate({ prefsVersion: 2, wallpaper: 'garbage' })
   assert.equal(usePrefs.getState().wallpaper.kind, 'none')

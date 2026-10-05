@@ -3,8 +3,6 @@ import { RefreshCw, Check, CloudOff, AlertTriangle, Cloud, Wifi, WifiOff, GitBra
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
-import { usePrefs } from '../store/prefs.js'
-import { WallpaperCredit } from './WallpaperCredit.jsx'
 import { useNoteZoom, zoomLabel, ZOOM_MIN, ZOOM_MAX } from '../store/zoom.js'
 import { syncNow } from '../lib/actions.js'
 import { conn } from '../lib/socket.js'
@@ -68,7 +66,6 @@ export function StatusBar() {
     return pane?.tabs.find((t) => t.id === pane.active)
   })
   const treeMap = useApp((s) => s.treeMap)
-  const photoCredit = usePrefs((s) => (s.wallpaper.kind === 'image' ? s.wallpaper.image : null))
   const [stats, setStats] = useState(null)
   const [saveState, setSaveState] = useState('idle')
   const [, tick] = useState(0)
@@ -171,11 +168,6 @@ export function StatusBar() {
       )}
       <WorkspacePeople people={[...people.values()]} />
       <span className="status-spacer" />
-      {photoCredit && (
-        <span className="status-item">
-          <WallpaperCredit image={photoCredit} />
-        </span>
-      )}
       {/* markdown notes only: a whiteboard zooms by itself (its own controls) */}
       {tab?.kind === 'note' && isNote(tab.path) && <ZoomChip />}
       {tab?.kind === 'note' && tab.ws === wsId && treeMap.get(tab.path)?.mtime > 0 && (

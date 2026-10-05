@@ -18,7 +18,6 @@ import { isDesktop } from './desktop.js'
 import { api } from './api.js'
 import { conn } from './socket.js'
 import * as A from './actions.js'
-import { shuffleWallpaper } from './wallpaperSource.js'
 import { toggleWrap, insertLink, toggleTask, setHeading, toggleQuote } from '../editor/commands.js'
 import { editorCtx } from '../editor/livePreview.js'
 import { dirname, isNote, stripExt, basename } from '@shared/paths.js'
@@ -131,7 +130,6 @@ export function buildCommands() {
     { id: 'new-tab', name: 'New tab', icon: Plus, hotkey: 'Alt+T', group: 'View', run: () => layout.newTab() },
     { id: 'theme', name: `Switch to ${document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'} theme`, icon: document.documentElement.dataset.theme === 'dark' ? Sun : Moon, group: 'View', run: () => prefs.set({ theme: document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark' }) },
     { id: 'readable-width', name: prefs.readableWidth ? 'Use full width' : 'Use readable line width', icon: BookOpen, group: 'View', run: () => prefs.set({ readableWidth: !prefs.readableWidth }) },
-    { id: 'shuffle-background', name: 'Shuffle background', icon: Shuffle, group: 'View', run: () => shuffleWallpaper().catch((e) => toast.error(e)) },
     ...PALETTES.map((p) => ({
       id: `palette-${p.id}`,
       name: `Colour theme: ${p.name}${prefs.palette === p.id ? ' ✓' : ''}`,

@@ -1,21 +1,16 @@
-// The app's background: a colour, a gradient or a picture on one fixed layer
-// behind everything (styles/wallpaper.css draws it from the variables below).
-// Preferences keep a small description; everything the layer needs is worked out
-// here. No DOM is touched until applyWallpaper runs.
-import { formatDate } from './util.js'
+// The app's background: a colour, a gradient or your own picture on one fixed
+// layer behind everything (styles/wallpaper.css draws it from the variables
+// below). Preferences keep a small description; everything the layer needs is
+// worked out here. No DOM is touched until applyWallpaper runs.
 
 export const DEFAULT_WALLPAPER = {
-  kind: 'none', // none | colour | gradient | image (a photo from a source) | own (a file on this device)
+  kind: 'none', // none | colour | gradient | own (a picture from this device)
   value: '', // colour and own: a hex colour (own: the picture's average); gradient: a preset id
-  image: null, // { provider, providerName, id, url, thumb, author, authorUrl, sourceUrl, color?, license? }
   blur: 0, // px, pictures only
   dim: 35, // % of the theme's own background laid over the picture
   panelOpacity: 60, // % — how solid the panels (sidebar, bars, notes, tasks, calendar) stay, within the floor below
   fit: 'cover', // cover | contain | tile
   position: 'center', // top | center | bottom: which part of a cropped picture stays in view
-  rotate: 'off', // off | launch | daily
-  rotatedOn: '', // the day the picture last changed by itself
-  pool: null, // { provider, q }: where the next picture comes from
 }
 
 export const PANEL_MIN = 35
@@ -47,65 +42,33 @@ export const GRADIENTS = [
 const HEX = /^#[0-9a-f]{6}$/i
 const pick = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback)
 const clamp = (v, min, max, fallback) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback)
-const text = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '')
 const is = (re, v) => typeof v === 'string' && re.test(v)
-const httpsUrl = (v) => {
-  try {
-    const u = new URL(v)
-    return u.protocol === 'https:' ? u.href : ''
-  } catch {
-    return ''
-  }
-}
-
-function normalizeImage(i) {
-  if (!i || typeof i !== 'object') return null
-  const url = httpsUrl(i.url)
-  if (!url || !is(/^[a-z]{2,20}$/, i.provider) || !is(/^[\w.:-]{1,80}$/, i.id)) return null
-  return {
-    provider: i.provider,
-    providerName: text(i.providerName, 60) || i.provider,
-    id: i.id,
-    url,
-    thumb: httpsUrl(i.thumb) || url,
-    author: text(i.author, 120),
-    authorUrl: httpsUrl(i.authorUrl),
-    sourceUrl: httpsUrl(i.sourceUrl),
-    ...(is(HEX, i.color) && { color: i.color.toLowerCase() }), // the provider's average colour, shown until the picture is there
-    ...(i.license && { license: text(i.license, 60) }),
-  }
-}
 
 // Whatever was stored — nothing, an older shape, something hand-edited or synced
-// from another version — becomes a complete, in-range description.
+// from another version — becomes a complete, in-range description. (Photos from
+// online sources were dropped: a background stored as one becomes none.)
 export function normalizeWallpaper(raw) {
   const w = raw && typeof raw === 'object' ? raw : {}
-  const image = normalizeImage(w.image)
-  let kind = pick(w.kind, ['none', 'colour', 'gradient', 'image', 'own'], 'none')
+  let kind = pick(w.kind, ['none', 'colour', 'gradient', 'own'], 'none')
   let value = ''
   if (kind === 'colour' || kind === 'own') value = is(HEX, w.value) ? w.value.toLowerCase() : ''
   if (kind === 'gradient') value = GRADIENTS.some((g) => g.id === w.value) ? w.value : ''
-  if ((kind === 'image' && !image) || (kind !== 'none' && kind !== 'image' && !value)) kind = 'none'
-  const pool = is(/^[a-z]{2,20}$/, w.pool?.provider) ? { provider: w.pool.provider, q: text(w.pool.q, 100) } : null
+  if (kind !== 'none' && !value) kind = 'none'
   const d = DEFAULT_WALLPAPER
   return {
     kind,
     value,
-    image,
     blur: clamp(w.blur, 0, 40, d.blur),
     dim: clamp(w.dim, 0, 80, d.dim),
     panelOpacity: clamp(w.panelOpacity, PANEL_MIN, 100, d.panelOpacity),
     fit: pick(w.fit, ['cover', 'contain', 'tile'], d.fit),
     position: pick(w.position, ['top', 'center', 'bottom'], d.position),
-    rotate: pick(w.rotate, ['off', 'launch', 'daily'], d.rotate),
-    rotatedOn: is(/^\d{4}-\d{2}-\d{2}$/, w.rotatedOn) ? w.rotatedOn : '',
-    pool,
   }
 }
 
 // ---------- what the layer needs ----------
 
-export const isPhoto = (w) => w.kind === 'image' || w.kind === 'own'
+export const isPhoto = (w) => w.kind === 'own'
 
 // The CSS variables that describe the background, or null for none. `own` is the
 // picture kept on this device ({ url }), if it has been loaded.
@@ -118,9 +81,6 @@ export function wallpaperVars(w, own = null) {
     if (!g) return null
     image = g.image
     color = g.color
-  } else if (w.kind === 'image' && w.image) {
-    image = `url(${JSON.stringify(w.image.url)})`
-    color = w.image.color || color
   } else if (w.kind === 'own') {
     color = w.value
     if (own) image = `url(${JSON.stringify(own.url)})`
@@ -139,11 +99,15 @@ export function wallpaperVars(w, own = null) {
   }
 }
 
-let ownImage = null // { url }: the picture kept on this device, once loaded
+let ownImage = null // { url, color }: the picture kept on this device, once loaded
+const ownListeners = new Set()
 export function setOwnImage(o) {
   ownImage = o
+  for (const fn of ownListeners) fn()
 }
 export const getOwnImage = () => ownImage
+// for useSyncExternalStore: the settings show the picture as soon as it has been read
+export const subscribeOwnImage = (fn) => (ownListeners.add(fn), () => ownListeners.delete(fn))
 
 let applied = ''
 // Forgets what the first paint reads, and that the page already shows what it shows: the next apply writes it again.
@@ -171,25 +135,4 @@ export function applyWallpaper(w) {
     if (vars) localStorage.setItem('obi:wp', JSON.stringify(w.kind === 'own' ? { ...vars, '--wp-image': 'none' } : vars))
     else localStorage.removeItem('obi:wp')
   } catch {}
-}
-
-// ---------- changing it by itself ----------
-
-export const dayKey = (d = new Date()) => formatDate(d, 'YYYY-MM-DD')
-
-// Whether the picture should change now. Daily only ever moves forward: a day that is not after the one it last
-// changed on (another time zone, a clock set back) leaves it be, so two devices on different dates cannot keep
-// swapping it between them. A date far ahead can only be a clock that was wrong, so it is not waited for.
-export function rotationDue(w, today = dayKey(), changedThisSession = false) {
-  if (w.kind !== 'image' || !w.pool) return false
-  if (w.rotate === 'launch') return !changedThisSession
-  return w.rotate === 'daily' && (today > w.rotatedOn || Date.parse(w.rotatedOn) - Date.parse(today) > 2 * 86400000)
-}
-
-// The next picture from a list, never the one already showing. Daily picks the
-// same one all day; otherwise it is chosen at random.
-export function pickNext(items, current, mode, today = dayKey(), rand = Math.random) {
-  const fresh = items.filter((i) => !(current && i.provider === current.provider && i.id === current.id))
-  if (!fresh.length) return null
-  return mode === 'daily' ? fresh[Math.floor(Date.parse(today) / 86400000) % fresh.length] : fresh[Math.floor(rand() * fresh.length)]
 }
