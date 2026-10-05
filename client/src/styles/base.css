@@ -50,6 +50,8 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
   --shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.55);
+  /* menus and other popups: close to the page, crisp edge */
+  --shadow-pop: 0 12px 32px -6px rgba(0, 0, 0, 0.55), 0 3px 8px -2px rgba(0, 0, 0, 0.35);
   --bg-overlay: rgba(8, 7, 6, 0.62);
   --bg-hover: rgb(var(--tint) / 0.05);
   --bg-active: rgb(var(--tint) / 0.085);
@@ -83,6 +85,7 @@
   --shadow-sm: 0 1px 2px rgb(var(--tint) / 0.07);
   --shadow: 0 10px 30px rgb(var(--tint) / 0.1);
   --shadow-lg: 0 28px 70px rgb(var(--tint) / 0.15);
+  --shadow-pop: 0 12px 32px -6px rgb(var(--tint) / 0.18), 0 3px 8px -2px rgb(var(--tint) / 0.08);
   --bg-overlay: rgb(var(--tint) / 0.25);
   --bg-hover: rgb(var(--tint) / 0.045);
   --bg-active: rgb(var(--tint) / 0.075);
@@ -1034,59 +1037,85 @@ kbd {
 }
 
 /* ---------- Menus ---------- */
+/* Every popup list (these menus, the editor's / and [[ suggestions) shares one look:
+   a hairline edge, a short shadow, 30px rows and the same hover. */
 .menu {
   position: fixed;
   z-index: 400;
-  min-width: 200px;
+  min-width: 208px;
   max-width: 300px;
   background: var(--bg-elev);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
-  padding: 5px;
-  animation: popIn 140ms var(--ease);
+  border-radius: 11px;
+  box-shadow: var(--shadow-pop), 0 0 0 1px var(--border-strong);
+  padding: 4px;
+  animation: menuIn 120ms var(--ease);
+  transform-origin: top left;
   max-height: 80vh;
   overflow: auto;
+  overscroll-behavior: contain;
+}
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
 }
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   width: 100%;
-  padding: 6px 9px;
-  border-radius: var(--radius-sm);
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 7px;
   border: none;
   background: none;
   cursor: pointer;
   text-align: left;
   color: var(--text);
   font-size: 13px;
+  line-height: 1.3;
 }
 .menu-item:hover,
 .menu-item.hl {
-  background: var(--bg-hover);
+  background: var(--bg-active);
 }
 .menu-item svg {
   width: 15px;
   height: 15px;
-  color: var(--text-3);
+  color: var(--text-2);
   flex-shrink: 0;
+  transition: color var(--t-fast);
+}
+.menu-item:hover svg,
+.menu-item.hl svg {
+  color: var(--text);
 }
 .menu-item.danger,
 .menu-item.danger svg {
   color: var(--danger);
 }
+.menu-item.danger:hover,
+.menu-item.danger.hl {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
 .menu-item .menu-hint {
   margin-left: auto;
+  padding-left: 12px;
   color: var(--text-3);
   font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
 }
 .menu-label {
-  padding: 6px 9px 3px;
-  font-size: 11px;
+  padding: 8px 10px 4px;
+  font-size: 10.5px;
   color: var(--text-3);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+}
+.menu > .divider {
+  margin: 4px 6px;
 }
 
 /* ---------- Toasts ---------- */
