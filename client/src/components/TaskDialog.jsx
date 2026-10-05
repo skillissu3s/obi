@@ -1,7 +1,7 @@
 // Everything about one task in one dialog, each change written straight to its
 // line. Opened from a card, a row or a chip on either page.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Flag, FileText, ListChecks, X } from 'lucide-react'
+import { Flag, FileText, ListChecks, Plus, Trash2, X } from 'lucide-react'
 import { PRIORITIES, addDays, checklistOf, cleanTag, isIsoDate, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
 import { basename, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
@@ -261,6 +261,7 @@ function TaskDialog({ at, onClose }) {
   const canEdit = useCanEdit()
   const root = useRef(null)
   const title = useRef(null)
+  const [moreDates, setMoreDates] = useState(false)
   const seen = useRef(at) // where the task was when last looked at
   const task = locate(model, seen.current)
 
@@ -340,18 +341,29 @@ function TaskDialog({ at, onClose }) {
           <Field label="Due">
             <DateField value={task.due} today={today} onChange={(v) => change({ due: v })} />
           </Field>
-          <Field label="Scheduled">
-            <DateField value={task.scheduled} today={today} onChange={(v) => change({ scheduled: v })} />
-          </Field>
-          <Field label="Starts">
-            <DateField value={task.start} today={today} onChange={(v) => change({ start: v })} />
-          </Field>
+          {moreDates || task.scheduled || task.start ? (
+            <>
+              <Field label="Scheduled">
+                <DateField value={task.scheduled} today={today} onChange={(v) => change({ scheduled: v })} />
+              </Field>
+              <Field label="Starts">
+                <DateField value={task.start} today={today} onChange={(v) => change({ start: v })} />
+              </Field>
+            </>
+          ) : (
+            <button type="button" className="td-more" onClick={() => setMoreDates(true)} title="When you plan to work on it, and the day it can start">
+              <Plus /> Scheduled and start dates
+            </button>
+          )}
           <Field label="Repeat">
             <Repeat task={task} change={change} />
           </Field>
           <Field label="Tags">
             <Tags task={task} change={change} known={model.tags} />
           </Field>
+          <button type="button" className="btn btn-sm btn-ghost td-delete" onClick={() => (A.deleteTask(task), onClose())}>
+            <Trash2 /> Delete task
+          </button>
         </fieldset>
       </div>
     </Modal>

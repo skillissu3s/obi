@@ -1,21 +1,92 @@
 // The pieces of a task shown on the Tasks and Calendar pages: its box, its chips,
 // and the card, row and chip they are put together in. The dialog that opens
 // from any of them is in TaskDialog.jsx.
-import { memo, useEffect, useRef, useState } from 'react'
-import { Ban, CalendarDays, FileText, Flag, Hourglass, ListChecks, Pencil, Play, Plus, Repeat } from 'lucide-react'
-import { PRIORITIES, PRIORITY_EMOJI, addDays, isOpen, splitTags, todayIso } from '@shared/tasks.js'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { Ban, CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Hourglass, ListChecks, Pencil, Play, Plus, Repeat, Trash2, X } from 'lucide-react'
+import { PRIORITIES, addDays, isOpen, parseQuickAdd, splitTags, todayIso, weekStartOf } from '@shared/tasks.js'
 import { basename, stripExt } from '@shared/paths.js'
 import { colorFor, dateOfIso, dueLabel, formatDate } from '../lib/util.js'
 import { renderInline } from '../lib/render.js'
 import { plainTitle, startDrag, toggleTag } from '../lib/planner.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
+import { useUI } from '../store/ui.js'
 import * as A from '../lib/actions.js'
 
 /** done ↔ open */
 export const toggleTask = (task) => A.updateTask(task, { status: isOpen(task.status) ? 'x' : ' ' })
 
 export const PRIORITY_LABEL = { highest: 'Highest priority', high: 'High priority', medium: 'Medium priority', low: 'Low priority', lowest: 'Lowest priority' }
+
+/** Right-click on a task: the changes made most often, without opening it */
+export function taskMenu(e, task, { ws, canEdit, onOpen }) {
+  if (e.target.closest('input, textarea, a')) return
+  const today = todayIso()
+  const nextWeek = weekStartOf(addDays(today, 7), 1)
+  const open = isOpen(task.status)
+  const set = (patch) => () => A.updateTask(task, patch)
+  const mark = (yes) => (yes ? CheckCircle2 : undefined)
+  const edits = canEdit
+    ? [
+        'divider',
+        { label: open ? 'Mark done' : 'Reopen', icon: open ? CheckCircle2 : Circle, hint: 'Space', run: () => toggleTask(task) },
+        open && task.status !== '/' && { label: 'Start (in progress)', icon: Play, run: set({ status: '/' }) },
+        { section: 'Due' },
+        { label: 'Today', icon: mark(task.due === today), run: set({ due: today }) },
+        { label: 'Tomorrow', icon: mark(task.due === addDays(today, 1)), run: set({ due: addDays(today, 1) }) },
+        { label: 'Next week', icon: mark(task.due === nextWeek), run: set({ due: nextWeek }) },
+        task.due && { label: 'No due date', icon: X, run: set({ due: null }) },
+        { section: 'Priority' },
+        ...['high', 'medium', 'low'].map((p) => ({ label: p[0].toUpperCase() + p.slice(1), icon: task.priority === p ? CheckCircle2 : Flag, run: set({ priority: p }) })),
+        task.priority && { label: 'No priority', icon: X, run: set({ priority: null }) },
+        'divider',
+        { label: 'Delete task', icon: Trash2, danger: true, hint: 'Del', run: () => A.deleteTask(task) },
+      ]
+    : []
+  useUI.getState().showContextMenu(e, [
+    { label: 'Open task', icon: Pencil, hint: 'Enter', run: () => onOpen(task) },
+    { label: 'Open in note', icon: ExternalLink, run: () => useLayout.getState().openNote(ws, task.path, { line: task.line }) },
+    ...edits,
+  ])
+}
+
+// ---------- typing a task in plain words ----------
+
+const FOUND_ICON = { due: CalendarDays, priority: Flag, recurrence: Repeat }
+const KIND_ORDER = ['due', 'priority', 'recurrence']
+const foundLabel = (f) => (f.kind === 'due' ? dueLabel(f.value) : f.kind === 'priority' ? PRIORITY_LABEL[f.value] : f.value[0].toUpperCase() + f.value.slice(1))
+
+/** What a task typed in plain words says (parseQuickAdd in shared/tasks.js), and a way to keep a phrase as words */
+export function useQuickParse(text, today = todayIso()) {
+  const [ignore, setIgnore] = useState([])
+  const parsed = useMemo(() => parseQuickAdd(text, { today, ignore }), [text, today, ignore])
+  // a new task starts with nothing set aside
+  useEffect(() => {
+    if (!text.trim() && ignore.length) setIgnore([])
+  }, [text, ignore.length])
+  return { parsed, keep: (words) => setIgnore((l) => [...l, words]) }
+}
+
+/** A chip for each phrase that was understood; its × keeps the phrase as words */
+export function ParsedChips({ found, onKeep }) {
+  if (!found.length) return null
+  return (
+    <div className="qa-chips" aria-live="polite">
+      {[...found].sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind)).map((f) => {
+        const Icon = FOUND_ICON[f.kind]
+        return (
+          <span key={f.kind} className={`qa-chip qa-${f.kind} ${f.kind === 'priority' ? `pri-${f.value}` : ''}`} title={`From “${f.text}”`}>
+            <Icon />
+            {foundLabel(f)}
+            <button type="button" aria-label={`Keep “${f.text}” as words`} title={`Keep “${f.text}” as words`} onMouseDown={(e) => e.preventDefault()} onClick={() => onKeep(f.text)}>
+              <X />
+            </button>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
 
 // The checkbox. In progress shows as a dash; cancelled as ticked and struck out.
 export function TaskBox({ task, disabled }) {
@@ -135,11 +206,21 @@ function onLink(e, task, ws) {
   return !!a
 }
 
-/** Opens a task on the keyboard: Enter or Space on the card itself, not on what is inside it */
-const openOnKey = (e, task, onOpen) => {
-  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+/**
+ * A task on the keyboard, when the card or row itself has focus (not something in it):
+ * Enter opens it, Space ticks it off, Delete deletes it (with Undo).
+ */
+const openOnKey = (e, task, onOpen, canEdit) => {
+  if (e.target !== e.currentTarget) return
+  if (e.key === 'Enter') {
     e.preventDefault()
     onOpen(task)
+  } else if (e.key === ' ' && canEdit) {
+    e.preventDefault()
+    toggleTask(task)
+  } else if ((e.key === 'Delete' || e.key === 'Backspace') && canEdit) {
+    e.preventDefault()
+    A.deleteTask(task)
   }
 }
 
@@ -163,7 +244,8 @@ export const TaskCard = memo(function TaskCard({ task, today, ws, canEdit, onOpe
       }}
       onDragEnd={() => setLifted(false)}
       onClick={(e) => !e.target.closest('input, button, a') && onOpen(task)}
-      onKeyDown={(e) => openOnKey(e, task, onOpen)}
+      onKeyDown={(e) => openOnKey(e, task, onOpen, canEdit)}
+      onContextMenu={(e) => taskMenu(e, task, { ws, canEdit, onOpen })}
     >
       <div className="pl-card-top">
         <TaskBox task={task} disabled={!canEdit} />
@@ -218,7 +300,8 @@ export const TaskChip = memo(function TaskChip({ task, today, canEdit, onOpen })
         e.stopPropagation()
         if (!e.target.closest('input')) onOpen(task)
       }}
-      onKeyDown={(e) => openOnKey(e, task, onOpen)}
+      onKeyDown={(e) => openOnKey(e, task, onOpen, canEdit)}
+      onContextMenu={(e) => taskMenu(e, task, { ws: useApp.getState().wsId, canEdit, onOpen })}
     >
       <TaskBox task={task} disabled={!canEdit} />
       <span className="pl-chip-text">{plainTitle(task)}</span>
@@ -239,7 +322,8 @@ export const TaskRow = memo(function TaskRow({ task, today, ws, canEdit, onOpen,
       aria-label={aboutTask(task, today)}
       draggable={canEdit}
       onDragStart={(e) => startDrag(e, task)}
-      onKeyDown={(e) => openOnKey(e, task, onOpen)}
+      onKeyDown={(e) => openOnKey(e, task, onOpen, canEdit)}
+      onContextMenu={(e) => taskMenu(e, task, { ws, canEdit, onOpen })}
     >
       <TaskBox task={task} disabled={!canEdit} />
       <div className="pl-row-main">
@@ -267,25 +351,30 @@ export const TaskRow = memo(function TaskRow({ task, today, ws, canEdit, onOpen,
 })
 
 /**
- * Adds a task: its words, and a day and a priority if you like. Without `day`
- * it goes in today's note; with one, in that day's note, due that day.
+ * Adds a task: its words, and a day and a priority if you like — typed ("Call Sam
+ * tomorrow !high every week") or picked. Without `day` it goes in today's note;
+ * with one, in that day's note, due that day unless another date was typed.
  */
 export function QuickAdd({ day = null, autoFocus = false }) {
-  const [title, setTitle] = useState('')
+  const [text, setText] = useState('')
   const [due, setDue] = useState('')
   const [priority, setPriority] = useState('')
   const [busy, setBusy] = useState(false)
   const input = useRef(null)
   const today = todayIso()
   const tomorrow = addDays(today, 1)
+  const { parsed, keep } = useQuickParse(text, today)
+  // what is picked wins over what is typed
+  const when = due || parsed.due || ''
+  const pri = priority || parsed.priority || ''
 
   const submit = async () => {
-    if (!title.trim() || busy) return
+    if (!parsed.title || busy) return
     setBusy(true)
-    const r = await A.addTask({ title, day: day || undefined, due: day || due || undefined, priority: priority || undefined })
+    const r = await A.addTask({ title: parsed.title, day: day || undefined, due: when || day || undefined, priority: pri || undefined, recurrence: parsed.recurrence || undefined })
     setBusy(false)
     if (r) {
-      setTitle('')
+      setText('')
       setDue('')
       setPriority('')
     }
@@ -293,44 +382,53 @@ export function QuickAdd({ day = null, autoFocus = false }) {
   }
 
   return (
-    <div className="task-add">
-      <Plus />
-      <input
-        ref={input}
-        className="task-add-input"
-        autoFocus={autoFocus}
-        aria-label="New task"
-        placeholder={day ? `Add a task for ${formatDate(dateOfIso(day), 'ddd D MMM')}…` : "Add a task to today's note…"}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-      />
-      {title.trim() && (
-        <>
-          {!day && (
-            <>
-              <button className={`te-quick ${due === today ? 'on' : ''}`} onClick={() => setDue(due === today ? '' : today)}>
-                Today
-              </button>
-              <button className={`te-quick ${due === tomorrow ? 'on' : ''}`} onClick={() => setDue(due === tomorrow ? '' : tomorrow)}>
-                Tomorrow
-              </button>
-              <input type="date" className="input task-add-date" value={due} onChange={(e) => setDue(e.target.value)} title="Due date" />
-            </>
-          )}
-          <select className="input task-add-pri" value={priority} onChange={(e) => setPriority(e.target.value)} title="Priority">
-            <option value="">Priority</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {PRIORITY_EMOJI[p]} {p[0].toUpperCase() + p.slice(1)}
-              </option>
-            ))}
-          </select>
-          <button className="btn btn-primary btn-sm" disabled={busy} onClick={submit}>
-            Add
-          </button>
-        </>
-      )}
+    <div className="task-add-wrap">
+      <div className="task-add">
+        <Plus />
+        <input
+          ref={input}
+          className="task-add-input"
+          autoFocus={autoFocus}
+          aria-label="New task"
+          placeholder={day ? `Add a task for ${formatDate(dateOfIso(day), 'ddd D MMM')}…` : 'Add a task… try “Call Sam tomorrow !high”'}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submit()
+            else if (e.key === 'Escape' && text) {
+              e.stopPropagation()
+              setText('')
+            }
+          }}
+        />
+        {text.trim() && (
+          <>
+            {!day && (
+              <>
+                <button type="button" className={`te-quick ${when === today ? 'on' : ''}`} onClick={() => setDue(when === today ? '' : today)}>
+                  Today
+                </button>
+                <button type="button" className={`te-quick ${when === tomorrow ? 'on' : ''}`} onClick={() => setDue(when === tomorrow ? '' : tomorrow)}>
+                  Tomorrow
+                </button>
+                <input type="date" className="input task-add-date" value={when} onChange={(e) => setDue(e.target.value)} title="Due date" aria-label="Due date" />
+              </>
+            )}
+            <select className="input task-add-pri" value={pri} onChange={(e) => setPriority(e.target.value)} title="Priority" aria-label="Priority">
+              <option value="">Priority</option>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {p[0].toUpperCase() + p.slice(1)}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn btn-primary btn-sm" disabled={busy || !parsed.title} onClick={submit}>
+              Add
+            </button>
+          </>
+        )}
+      </div>
+      {text.trim() && <ParsedChips found={parsed.found.filter((f) => !(f.kind === 'due' && due) && !(f.kind === 'priority' && priority))} onKeep={keep} />}
     </div>
   )
 }

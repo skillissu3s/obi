@@ -49,7 +49,7 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 - Full-text search with `tag:`, `path:`, `file:`, `"phrases"` and `-exclusions`
 - Backlinks **and** unlinked mentions, outline, local graph, note info
 - Global **graph view** — force-directed, folder-coloured, filterable
-- **Tasks** as a Trello-style **board** (or a list): a column for each status, due date or priority, with cards showing tags, due date, repeat and checklist progress. Drag a card to another column to change that field on its line (finishing it stamps `✅` and starts the next occurrence of a repeating task, and an Undo toast takes any move back), or add cards straight into a column. Open a card for everything about it — title, status, priority, due / scheduled / start dates, repeat, tags and a checklist made of the task's nested subtasks — each change written to its line. Search and filter by tag or priority, and a **Schedule** beside the board takes a card dropped on a day to give it that date. Columns are only a view: nothing about the board is stored in your notes. Tasks use the Obi/Obsidian-Tasks emoji format — `- [ ] Write report #work ⏫ 🔁 every week 📅 2026-10-05` — so existing vaults just work
+- **Tasks** as a Trello-style **board** (or a list): a column for each status, due date or priority, with cards showing tags, due date, repeat and checklist progress. Drag a card to another column to change that field on its line (finishing it stamps `✅` and starts the next occurrence of a repeating task, and an Undo toast takes any move back), or add cards straight into a column. Open a card for everything about it — title, status, priority, due / scheduled / start dates, repeat, tags and a checklist made of the task's nested subtasks — each change written to its line. Search and filter by tag or priority, and a **Schedule** beside the board takes a card dropped on a day to give it that date. Columns are only a view: nothing about the board is stored in your notes. Type a date, priority or repeat straight into a new task — `Pay rent fri !high every month`, `Call Sam tomorrow`, `Dentist 12 oct`, `in 3 days` — and it is understood as you type (each phrase shows as a chip; its × keeps the words as they are). Right-click a task for the quick changes (done, due today / tomorrow / next week, priority, delete); with a card focused, Enter opens it, Space ticks it off and Delete deletes it (with Undo). Tasks use the Obi/Obsidian-Tasks emoji format — `- [ ] Write report #work ⏫ 🔁 every week 📅 2026-10-05` — so existing vaults just work
 - **Calendar** with month, week and agenda views: each day shows its daily note, the tasks due or scheduled on it and the notes you worked on that day. Click a task to open the same card, drag it to another day to reschedule it, or add a task for a day from the `+` on it. A **To plan** panel lists what is overdue (move it all to today in one click) and the tasks that have no date yet, ready to drag onto a day. The week can start on Monday or Sunday (Settings)
 
 **Working together** (online workspaces)
@@ -70,7 +70,7 @@ Both kinds are plain markdown, folders and attachments — never a proprietary f
 
 **Everything else**
 - **13 colour themes**, each with a light and a dark version. Light-first: Paper (crisp white & ink blue), Sand, Sakura, Mint, Sky. Dark-first: Sumi (warm ink & paper), Graphite, Midnight, Nordic, Forest, Ember, Mocha, Nebula. Switch from *Settings → Appearance* or the command palette (“Colour theme: …”). Themes restyle the whole app, including drawings: surfaces, text, borders, syntax highlighting and accent.
-- **Backgrounds**: a colour, a gradient, a photo from Unsplash, Pexels, Pixabay, Wallhaven, NASA, Flickr, Bing, Wikimedia Commons, the Art Institute of Chicago, The Met or Picsum (search them from *Settings → Appearance → Background*), or an image from your own device. Blur, dim and panel transparency are adjustable, the note itself stays readable, and the picture can change on every launch or daily. [Setting up the photo sources](#background-images)
+- **Backgrounds**: a colour, a gradient or an image from your own device behind the app. Blur, dim and panel transparency are adjustable, and the note itself stays readable.
 - Optional accent override on top of any theme, three editor fonts, adjustable size/line-height, readable line width, focus mode
 - Minimal chrome by design: no panel borders, flat tabs, a header that fades until you reach for it. The left side shows either the full sidebar or a slim icon ribbon, and hidden toggles appear when the pointer nears a panel edge
 - Split panes, tabs, per-workspace layout persistence
@@ -174,30 +174,12 @@ Redeploy (or `docker compose up -d --build`). The server saves open documents an
 | `SMTP_URL` | — | Alternative to the above in one line, e.g. `smtps://user:pass@smtp.example.com`. |
 | `MAIL_FROM` | `SMTP_USER` | Sender, e.g. `Obi <no-reply@example.com>`. |
 | `MAIL_LOG_CODES` | `0` | Development only: with no SMTP configured, print emails (and their codes) to the server log instead of sending them. |
-| `UNSPLASH_ACCESS_KEY`, `PEXELS_API_KEY`, `PIXABAY_API_KEY`, `FLICKR_API_KEY`, `WALLHAVEN_API_KEY`, `NASA_API_KEY` | — | Keys for the photo sources in *Settings → Appearance → Background*. All optional; see [Background images](#background-images). |
-| `UNSPLASH_REQUESTS_PER_HOUR` | `50` | How many requests an hour this server may make to Unsplash. Raise it to `5000` once Unsplash has approved the app for production. |
 
 ---
 
-## Background images
+## Backgrounds
 
-*Settings → Appearance → Background* can put a photo behind the app. Some sources need nothing; the rest show up as "needs a key" until you give the server one. Keys are read from the environment, stay on the server (the browser never sees them) and are never logged. Set them next to the other variables, in `.env` for Compose or in the app's environment on Dokploy, and restart.
-
-| Source | Variable | Free key from | Limits (as published) | Credit |
-|---|---|---|---|---|
-| Unsplash | `UNSPLASH_ACCESS_KEY` | [unsplash.com/oauth/applications](https://unsplash.com/oauth/applications) (the *Access Key*) | 50 requests/hour until Unsplash approves the app for production, then 5,000 | Required: "Photo by *name* on Unsplash", linked. Shown in the status bar and in settings; Obi also tells Unsplash when a photo is chosen, as its guidelines ask |
-| Pexels | `PEXELS_API_KEY` | [pexels.com/api](https://www.pexels.com/api/new/) | 200 requests/hour, 20,000/month | Required: photographer and Pexels, linked |
-| Pixabay | `PIXABAY_API_KEY` | [pixabay.com/api/docs](https://pixabay.com/api/docs/) (shown once you are signed in) | 100 requests/minute; results are cached for 24 hours | Not required; shown. Pixabay's terms discourage permanent hotlinking, and the browser loads the chosen picture from Pixabay each time it is shown, so use this source only if that suits you. Pictures are 1280px wide unless Pixabay has given your key full-HD access |
-| Flickr | `FLICKR_API_KEY` | [flickr.com/services/apps/create](https://www.flickr.com/services/apps/create/apply/) (a non-commercial key is instant) | 3,600 requests/hour | Required by the licence: photographer and licence are shown. Only CC BY, CC BY-SA, CC0, public-domain and US-government photos are offered |
-| Wallhaven | `WALLHAVEN_API_KEY` (optional) | [wallhaven.cc/settings/account](https://wallhaven.cc/settings/account) | 45 requests/minute | Uploaders are not named by the API. Safe-for-work only, with or without a key |
-| NASA APOD | `NASA_API_KEY` (optional) | [api.nasa.gov](https://api.nasa.gov/) | `DEMO_KEY` (the default) allows about 30 requests/hour per IP; a free key 1,000 | Photographer shown when the picture is not NASA's |
-| Bing image of the day | none | — | only the last 8 pictures exist | Meant for personal use as a wallpaper |
-| Wikimedia Commons | none | — | be gentle; results are cached; thumbnails only at Commons' standard widths | Author and licence are shown. Search is limited to featured pictures |
-| Art Institute of Chicago | none | — | 60 requests/minute | Public-domain works (CC0) |
-| The Met | none | — | 80 requests/second | Public-domain works (CC0) |
-| Lorem Picsum | none | — | — | Photos are from Unsplash; photographer shown |
-
-Everything is cached on the server for 15 minutes (24 hours for Pixabay, 6 for NASA), so browsing and shuffling rarely spend a provider request. What does reach a provider is held to that provider's published limit in the table (50 an hour for Unsplash unless you set `UNSPLASH_REQUESTS_PER_HOUR`), shared by everyone on the server, with at most a few requests in flight at once; past that people are told to try again later rather than the key being spent. Obi only tells Unsplash about a picture this server offered, once for each person. The server only ever contacts those providers' own API addresses, and only passes on image links that live on the provider's own image hosts. The picture itself is loaded by the browser straight from the provider. Backgrounds never appear on published notes, in print, or inside the desktop app's title bar.
+*Settings → Appearance → Background* puts a colour, a gradient or a picture of your own behind the app. Dim, blur and panel transparency are adjustable, and text always stays on a plate solid enough to read. Backgrounds never appear on published notes, in print, or in the desktop app's title bar. Nothing is fetched from the internet and no keys are needed.
 
 A background you pick from your own device is stored in that browser only (not synced, never written into a vault or repository). Signing out removes it, and the cached background, from the browser, and somebody else signing in on that browser never sees it.
 

@@ -474,6 +474,45 @@ export function addSubtask(text, { line, title }, taskLine) {
   return { text: lines.join('\n'), line: end + 1 }
 }
 
+/** How many lines a deleted task may bring back with it (the task and its checklist) */
+export const MAX_RESTORE_LINES = 2000
+
+/**
+ * Deletes the task at `line` (found as for applyTaskEdit) with everything nested
+ * under it — its checklist and notes. Returns { text, line, block }: `block` is
+ * the lines that went, which restoreTaskBlock puts back at `line`.
+ */
+export function removeTask(text, { line, title }) {
+  const lines = text.split('\n')
+  const at = findTask(lines, taskLinesOf(text), line, title)
+  const crlf = lines.some((l) => l.endsWith('\r'))
+  let end = blockEnd(lines, at)
+  // blank lines that only separated the checklist from what follows stay where they are
+  while (end > at && !/\S/.test(lines[end])) end--
+  const block = lines.splice(at, end - at + 1)
+  // the last line of a note has no line ending of its own (see editAt)
+  if (crlf && at === lines.length && at > 0) lines[at - 1] = lines[at - 1].replace(/\r$/, '')
+  return { text: lines.join('\n'), line: at, block: block.map((l) => l.replace(/\r$/, '')) }
+}
+
+/** Puts back what removeTask took out: `block` goes in as line `line`, or at the end if the note is shorter now. Returns { text, line }. */
+export function restoreTaskBlock(text, line, block) {
+  if (!text) return { text: block.join('\n'), line: 0 }
+  const lines = text.split('\n')
+  const crlf = lines.some((l) => l.endsWith('\r'))
+  // a note ending in a newline has an empty last "line": what goes at the end goes before it
+  const last = lines[lines.length - 1] === '' && lines.length > 1 ? lines.length - 1 : lines.length
+  const at = Math.min(Math.max(0, line), last)
+  const put = block.map((l) => (crlf ? `${l}\r` : l))
+  if (at === lines.length) {
+    // the new last line: no line ending of its own, and the one before it gets one
+    if (crlf && at > 0) lines[at - 1] += '\r'
+    put[put.length - 1] = put[put.length - 1].replace(/\r$/, '')
+  }
+  lines.splice(at, 0, ...put)
+  return { text: lines.join('\n'), line: at }
+}
+
 /** A new task at the end of a note, with its siblings if it ends in a list of them */
 export function appendTask(text, taskLine) {
   const body = text.replace(/\n+$/, '')
@@ -696,4 +735,88 @@ function lineOf(t) {
 export function previewEdit(task, patch, opts) {
   const r = editTaskLine(lineOf(task), patch, opts)
   return { ...parseTask(r.line), line: task.line, ...(task.parent != null && { parent: task.parent }) }
+}
+
+// ---------- typing a task in plain words ----------
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+const MONTH = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
+// Weekdays. "sat", "sun" and "wed" are words of their own ("I sat…"), so those
+// three count only in full or after "on", "next" or "this".
+const WEEKDAY_ANY = '(monday|mon|tuesday|tues|tue|wednesday|thursday|thurs|thur|thu|friday|fri|saturday|sunday)'
+const WEEKDAY_SHORT_AFTER = '(sat|sun|wed)'
+const weekdayIndex = (w) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(w.slice(0, 3))
+const PRIORITY_WORDS = { 1: 'highest', '!!!': 'highest', highest: 'highest', urgent: 'highest', 2: 'high', '!!': 'high', high: 'high', 3: 'medium', medium: 'medium', med: 'medium', 4: 'low', low: 'low', lowest: 'lowest' }
+
+// the next `weekday` (0 = Sunday) after `today`, never today itself
+const comingWeekday = (today, weekday) => addDays(today, ((weekday - weekdayOf(today) + 7) % 7) || 7)
+
+// `day` of month `month` (0-11): this year's, or next year's once this year's has gone by
+function comingDate(today, month, day) {
+  let year = Number(today.slice(0, 4))
+  const make = (y) => `${y}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  if (!isIsoDate(make(year))) return null
+  if (make(year) < today) year++
+  return isIsoDate(make(year)) ? make(year) : null
+}
+
+// What each kind of phrase is, in the order they are looked for: a repeat first
+// (its weekdays are not a date), then the first date phrase found is the date, and so on.
+const PHRASES = [
+  {
+    kind: 'recurrence',
+    re: new RegExp(String.raw`\bevery (?:(?:\d+ )?(?:day|week|month|year)s?|weekday|${DAY_NAME}(?:(?:, and |, | and )${DAY_NAME})*)(?: when done)?\b`, 'gi'),
+    value: (m) => (parseRecurrence(m[0]) ? m[0].toLowerCase().replace(/\s+/g, ' ') : null),
+  },
+  { kind: 'due', re: /\b(?:(?:on|by|due) )?(\d{4}-\d{2}-\d{2})\b/gi, date: (m) => (isIsoDate(m[1]) ? m[1] : null) },
+  { kind: 'due', re: /\b(?:(?:on|by|due) )?today\b/gi, date: (m, t) => t },
+  { kind: 'due', re: /\b(?:(?:by|due) )?(?:tomorrow|tmrw)\b/gi, date: (m, t) => addDays(t, 1) },
+  { kind: 'due', re: /\bnext week\b/gi, date: (m, t) => weekStartOf(addDays(t, 7), 1) },
+  { kind: 'due', re: /\bnext month\b/gi, date: (m, t) => addMonths(t, 1) },
+  { kind: 'due', re: /\bin (\d{1,3}) (day|week|month)s?\b/gi, date: (m, t) => (m[2].toLowerCase() === 'month' ? addMonths(t, +m[1]) : addDays(t, +m[1] * (m[2].toLowerCase() === 'week' ? 7 : 1))) },
+  { kind: 'due', re: new RegExp(String.raw`\b(?:(?:on|by|due) )?(\d{1,2})(?:st|nd|rd|th)? ${MONTH}\b`, 'gi'), date: (m, t) => comingDate(t, MONTHS.indexOf(m[2].slice(0, 3).toLowerCase()), +m[1]) },
+  { kind: 'due', re: new RegExp(String.raw`\b(?:(?:on|by|due) )?${MONTH} (\d{1,2})(?:st|nd|rd|th)?\b`, 'gi'), date: (m, t) => comingDate(t, MONTHS.indexOf(m[1].slice(0, 3).toLowerCase()), +m[2]) },
+  { kind: 'due', re: new RegExp(String.raw`\b(?:(next|this|on|by|due) )?${WEEKDAY_ANY}\b`, 'gi'), date: (m, t) => addDays(comingWeekday(t, weekdayIndex(m[2].toLowerCase())), m[1]?.toLowerCase() === 'next' ? 7 : 0) },
+  { kind: 'due', re: new RegExp(String.raw`\b(next|this|on|by|due) ${WEEKDAY_SHORT_AFTER}\b`, 'gi'), date: (m, t) => addDays(comingWeekday(t, weekdayIndex(m[2].toLowerCase())), m[1].toLowerCase() === 'next' ? 7 : 0) },
+  // "!high", "!2", or as many marks as it matters: "!!" high, "!!!" highest
+  { kind: 'priority', re: /(?<=^|\s)!(highest|urgent|high|medium|med|lowest|low|[1-4]|!!|!)(?=\s|$)/gi, value: (m) => PRIORITY_WORDS[m[1].toLowerCase() === '!' ? '!!' : m[1].toLowerCase() === '!!' ? '!!!' : m[1].toLowerCase()] },
+]
+
+/**
+ * Reads a task typed in plain words: "Call mom tomorrow !high", "Pay rent every
+ * month on 1st"… Returns { title, due, priority, recurrence, found }: the title
+ * without the phrases that were understood, what they meant, and `found`, one
+ * { kind, text, value } for each phrase (what to show the person). Links, code
+ * and anything in `ignore` (phrases the person said to keep as words) are left alone.
+ */
+export function parseQuickAdd(text, { today = todayIso(), ignore = [] } = {}) {
+  const source = String(text || '')
+  // links and code are words of their own: nothing inside them is a phrase
+  const masked = source.replace(/\[\[[^\]]*\]\]|\[[^\]]*\]\([^)]*\)|`[^`]*`/g, (m) => '\u0001'.repeat(m.length))
+  const skip = new Set(ignore.map((s) => s.toLowerCase()))
+  const out = { title: source.trim(), due: null, priority: null, recurrence: null, found: [] }
+  const taken = []
+  const free = (a, b) => taken.every(([x, y]) => b <= x || a >= y)
+  for (const p of PHRASES) {
+    if (out[p.kind]) continue
+    for (const m of masked.matchAll(p.re)) {
+      const at = m.index
+      const end = at + m[0].length
+      if (skip.has(m[0].toLowerCase()) || !free(at, end)) continue
+      const value = p.date ? p.date(m, today) : p.value(m)
+      if (!value) continue
+      out[p.kind] = value
+      taken.push([at, end])
+      out.found.push({ kind: p.kind, text: source.slice(at, end), value })
+      break
+    }
+  }
+  if (!taken.length) return out
+  let title = source
+  for (const [a, b] of [...taken].sort((x, y) => y[0] - x[0])) title = title.slice(0, a) + title.slice(b)
+  title = title.replace(/\s+/g, ' ').trim()
+  // nothing left to call it: the words were the task after all
+  if (!title) return { title: source.trim(), due: null, priority: null, recurrence: null, found: [] }
+  out.title = title
+  return out
 }

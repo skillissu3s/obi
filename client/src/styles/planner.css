@@ -1827,3 +1827,135 @@
     transform: none;
   }
 }
+
+/* ---------- what a typed task was understood to say ---------- */
+.task-add-wrap {
+  margin-bottom: 18px;
+}
+.task-add-wrap > .task-add {
+  margin-bottom: 0;
+}
+.task-add-wrap > .qa-chips {
+  margin: 8px 2px 0;
+}
+.qa-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.qa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 2px 0 8px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  animation: menuIn 120ms var(--ease);
+}
+.qa-chip > svg {
+  width: 12px;
+  height: 12px;
+}
+.qa-chip.qa-priority {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.qa-chip.qa-priority.pri-low,
+.qa-chip.qa-priority.pri-lowest {
+  color: var(--text-2);
+}
+.qa-chip button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+}
+.qa-chip button:hover {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.qa-chip button svg {
+  width: 11px;
+  height: 11px;
+}
+.pl-composer .qa-chips {
+  margin-top: 6px;
+}
+
+/* ---------- task dialog: the rarer dates, and deleting ---------- */
+.td-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: -6px;
+  padding: 3px 0;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.td-more:hover {
+  color: var(--text);
+}
+.td-more svg {
+  width: 13px;
+  height: 13px;
+}
+.td-delete {
+  align-self: flex-start;
+  margin-top: auto;
+  color: var(--text-3);
+}
+.td-delete:hover:not(:disabled) {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+/* With a mouse, the card's edit button sits over its corner while it is shown,
+   so the title has the card's whole width instead of wrapping early beside an
+   empty space. On a touch screen it stays where it is, always visible. */
+@media (pointer: fine) {
+  .pl-card-top .pl-edit {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    margin: 0;
+    background: var(--bg-elev);
+    box-shadow: 0 0 0 1px var(--border-strong), -8px 0 8px -2px var(--bg-elev);
+  }
+  .pl-card-top .pl-edit:hover {
+    background: color-mix(in srgb, var(--text) 8%, var(--bg-elev));
+  }
+}
+
+/* a typed priority in its own colour */
+.qa-chip.qa-priority.pri-highest {
+  color: var(--danger);
+}
+.qa-chip.qa-priority.pri-high {
+  color: var(--warning);
+}
+.qa-chip.qa-priority.pri-medium {
+  color: var(--accent-text);
+}
+.pl-dayadd .task-add-wrap {
+  margin: 0;
+}
+.pl-dayadd .qa-chips {
+  margin: 2px 4px 4px;
+}

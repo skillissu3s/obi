@@ -6,6 +6,7 @@ import {
   addDays, addMonths, daysBetween, weekdayOf, isIsoDate, bucketOf, compareTasks, priorityRank, TaskChangedError,
   addSubtask, boardColumns, columnOf, columnFields, dateKeyOf, dropPatch, undoPatch, taskTree, splitTags, joinTags,
   hasTag, matchTask, previewEdit, cleanTag, weekStartOf, monthDays, applyTaskEdits, checklistOf, nextBlock, insertNext, MAX_TASK_EDITS,
+  removeTask, restoreTaskBlock, parseQuickAdd,
 } from './tasks.js'
 import { parseNote } from './parse.js'
 
@@ -556,4 +557,78 @@ test('a repeating task on the last line of a note with Windows line endings keep
   const back = applyTaskEdit(done.text, { line: 1, title: 'b', patch: { status: ' ', done: null }, today, dropNext: true })
   assert.equal(back.dropped, true)
   assert.equal(back.text, note)
+})
+
+test('removeTask: the task goes with its checklist, and restoreTaskBlock puts it all back', () => {
+  const text = '# Plan\n- [ ] one\n- [ ] two\n  - [ ] two a\n  - [x] two b\n\n- [ ] three\n'
+  const r = removeTask(text, { line: 2, title: 'two' })
+  assert.equal(r.text, '# Plan\n- [ ] one\n\n- [ ] three\n')
+  assert.equal(r.line, 2)
+  assert.deepEqual(r.block, ['- [ ] two', '  - [ ] two a', '  - [x] two b'])
+  assert.equal(restoreTaskBlock(r.text, r.line, r.block).text, text)
+})
+
+test('removeTask finds a task that moved, and refuses one that changed', () => {
+  const text = 'intro\n- [ ] one\n- [ ] two\n'
+  assert.equal(removeTask(text, { line: 1, title: 'two' }).text, 'intro\n- [ ] one\n')
+  assert.throws(() => removeTask(text, { line: 2, title: 'something else' }), TaskChangedError)
+  // an example in a code block is not a task
+  assert.throws(() => removeTask('```\n- [ ] not a task\n```\n', { line: 1, title: 'not a task' }), TaskChangedError)
+})
+
+test('removing and restoring the last task of a note keeps its line endings', () => {
+  for (const text of ['a\n- [ ] t\n', 'a\n- [ ] t', 'a\r\nb\r\n- [ ] t\r\n', 'a\r\nb\r\n- [ ] t']) {
+    const lines = text.split('\n')
+    const line = lines.findIndex((l) => l.startsWith('- [ ] t'))
+    const r = removeTask(text, { line, title: 't' })
+    assert.ok(!r.text.endsWith('\r'), JSON.stringify(text))
+    assert.equal(restoreTaskBlock(r.text, r.line, r.block).text, text, JSON.stringify(text))
+  }
+})
+
+test('restoreTaskBlock: a note that got shorter meanwhile takes the task at its end', () => {
+  assert.deepEqual(restoreTaskBlock('a\n', 9, ['- [ ] t']), { text: 'a\n- [ ] t\n', line: 1 })
+  assert.deepEqual(restoreTaskBlock('', 3, ['- [ ] t']), { text: '- [ ] t', line: 0 })
+})
+
+test('parseQuickAdd: dates, priority and repeats typed in plain words', () => {
+  const q = (s) => parseQuickAdd(s, { today }) // today is Saturday 2026-10-03
+  assert.deepEqual(
+    { ...q('Call mom tomorrow !high'), found: undefined },
+    { title: 'Call mom', due: '2026-10-04', priority: 'high', recurrence: null, found: undefined },
+  )
+  assert.equal(q('Report due fri').due, '2026-10-09')
+  assert.equal(q('Report due fri').title, 'Report')
+  assert.equal(q('Plan party next friday').due, '2026-10-16')
+  assert.equal(q('mon standup').due, '2026-10-05')
+  assert.equal(q('meet on sat').due, '2026-10-10', 'never today: the coming one')
+  assert.equal(q('Dentist 12 oct').due, '2026-10-12')
+  assert.equal(q('Dentist oct 2').due, '2027-10-02', 'a day already gone this year is next year')
+  assert.equal(q('Call 1st jan').due, '2027-01-01')
+  assert.equal(q('Buy milk 2026-11-01').due, '2026-11-01')
+  assert.equal(q('in 3 days do x').due, '2026-10-06')
+  assert.equal(q('Party next week').due, '2026-10-05', 'next week starts on Monday')
+  assert.equal(q('do it today').due, today)
+  assert.equal(q('Ship it !!!').priority, 'highest')
+  assert.equal(q('Ship it !!').priority, 'high')
+  assert.equal(q('Ship it !3').priority, 'medium')
+  assert.deepEqual([q('Pay rent every month').title, q('Pay rent every month').recurrence], ['Pay rent', 'every month'])
+  const plants = q('water plants every monday and thursday !low')
+  assert.deepEqual([plants.title, plants.recurrence, plants.due, plants.priority], ['water plants', 'every monday and thursday', null, 'low'])
+})
+
+test('parseQuickAdd leaves words alone that only look like phrases', () => {
+  const q = (s, o) => parseQuickAdd(s, { today, ...o })
+  for (const s of ['I sat on the sun', 'sort out the wed dress', 'weekly report', 'today']) {
+    const r = q(s)
+    assert.deepEqual([r.title, r.due, r.found.length], [s, null, 0], s)
+  }
+  // inside a link or code
+  assert.equal(q('review [[Project tomorrow]]').due, null)
+  assert.equal(q('run `make monday`').due, null)
+  // a phrase the person said to keep
+  const kept = q('Plan friday party', { ignore: ['friday'] })
+  assert.deepEqual([kept.title, kept.due], ['Plan friday party', null])
+  // found says what was understood, in the words typed
+  assert.deepEqual(q('Call Mom Tomorrow').found, [{ kind: 'due', text: 'Tomorrow', value: '2026-10-04' }])
 })

@@ -6,20 +6,24 @@ import { boardColumns, columnFields, columnOf, compareFinished, compareTasks, da
 import * as A from '../lib/actions.js'
 import { draggedTask, isTaskDrag, moveToColumn, taskKey } from '../lib/planner.js'
 import { dueLabel } from '../lib/util.js'
-import { TaskCard } from './TaskParts.jsx'
+import { ParsedChips, TaskCard, useQuickParse } from './TaskParts.jsx'
 
 export const PAGE = 40 // cards shown in a column before "Show more"
 
-/** Adds cards one after another: Enter adds and stays, Escape closes */
+/**
+ * Adds cards one after another: Enter adds and stays, Escape closes. A date, a
+ * priority or a repeat can be typed in the title ("tomorrow", "!high", "every week").
+ */
 function Composer({ onAdd, onClose }) {
   const [text, setText] = useState('')
   const input = useRef(null)
+  const { parsed, keep } = useQuickParse(text)
   useEffect(() => input.current?.focus(), [])
   const submit = () => {
-    const title = text.trim()
-    if (!title) return
+    if (!parsed.title) return
+    const { title, due, priority, recurrence } = parsed
     setText('')
-    onAdd(title)
+    onAdd(title, Object.fromEntries(Object.entries({ due, priority, recurrence }).filter(([, v]) => v)))
   }
   return (
     <div className="pl-composer" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && !text.trim() && onClose()}>
@@ -27,7 +31,7 @@ function Composer({ onAdd, onClose }) {
         ref={input}
         rows={2}
         aria-label="Title of the new card"
-        placeholder="Enter a title…"
+        placeholder="Title… “Pay rent fri !high”"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -40,6 +44,7 @@ function Composer({ onAdd, onClose }) {
           }
         }}
       />
+      <ParsedChips found={parsed.found} onKeep={keep} />
       <div className="pl-composer-actions">
         <button type="button" className="btn btn-primary btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={submit}>
           Add card
@@ -65,7 +70,8 @@ function Column({ col, group, tasks, lists, today, ws, canEdit, onOpen }) {
   const day = dragging && group === 'date' && columnFields(group, col.id, today, dateKeyOf(dragging))
   const target = day && (day.due || day.scheduled || day.start)
 
-  const add = (title) => A.addTask({ title, quiet: true, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v)) })
+  // what was typed in the title wins over what the column would give
+  const add = (title, typed = {}) => A.addTask({ title, quiet: true, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v)), ...typed })
 
   return (
     <section

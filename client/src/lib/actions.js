@@ -688,6 +688,23 @@ export async function addTask({ title, day, quiet = false, ...fields }) {
   }
 }
 
+/** Deletes a task and its checklist from its note, with a moment to take it back */
+export async function deleteTask(task, { ws = app().wsId } = {}) {
+  try {
+    const r = await api.removeTask(ws, { path: task.path, line: task.line, title: task.text })
+    const undo = () =>
+      api.restoreTask(ws, { path: task.path, line: r.line, block: r.block }).catch((e) => {
+        toast.error(e)
+      })
+    toast.success(r.block.length > 1 ? 'Task and its checklist deleted' : 'Task deleted', { timeout: 7000, action: { label: 'Undo', run: undo } })
+    return r
+  } catch (e) {
+    toast.error(e)
+    if (ws === app().wsId) app().refreshIndex()
+    return null
+  }
+}
+
 /** Adds a subtask to the line below a task, in its own note */
 export async function addSubtask(task, title) {
   try {

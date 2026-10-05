@@ -15,7 +15,7 @@ import { cloudStatus } from './cloudsync.js'
 import { extname, isNote, basename, dirname, safeName, joinPath } from '../shared/paths.js'
 import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
 import { scanDir } from './fsutil.js'
-import { MAX_TASK_EDITS, addSubtask, applyTaskEdit, applyTaskEdits, appendTask, insertNext, newTaskLine, isIsoDate, toggleTaskLine, TaskChangedError } from '../shared/tasks.js'
+import { MAX_TASK_EDITS, MAX_RESTORE_LINES, addSubtask, applyTaskEdit, applyTaskEdits, appendTask, insertNext, newTaskLine, isIsoDate, toggleTaskLine, removeTask, restoreTaskBlock, TaskChangedError } from '../shared/tasks.js'
 import path from 'node:path'
 
 export const wsRouter = express.Router()
@@ -474,6 +474,53 @@ wsRouter.post('/:id/tasks/add', async (req, res) => {
     throw e
   }
   res.json({ path: p, line: at })
+})
+
+// Deletes a task, with its checklist: { path, line, title } as for an update.
+// Answers { line, block }, which /tasks/restore takes to put it back (undo).
+wsRouter.post('/:id/tasks/remove', async (req, res) => {
+  const p = safePath(req.body?.path)
+  notePathAccess(req, 'editor', p)
+  const { line, title } = req.body || {}
+  if (!Number.isInteger(line) || line < 0) throw new HttpError(400, 'A task line is required')
+  const rt = await getRuntime(req.ws.id)
+  let result = null
+  try {
+    await rt.updateNote(
+      p,
+      (text) => {
+        result = removeTask(text, { line, title })
+        return result.text
+      },
+      { userId: req.user.id },
+    )
+  } catch (e) {
+    if (e instanceof TaskChangedError) throw new HttpError(409, e.message)
+    throw e
+  }
+  res.json({ line: result.line, block: result.block })
+})
+
+// Puts back a task that was deleted: { path, line, block } from /tasks/remove.
+wsRouter.post('/:id/tasks/restore', async (req, res) => {
+  const p = safePath(req.body?.path)
+  notePathAccess(req, 'editor', p)
+  const { line, block } = req.body || {}
+  const ok = Array.isArray(block) && block.length > 0 && block.length <= MAX_RESTORE_LINES && block.every((l) => typeof l === 'string' && l.length <= 20000 && !l.includes('\n'))
+  if (!Number.isInteger(line) || line < 0 || !ok) throw new HttpError(400, 'Nothing to put back')
+  const rt = await getRuntime(req.ws.id)
+  if (!rt.hasFile(p)) throw new HttpError(404, 'That note is gone')
+  let at = 0
+  await rt.updateNote(
+    p,
+    (text) => {
+      const r = restoreTaskBlock(text, line, block)
+      at = r.line
+      return r.text
+    },
+    { userId: req.user.id },
+  )
+  res.json({ line: at })
 })
 
 // ---------------- history ----------------
