@@ -32,7 +32,8 @@ function plainItem(state, line, lead) {
   return blocks === 1
 }
 
-// { ranges: [[from, to]], hang: Map(line start -> px) }: what was measured where
+// { ranges: [[from, to]], hang: Map(line start -> px), held: Set(line start) }:
+// what was measured where, and the lines in those ranges left as they were
 const setHang = StateEffect.define()
 
 const mark = (px) => Decoration.line({ class: 'cm-lp-hang', attributes: { style: `--hang:${px}px` } })
@@ -43,10 +44,10 @@ const hangField = StateField.define({
     deco = deco.map(tr.changes)
     for (const e of tr.effects) {
       if (!e.is(setHang)) continue
-      const { ranges, hang } = e.value
+      const { ranges, hang, held } = e.value
       // lines out of view keep what they had, so scrolling back to them changes nothing
       deco = deco.update({
-        filter: (from) => !ranges.some(([a, b]) => from >= a && from <= b),
+        filter: (from) => held.has(from) || !ranges.some(([a, b]) => from >= a && from <= b),
         add: [...hang].sort((x, y) => x[0] - y[0]).map(([from, px]) => mark(px).range(from)),
       })
     }
@@ -70,15 +71,25 @@ const measurer = ViewPlugin.fromClass(
     }
     read(view) {
       const hang = new Map()
+      const held = new Set()
       const scale = view.scaleX || 1
-      const { doc } = view.state
+      const { doc, selection } = view.state
       const ranges = view.visibleRanges.map(({ from, to }) => [doc.lineAt(from).from, to])
+      // While the selection covers an item's bullet, live preview shows the raw
+      // "- " instead, which is a little narrower or wider. Such a line keeps the
+      // indent it had: measuring it again would re-wrap it under a dragging mouse,
+      // which moves the text, which moves the selection, and the page shakes.
+      const covered = (from, to) => selection.ranges.some((r) => r.from <= to && r.to >= from)
       for (const [from, to] of ranges) {
         for (let pos = from; pos <= to; ) {
           const line = doc.lineAt(pos)
           pos = line.to + 1
           const m = LEAD.exec(line.text)
           if (!m || !plainItem(view.state, line, m[0].length)) continue
+          if (covered(line.from, line.from + m[0].length)) {
+            held.add(line.from)
+            continue
+          }
           const a = view.coordsAtPos(line.from, 1)
           const b = view.coordsAtPos(line.from + m[0].length, 1)
           // both on the first row (a lead too wide for the column wraps itself: leave that line be)
@@ -86,20 +97,20 @@ const measurer = ViewPlugin.fromClass(
           hang.set(line.from, round((b.left - a.left) / scale))
         }
       }
-      return { doc, ranges, hang }
+      return { doc, ranges, hang, held }
     }
-    write({ doc, ranges, hang }, view) {
+    write({ doc, ranges, hang, held }, view) {
       // what is there already, for the lines just measured
       const now = new Map()
       view.state.field(hangField).between(0, doc.length, (from, to, d) => {
-        if (ranges.some(([a, b]) => from >= a && from <= b)) now.set(from, d.spec.attributes.style)
+        if (!held.has(from) && ranges.some(([a, b]) => from >= a && from <= b)) now.set(from, d.spec.attributes.style)
       })
       if (now.size === hang.size && [...hang].every(([k, v]) => now.get(k) === `--hang:${v}px`)) return
       queueMicrotask(() => {
         if (this.gone) return
         // the text changed in between: those positions are stale, measure again
         if (view.state.doc !== doc) return view.requestMeasure(this.measure)
-        view.dispatch({ effects: setHang.of({ ranges, hang }) })
+        view.dispatch({ effects: setHang.of({ ranges, hang, held }) })
       })
     }
     destroy() {
