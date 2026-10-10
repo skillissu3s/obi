@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { UpdateSettings } from '../Updates.jsx'
 import {
   User, Palette, Pencil, Layers, Users, FolderGit2, Trash2, Info, LogOut, KeyRound, Monitor, Sun, Moon, RefreshCw,
   Download, Upload, Plus, Check, X, Shield, Cloud, AlertTriangle, ExternalLink, Copy, CalendarDays, FileText, Clock,
@@ -1106,6 +1107,7 @@ function AboutSection() {
     <>
       <h2>About Obi</h2>
       <p className="section-sub">A calm, fast, self-hosted home for your markdown notes.</p>
+      <UpdateSettings />
       <h3>Keyboard shortcuts</h3>
       <div className="shortcut-list">
         {shortcuts.map(([k, v]) => (

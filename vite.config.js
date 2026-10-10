@@ -1,13 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
+import fs from 'node:fs'
 
 const target = process.env.OBI_API || 'http://localhost:3000'
+// the version the app shows in Settings → About (and compares on the web)
+const version = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf8')).version
 
 export default defineConfig({
   root: 'client',
   publicDir: 'public',
   plugins: [react()],
+  define: { __APP_VERSION__: JSON.stringify(version) },
   resolve: {
     alias: { '@shared': path.resolve(import.meta.dirname, 'shared') },
   },

@@ -41,6 +41,20 @@ app.use(
 
 app.get('/healthz', (req, res) => res.json({ ok: true }))
 
+// Which build of the app this server hands out: the version, and the app's
+// entry script (its name carries a hash of its contents, so any change to the
+// app gives a new one). An open tab compares it with the script it is running
+// and offers a reload once the server has been updated (client/src/lib/updates.js).
+const VERSION = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version
+let ENTRY = null
+try {
+  ENTRY = /<script[^>]+src="([^"]*\/assets\/main-[^"]+\.js)"/.exec(fs.readFileSync(path.join(DIST, 'index.html'), 'utf8'))?.[1] || null
+} catch {}
+app.get('/api/version', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  res.json({ version: VERSION, entry: ENTRY })
+})
+
 app.use('/api', express.json({ limit: '20mb' }), csrfGuard)
 app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRouter)

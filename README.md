@@ -322,6 +322,15 @@ universal macOS `.dmg` (Apple silicon and Intel) and the Linux AppImage and
 `.deb` on GitHub Actions, and attaches them to a draft release; publishing it
 moves the intro page's download links to the new version.
 
+**Updates.** The desktop app looks for a newer release a few seconds after it
+starts and every six hours (and on *Settings → About → Check for updates*). On
+Windows, and in the Linux AppImage, it downloads the update in the background
+and says *Obi x.y.z is ready* with a *Restart* button; if you don't restart, it
+installs the next time the app quits. The macOS build can't replace itself until
+it is signed by Apple, and a `.deb` belongs to the system's package manager, so
+there it offers the download instead. In the browser, an open tab notices when
+the server has been updated (`/api/version`) and offers a reload.
+
 The installers are not signed with a paid certificate: Windows SmartScreen asks
 for *More info → Run anyway*, and macOS (the app is ad-hoc signed, not
 notarised) asks for *System Settings → Privacy & Security → Open Anyway* the

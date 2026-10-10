@@ -12,4 +12,16 @@ contextBridge.exposeInMainWorld('obiDesktop', {
   reveal: (dir) => ipcRenderer.invoke('obi:reveal', dir),
   documentsFolder: () => ipcRenderer.invoke('obi:documents'),
   reauth: () => ipcRenderer.invoke('obi:reauth'),
+  // new releases: their state, checking now, restarting into one (desktop/updates.js)
+  updates: {
+    state: () => ipcRenderer.invoke('obi:update-state'),
+    check: () => ipcRenderer.invoke('obi:update-check'),
+    install: () => ipcRenderer.invoke('obi:update-install'),
+    openDownload: () => ipcRenderer.invoke('obi:update-download'),
+    onChange: (fn) => {
+      const listener = (e, state) => fn(state)
+      ipcRenderer.on('obi:update', listener)
+      return () => ipcRenderer.removeListener('obi:update', listener)
+    },
+  },
 })

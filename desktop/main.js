@@ -7,6 +7,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, session, nativeTheme } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { setupUpdates } from './updates.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -151,6 +152,7 @@ app.whenReady().then(async () => {
     return
   }
   createWindow()
+  setupUpdates({ beforeInstall: stopServerOnce })
   app.on('activate', () => {
     if (!BrowserWindow.getAllWindows().length) createWindow()
   })
@@ -161,11 +163,13 @@ app.on('window-all-closed', () => {
 })
 
 // save open notes and finish syncing before the process goes
+function stopServerOnce() {
+  if (stopped || !server) return Promise.resolve()
+  stopped = true
+  return Promise.race([server.stopServer(), new Promise((r) => setTimeout(r, 10000))]).catch(() => {})
+}
 app.on('before-quit', (e) => {
   if (stopped || !server) return
   e.preventDefault()
-  stopped = true
-  Promise.race([server.stopServer(), new Promise((r) => setTimeout(r, 10000))])
-    .catch(() => {})
-    .finally(() => app.quit())
+  stopServerOnce().finally(() => app.quit())
 })

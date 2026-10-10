@@ -556,6 +556,15 @@
   font-size: inherit;
   white-space: nowrap;
 }
+/* a new version to take (components/Updates.jsx) */
+.status-item.status-update {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+button.status-item.status-update:hover {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
 button.status-item {
   cursor: pointer;
 }
@@ -1136,4 +1145,28 @@ button.status-item:disabled {
 .rp-tabs .icon-btn.active {
   background: var(--accent-soft);
   color: var(--accent-text);
+}
+
+/* Settings → About: version and updates */
+.update-setting .setting-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.update-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.update-line svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.update-line .ok {
+  color: var(--success);
+}
+.update-line .bad {
+  color: var(--danger);
 }

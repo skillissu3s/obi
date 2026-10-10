@@ -7,6 +7,7 @@ import { conn } from './lib/socket.js'
 import { LoginPage, RegisterPage, SetupPage, SignupPage } from './pages/Auth.jsx'
 import { Toasts, Dialogs, ContextMenu } from './components/ui.jsx'
 import { ErrorBoundary } from './components/ErrorBoundary.jsx'
+import { UpdateWatcher } from './components/Updates.jsx'
 
 const AppShell = lazy(() => import('./pages/AppShell.jsx'))
 const AdminPage = lazy(() => import('./pages/Admin.jsx'))
@@ -87,6 +88,7 @@ export function App() {
         <Suspense fallback={<Splash />}>{page}</Suspense>
       </ErrorBoundary>
       <Toasts />
+      <UpdateWatcher />
       <Dialogs />
       <ContextMenu />
     </>

@@ -8,6 +8,7 @@ import { syncNow } from '../lib/actions.js'
 import { conn } from '../lib/socket.js'
 import { timeAgo, readingTime } from '../lib/util.js'
 import { WorkspacePeople } from './People.jsx'
+import { UpdatePill } from './Updates.jsx'
 import { HardDrive } from 'lucide-react'
 import { dapi } from '../lib/desktop.js'
 import { cloudStatusText } from './Desktop.jsx'
@@ -168,6 +169,7 @@ export function StatusBar() {
       )}
       <WorkspacePeople people={[...people.values()]} />
       <span className="status-spacer" />
+      <UpdatePill />
       {/* markdown notes only: a whiteboard zooms by itself (its own controls) */}
       {tab?.kind === 'note' && isNote(tab.path) && <ZoomChip />}
       {tab?.kind === 'note' && tab.ws === wsId && treeMap.get(tab.path)?.mtime > 0 && (
