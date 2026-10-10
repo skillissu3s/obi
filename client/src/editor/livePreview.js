@@ -12,6 +12,56 @@ export const refreshEffect = StateEffect.define()
 
 // Block widgets (properties, tables, math, diagrams, whiteboards) only step aside for the
 // cursor while the editor actually has focus, so an unfocused note stays fully rendered.
+// What live preview shows as typed follows the selection — except while a mouse
+// drag is making one. Revealing markup under a moving selection (a list's "- [ ]",
+// "**", a table's source) re-wraps lines under the pointer, which moves the text,
+// which moves the selection, and the page shook. So from the button going down
+// until it comes up, the selection that decides it stays what it was; on release
+// it catches up once.
+export const setRevealFreeze = StateEffect.define()
+export const revealFreeze = StateField.define({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setRevealFreeze)) return e.value
+    return value && tr.docChanged ? value.map(tr.changes) : value
+  },
+})
+/** The selection live preview reveals markup for */
+export const revealSelection = (state) => state.field(revealFreeze, false) || state.selection
+const isFreeze = (tr) => tr.effects.some((e) => e.is(setRevealFreeze))
+
+const freezeWhileDragging = ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this.view = view
+      this.release = () => {
+        window.removeEventListener('mouseup', this.release, true)
+        window.removeEventListener('blur', this.release)
+        if (!this.gone && view.state.field(revealFreeze, false)) view.dispatch({ effects: setRevealFreeze.of(null) })
+      }
+    }
+    destroy() {
+      this.gone = true
+      window.removeEventListener('mouseup', this.release, true)
+      window.removeEventListener('blur', this.release)
+    }
+  },
+  {
+    eventHandlers: {
+      mousedown(e, view) {
+        if (e.button !== 0) return false
+        view.dispatch({ effects: setRevealFreeze.of(view.state.selection) })
+        window.addEventListener('mouseup', this.release, true)
+        window.addEventListener('blur', this.release)
+        return false
+      },
+    },
+  },
+)
+
+/** Holds what is revealed still while a mouse drag selects (see revealFreeze) */
+export const revealOnRelease = [revealFreeze, freezeWhileDragging]
+
 export const setEditorFocus = StateEffect.define()
 export const editorFocusField = StateField.define({
   create: () => false,
@@ -544,7 +594,7 @@ function buildDecorations(view) {
   const ctx = state.facet(editorCtx)
   const doc = state.doc
   const focused = view.hasFocus
-  const ranges = state.selection.ranges
+  const ranges = revealSelection(state).ranges
   const decos = []
   const seen = new Set()
   const activeLines = new Set()
@@ -556,6 +606,12 @@ function buildDecorations(view) {
     }
   }
   const touches = (from, to) => focused && ranges.some((r) => r.from <= to && r.to >= from)
+  // A list's bullet or checkbox is shown as typed only for editing it: the
+  // cursor at it, or a selection inside it. A selection passing over it leaves
+  // it drawn, since swapping it for the wider or narrower "- [ ]" would re-wrap
+  // the line under a dragging mouse, move the text below, and with it the
+  // selection — the page shook.
+  const editingMark = (from, to) => focused && ranges.some((r) => (r.empty ? r.from >= from && r.from <= to : r.from >= from && r.to <= to))
   const lineActive = (pos) => activeLines.has(doc.lineAt(pos).number)
   const add = (deco, from, to) => {
     const key = `${from}:${to}:${deco.spec.class || deco.spec.widget?.constructor.name || 'r'}`
@@ -719,7 +775,7 @@ function buildDecorations(view) {
             const start = listMark ? listMark.from : node.from
             const checked = /[xX]/.test(doc.sliceString(node.from + 1, node.to - 1))
             if (checked) addLine(node.from, 'cm-lp-task-done')
-            if (!touches(start, node.to)) add(Decoration.replace({ widget: new CheckboxWidget(checked) }), start, node.to)
+            if (!editingMark(start, node.to)) add(Decoration.replace({ widget: new CheckboxWidget(checked) }), start, node.to)
             return
           }
           case 'ListMark': {
@@ -730,7 +786,7 @@ function buildDecorations(view) {
             }
             if (item?.parent?.name !== 'BulletList') return
             if (item.getChild('Task')) return
-            if (!touches(node.from, node.to + 1)) add(Decoration.replace({ widget: new TextWidget('•', 'cm-lp-bullet') }), node.from, node.to)
+            if (!editingMark(node.from, node.to + 1)) add(Decoration.replace({ widget: new TextWidget('•', 'cm-lp-bullet') }), node.from, node.to)
             return
           }
           case 'Blockquote': {
@@ -855,12 +911,14 @@ export const livePreview = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view)
     }
     update(update) {
+      // (a selection moving under a held mouse changes nothing that is shown)
+      const frozen = !!update.state.field(revealFreeze, false)
       if (
         update.docChanged ||
-        update.selectionSet ||
+        (update.selectionSet && !frozen) ||
         update.viewportChanged ||
         update.focusChanged ||
-        update.transactions.some((tr) => tr.effects.some((e) => e.is(refreshEffect))) ||
+        update.transactions.some((tr) => isFreeze(tr) || tr.effects.some((e) => e.is(refreshEffect))) ||
         syntaxTree(update.startState) !== syntaxTree(update.state)
       ) {
         this.decorations = buildDecorations(update.view)
@@ -880,7 +938,7 @@ function soloEmbedLine(doc, from, to) {
 function buildBlocks(state) {
   const ctx = state.facet(editorCtx)
   const doc = state.doc
-  const ranges = state.selection.ranges
+  const ranges = revealSelection(state).ranges
   const focused = state.field(editorFocusField, false)
   const touches = (from, to) => focused && ranges.some((r) => r.from <= to && r.to >= from)
   const decos = []
@@ -963,8 +1021,8 @@ export const blockWidgets = StateField.define({
   update(value, tr) {
     if (
       tr.docChanged ||
-      tr.selection ||
-      tr.effects.some((e) => e.is(refreshEffect) || e.is(setEditorFocus)) ||
+      (tr.selection && !tr.state.field(revealFreeze, false)) ||
+      tr.effects.some((e) => e.is(refreshEffect) || e.is(setEditorFocus) || e.is(setRevealFreeze)) ||
       syntaxTree(tr.startState) !== syntaxTree(tr.state)
     )
       return buildBlocks(tr.state)

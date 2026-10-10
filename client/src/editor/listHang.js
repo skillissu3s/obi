@@ -14,6 +14,7 @@
 import { StateEffect, StateField } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
+import { revealSelection } from './livePreview.js'
 
 // indentation, the mark, an optional task box, and the space before the text
 const LEAD = /^([ \t]*)([-*+]|\d{1,9}[.)])([ \t]+\[[ xX/-]\])?[ \t]+(?=\S)/
@@ -73,13 +74,14 @@ const measurer = ViewPlugin.fromClass(
       const hang = new Map()
       const held = new Set()
       const scale = view.scaleX || 1
-      const { doc, selection } = view.state
+      const { doc } = view.state
+      const selection = revealSelection(view.state)
       const ranges = view.visibleRanges.map(({ from, to }) => [doc.lineAt(from).from, to])
-      // While the selection covers an item's bullet, live preview shows the raw
-      // "- " instead, which is a little narrower or wider. Such a line keeps the
-      // indent it had: measuring it again would re-wrap it under a dragging mouse,
-      // which moves the text, which moves the selection, and the page shakes.
-      const covered = (from, to) => selection.ranges.some((r) => r.from <= to && r.to >= from)
+      // While the cursor is at an item's bullet, live preview shows the raw "- "
+      // (livePreview.js, editingMark), a little narrower or wider than the bullet.
+      // Such a line keeps the indent it had rather than re-wrapping as the cursor
+      // comes and goes; it is measured again once the cursor leaves the bullet.
+      const covered = (from, to) => selection.ranges.some((r) => (r.empty ? r.from >= from && r.from <= to : r.from >= from && r.to <= to))
       for (const [from, to] of ranges) {
         for (let pos = from; pos <= to; ) {
           const line = doc.lineAt(pos)
