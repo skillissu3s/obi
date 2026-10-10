@@ -779,6 +779,12 @@ function buildDecorations(view) {
             return
           }
           case 'ListMark': {
+            // ⚠ LAYOUT CONTRACT — the item's indentation is a box of its own
+            // (.cm-lp-indent in editor.css, .obi-indent on the published page), so a
+            // tab in it is as wide as it is from the start of the line, whatever
+            // padding the line's hanging indent adds (listHang.js)
+            const line = doc.lineAt(node.from)
+            if (node.from > line.from && !doc.sliceString(line.from, node.from).trim()) add(Decoration.mark({ class: 'cm-lp-indent' }), line.from, node.from)
             const item = node.node.parent
             if (item?.parent?.name === 'OrderedList') {
               add(Decoration.mark({ class: 'cm-lp-number' }), node.from, node.to)

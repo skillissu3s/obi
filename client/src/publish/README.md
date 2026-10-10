@@ -47,6 +47,12 @@ is what this contract guards.
      an item that is one line of text gets it (not one whose paragraph runs
      over several source lines, holds a second block, or sits in a quote), on
      both sides alike.
+   - **An item's indentation is a box of its own** (`.cm-lp-indent` /
+     `.obi-indent`, `display: inline-block`): tab stops count from the edge of
+     the box a tab is in, and the hanging indent's padding moves the line's edge,
+     so a tab directly in the line changed width every time the indent was
+     applied and tab-indented items never settled (the page shook while
+     selecting). In its own box a tab is as wide as from the start of the line.
    - **An empty item** (`- ` alone) is one line with its bullet, as in the editor.
    - **A task's checkbox** is sized in the text's em (`font-size: inherit`, a
      form control's default is smaller), and the space after `[ ]` stays, so

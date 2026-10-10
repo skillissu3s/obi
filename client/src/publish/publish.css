@@ -167,6 +167,9 @@ main {
   padding: 0;
 }
 #content .obi-indent {
+  /* .cm-lp-indent: a box of its own, so its tabs count from the start of the line
+     and not from the edge the hanging indent's padding moves */
+  display: inline-block;
   white-space: pre;
 }
 /* .cm-lp-hang: publish/main.js gives a list item a hanging indent (inline

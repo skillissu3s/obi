@@ -59,15 +59,23 @@ const hangField = StateField.define({
 
 const round = (n) => Math.round(n * 100) / 100
 
+// A line whose measured indent changes again and again in a short while is in
+// some loop between its indent and its own layout; it keeps the value it has
+// rather than shake. (Text edits start the count afresh.)
+const RESTLESS = 3
+const RESTLESS_MS = 2000
+
 const measurer = ViewPlugin.fromClass(
   class {
     constructor(view) {
       this.view = view
+      this.changes = new Map() // line start -> { n, since }
       this.measure = { read: (v) => this.read(v), write: (m, v) => this.write(m, v) }
       view.requestMeasure(this.measure)
       document.fonts?.ready.then(() => !this.gone && view.requestMeasure(this.measure))
     }
     update(u) {
+      if (u.docChanged) this.changes.clear()
       if (u.docChanged || u.viewportChanged || u.geometryChanged || u.selectionSet) u.view.requestMeasure(this.measure)
     }
     read(view) {
@@ -107,7 +115,23 @@ const measurer = ViewPlugin.fromClass(
       view.state.field(hangField).between(0, doc.length, (from, to, d) => {
         if (!held.has(from) && ranges.some(([a, b]) => from >= a && from <= b)) now.set(from, d.spec.attributes.style)
       })
-      if (now.size === hang.size && [...hang].every(([k, v]) => now.get(k) === `--hang:${v}px`)) return
+      // lines that keep changing keep what they have
+      const t = Date.now()
+      for (const [k, v] of [...hang]) {
+        const had = now.get(k)
+        if (had == null || had === `--hang:${v}px`) continue
+        const c = this.changes.get(k)
+        const fresh = !c || t - c.since > RESTLESS_MS
+        const n = fresh ? 1 : c.n + 1
+        this.changes.set(k, { n, since: fresh ? t : c.since })
+        if (n > RESTLESS) {
+          hang.delete(k)
+          held.add(k)
+        }
+      }
+      // nothing to do when every measured line already has its value, and no line lost one
+      const stale = [...hang].some(([k, v]) => now.get(k) !== `--hang:${v}px`) || [...now.keys()].some((k) => !held.has(k) && !hang.has(k))
+      if (!stale) return
       queueMicrotask(() => {
         if (this.gone) return
         // the text changed in between: those positions are stale, measure again

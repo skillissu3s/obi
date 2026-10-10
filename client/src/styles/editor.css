@@ -525,6 +525,15 @@
 .obi-editor .cm-line.cm-lp-hang * {
   text-indent: 0;
 }
+/* ⚠ LAYOUT CONTRACT — a list item's indentation (spaces or tabs) as a box of its
+   own. Tab stops count from the edge of the box a tab is in: in the line itself
+   that edge moves with the hanging indent's padding, so a tab's width (and with
+   it where the text starts) changed every time the indent was applied, and the
+   line never settled. Mirrored by .obi-indent in publish.css. */
+.cm-lp-indent {
+  display: inline-block;
+  white-space: pre;
+}
 .cm-lp-checkbox {
   display: inline-flex;
   align-items: center;
