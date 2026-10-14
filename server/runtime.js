@@ -312,6 +312,8 @@ class WorkspaceRuntime {
       if (!(await exists(abs))) return
       await fs.rm(abs, { force: true })
     } else {
+      // the same drawings written again change nothing: no write, nothing to sync
+      if ((await fs.readFile(abs, 'utf8').catch(() => null)) === text) return
       await atomicWrite(abs, text)
     }
     this.markDirty(rel)
@@ -857,7 +859,7 @@ class WorkspaceRuntime {
     }
     const delay = Math.max(5, Number(s.autoSyncSeconds ?? 30)) * 1000
     clearTimeout(this.syncTimer)
-    this.syncTimer = setTimeout(() => this.requestSync(), delay)
+    this.syncTimer = setTimeout(() => this.requestSync({ fromSave: true }), delay)
   }
 
   startPullLoop() {
@@ -875,19 +877,24 @@ class WorkspaceRuntime {
   }
 
   // push: false only commits and pulls. message: this commit's message.
-  requestSync({ push = true, message } = {}) {
+  // fromSave: asked for by a save — when it turns out nothing changed, GitHub is
+  // left alone (fetching others' changes is the pull loop's job).
+  requestSync({ push = true, message, fromSave = false } = {}) {
     if (this.type !== 'github' || this.closed) return Promise.resolve(this.syncStatus())
     if (this.syncPromise) {
       this.syncAgain = true
+      this.syncAgainFull ||= !fromSave
       return this.syncPromise
     }
     this.syncPromise = (async () => {
       try {
         do {
           this.syncAgain = false
-          await this.lock.run(() => this.doSync({ push, message }))
+          await this.lock.run(() => this.doSync({ push, message, skipIfClean: fromSave }))
           push = true
           message = undefined
+          fromSave = !this.syncAgainFull
+          this.syncAgainFull = false
         } while (this.syncAgain && !this.closed)
       } finally {
         this.syncPromise = null
@@ -897,7 +904,7 @@ class WorkspaceRuntime {
     return this.syncPromise
   }
 
-  async doSync({ initial = false, push = true, message: custom } = {}) {
+  async doSync({ initial = false, push = true, message: custom, skipIfClean = false } = {}) {
     if (this.initError && !initial) {
       // try again from scratch
       try {
@@ -911,20 +918,32 @@ class WorkspaceRuntime {
     clearTimeout(this.syncTimer)
     this.syncTimer = null
     this.syncState.syncing = true
-    this.setSync({ state: initial ? 'cloning' : 'syncing' })
+    // a save's sync shows "Syncing" only once git finds something to send
+    const quiet = skipIfClean && !initial
+    if (!quiet) this.setSync({ state: initial ? 'cloning' : 'syncing' })
     try {
       await this.flushDocs()
       const opts = this.gitOpts()
-      const files = [...this.dirtyPaths]
-      const summary = files.length
-        ? `${files.length === 1 ? 'Update' : `Update ${files.length} files:`} ${files.slice(0, 3).map(commitLabel).join(', ')}${files.length > 3 ? ` +${files.length - 3} more` : ''}`
-        : 'Update notes'
-      const message = String(custom || '').trim() || commitMessage(this.settings.commitMessage, { summary, files })
+      // the message names what git is actually committing, not every file that was saved
+      const message = (files) => {
+        if (quiet) this.setSync({ state: 'syncing' })
+        const summary = files.length
+          ? `${files.length === 1 ? 'Update' : `Update ${files.length} files:`} ${files.slice(0, 3).map(commitLabel).join(', ')}${files.length > 3 ? ` +${files.length - 3} more` : ''}`
+          : 'Update notes'
+        return String(custom || '').trim() || commitMessage(this.settings.commitMessage, { summary, files })
+      }
       const dirtyBefore = new Set(this.dirtyPaths)
-      let result = await git.syncRepo(this.dir, { ...opts, message, push })
+      let result = await git.syncRepo(this.dir, { ...opts, message, push, skipIfClean: quiet })
       if (result.retry) result = await git.syncRepo(this.dir, { ...opts, message, push })
       if (result.retry) throw new Error('Push was rejected, will retry shortly')
       for (const f of dirtyBefore) this.dirtyPaths.delete(f)
+      if (result.clean) {
+        // nothing to commit, and GitHub was not asked: back to where it was
+        this.syncState.dirty = this.dirtyPaths.size > 0
+        this.syncState.syncing = false
+        this.setSync({ state: this.syncState.dirty ? 'dirty' : 'idle', error: null })
+        return
+      }
       if (!initial) await this.applyRemoteChanges(result.changed)
       const t = now()
       run('UPDATE workspaces SET last_sync_at = ?, sync_error = NULL WHERE id = ?', t, this.id)

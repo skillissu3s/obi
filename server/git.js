@@ -188,19 +188,40 @@ async function showStage(dir, stage, file) {
   return r.code === 0 ? r.stdout : null
 }
 
+// The paths `git status --porcelain -z` lists (a rename gives its new path)
+function statusPaths(out) {
+  const parts = out.split('\0')
+  const paths = []
+  for (let i = 0; i < parts.length; i++) {
+    const e = parts[i]
+    if (e.length < 4) continue
+    paths.push(e.slice(3))
+    if (e[0] === 'R' || e[0] === 'C') i++ // the old path follows
+  }
+  return paths
+}
+
 /**
  * Full sync cycle: commit local changes, fetch, merge (saving conflict copies), push.
- * Returns { changed: string[] | null (null = unknown/all), pushed, conflicts }
+ * `message` is the commit message, or a function of the paths being committed.
+ * `skipIfClean`: when there is nothing to commit, stop there — no fetch, no push
+ * (a save that changed nothing). Returns { changed: string[] | null (null =
+ * unknown/all), pushed, conflicts, committed: string[], clean }
  */
-export async function syncRepo(dir, { url, branch, token, username, authorName, authorEmail, message, push = true }) {
+export async function syncRepo(dir, { url, branch, token, username, authorName, authorEmail, message, push = true, skipIfClean = false }) {
   const auth = { token, username }
   const ident = ['-c', `user.name=${authorName || 'Obi'}`, '-c', `user.email=${authorEmail || 'obi@localhost'}`]
   await runGit(dir, ['remote', 'set-url', 'origin', url])
 
   await must(dir, ['add', '-A'])
   const st = await must(dir, ['status', '--porcelain', '-z'])
-  if (st.stdout.replace(/\0/g, '').trim()) {
-    await must(dir, [...ident, 'commit', '--no-verify', '-q', '-m', message || 'Update notes'])
+  const committed = statusPaths(st.stdout)
+  if (committed.length) {
+    const text = typeof message === 'function' ? message(committed) : message
+    await must(dir, [...ident, 'commit', '--no-verify', '-q', '-m', text || 'Update notes'])
+  } else if (skipIfClean) {
+    // the save changed nothing git can see: GitHub is not even asked
+    return { changed: [], pushed: false, conflicts: [], committed, clean: true }
   }
 
   const before = await revParse(dir, 'HEAD')
@@ -291,7 +312,7 @@ export async function syncRepo(dir, { url, branch, token, username, authorName, 
       await runGit(dir, ['update-ref', remoteRef, 'HEAD'])
     }
   }
-  return { changed, pushed, conflicts }
+  return { changed, pushed, conflicts, committed, clean: false }
 }
 
 export async function fileHistory(dir, file, limit = 50) {
