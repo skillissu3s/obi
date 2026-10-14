@@ -23,6 +23,7 @@ function load() {
     mode: oneOf(s.mode, ['month', 'week', 'agenda']), // the calendar
     side: oneOf(s.side, ['day', 'plan']), // and which side panel it shows,
     panel: s.panel !== false, // if any
+    project: typeof s.project === 'string' ? s.project : null, // where new tasks go (lib/projects.js)
   }
 }
 

@@ -1,9 +1,9 @@
 import {
   FilePlus, FolderPlus, CalendarDays, Search, Network, ListChecks, Settings, PanelLeft, PanelRight, Eye, Code2, Sun, Moon,
   Maximize2, SplitSquareHorizontal, X, RefreshCw, Share2, Globe, History, Pencil, Trash2, Copy, Link2, Star, Shuffle,
-  Download, Upload, LogOut, ShieldCheck, Command, FolderInput, Keyboard, Plus, LayoutGrid, BookOpen, Undo2, Redo2,
+  Download, Upload, LogOut, ShieldCheck, Command, FolderInput, Keyboard, Plus, BookOpen, Undo2, Redo2,
   Bold, Italic, Quote, IndentIncrease, IndentDecrease, Hash, Users, Layers, Palette, Shapes, PencilRuler, PanelLeftOpen,
-  Printer, ZoomIn, ZoomOut,
+  Printer, ZoomIn, ZoomOut, SquareKanban,
 } from 'lucide-react'
 import { indentMore, indentLess, undo, redo } from '@codemirror/commands'
 import { yUndoManagerKeymap } from 'y-codemirror.next'
@@ -18,6 +18,7 @@ import { isDesktop } from './desktop.js'
 import { api } from './api.js'
 import { conn } from './socket.js'
 import * as A from './actions.js'
+import { createProject, projectName, taskTarget } from './projects.js'
 import { toggleWrap, insertLink, toggleTask, setHeading, toggleQuote } from '../editor/commands.js'
 import { editorCtx } from '../editor/livePreview.js'
 import { dirname, isNote, stripExt, basename } from '@shared/paths.js'
@@ -77,21 +78,22 @@ export function buildCommands() {
     { id: 'new-whiteboard', name: 'New whiteboard', icon: Shapes, hotkey: 'Alt+B', group: 'File', run: () => A.createWhiteboard({ folder: currentFolder() }) },
     { id: 'insert-whiteboard', name: 'Insert a new whiteboard into this note', icon: Shapes, group: 'Editor', hidden: !activeView, run: () => insertWhiteboard() },
     { id: 'canvas-tools', name: 'Toggle canvas tools on notes', icon: PencilRuler, hotkey: 'Alt+C', group: 'View', run: () => window.dispatchEvent(new CustomEvent('obi:canvas-bar')) },
-    { id: 'new-board', name: 'New board (Kanban)', icon: LayoutGrid, group: 'File', run: async () => {
-        const { emptyBoardContent } = await import('./kanban.js')
-        A.createNote({ folder: currentFolder(), title: 'Board', content: emptyBoardContent() })
+    { id: 'new-project', name: 'New project (a board of lists and cards)', icon: SquareKanban, group: 'File', run: async () => {
+        const name = await promptDialog({ title: 'New project', placeholder: 'Project name', confirmText: 'Create' })
+        if (name?.trim()) createProject(name)
       } },
+    { id: 'projects', name: 'Show projects', icon: SquareKanban, hotkey: 'Mod+Shift+P', group: 'Navigate', run: () => layout.setLeftTab('projects') },
     { id: 'daily-note', name: "Open today's daily note", icon: CalendarDays, hotkey: 'Mod+D', group: 'File', run: () => A.openDailyNote() },
     { id: 'quick-switch', name: 'Quick switcher: open note', icon: Search, hotkey: 'Mod+O', group: 'Navigate', run: () => ui.openPalette('files') },
     { id: 'command-palette', name: 'Command palette', icon: Command, hotkey: 'Mod+K', group: 'Navigate', run: () => ui.openPalette('commands') },
     { id: 'search', name: 'Search in all notes', icon: Search, hotkey: 'Mod+Shift+F', group: 'Navigate', run: () => layout.setLeftTab('search') },
     { id: 'search-note', name: 'Find in current note', icon: Search, hotkey: 'Mod+F', group: 'Navigate', run: ed((v) => openSearchPanel(v)) },
     { id: 'graph', name: 'Open graph view', icon: Network, hotkey: 'Mod+G', group: 'Navigate', run: () => layout.openView('graph') },
-    { id: 'tasks', name: 'Open tasks', icon: ListChecks, group: 'Navigate', run: () => layout.openView('tasks') },
+    { id: 'tasks', name: 'Open all tasks', icon: ListChecks, group: 'Navigate', run: () => layout.openView('tasks') },
     { id: 'calendar', name: 'Open calendar', icon: CalendarDays, group: 'Navigate', run: () => layout.openView('calendar') },
     { id: 'mini-calendar', name: 'Show the calendar in the side panel', icon: CalendarDays, group: 'View', run: () => layout.setRightTab('calendar') },
     { id: 'add-task', name: 'Add a task…', icon: ListChecks, hotkey: 'Alt+A', group: 'File', run: async () => {
-        const title = await promptDialog({ title: 'Add a task', placeholder: "Goes in today's note", confirmText: 'Add' })
+        const title = await promptDialog({ title: 'Add a task', placeholder: `Goes to ${projectName(taskTarget())}`, confirmText: 'Add' })
         if (title?.trim()) A.addTask({ title })
       } },
     { id: 'random-note', name: 'Open random note', icon: Shuffle, group: 'Navigate', run: () => {

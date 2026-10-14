@@ -13,7 +13,7 @@ import { useUI, toast } from '../store/ui.js'
 import { useNoteZoom } from '../store/zoom.js'
 import { Editor } from './Editor.jsx'
 import { Reader } from './Reader.jsx'
-import { Board } from './Board.jsx'
+import { ProjectBoard } from './ProjectBoard.jsx'
 import { NoteCanvas } from '../canvas/NoteCanvas.jsx'
 import { menuFromElement } from './ui.jsx'
 import { PeopleButton, OffscreenCursors } from './People.jsx'
@@ -280,7 +280,6 @@ export function NoteView({ tab, paneId, active }) {
           <p>{handle.error}</p>
         </div>
       )
-    if (mode === 'board') return <Board handle={handle} readOnly={readOnly} />
     return (
       <ZoomFrame zoom={zoom} reflow={mode === 'read'}>
         <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`} ref={mode === 'read' ? undefined : setInnerEl}>
@@ -387,9 +386,22 @@ export function NoteView({ tab, paneId, active }) {
           </button>
         )}
       </div>
-      <div className="note-scroll" ref={setScroll} tabIndex={-1}>
-        {body()}
-      </div>
+      {/* a project (a board note) is a board of its own, which scrolls sideways */}
+      {mode === 'board' && isBoard && !creating && handle?.status === 'ready' ? (
+        <ProjectBoard
+          key={`${handle.key}:${handle.generation}`}
+          handle={handle}
+          readOnly={readOnly}
+          title={title}
+          onRename={foreign ? undefined : () => renameEntry(tab.path)}
+          onMarkdown={() => setMode('live')}
+          onDelete={foreign ? undefined : () => deleteEntry(tab.path)}
+        />
+      ) : (
+        <div className="note-scroll" ref={setScroll} tabIndex={-1}>
+          {body()}
+        </div>
+      )}
       {view && mode !== 'read' && <OffscreenCursors collab={collab} view={view} scrollEl={scrollEl} />}
       {handle?.status === 'ready' && (mode === 'live' || mode === 'source') && view && originEl && scrollEl && (
         <NoteCanvas key={`${handle.key}:${handle.generation}`} tab={tab} view={view} scrollEl={scrollEl} innerEl={innerEl} originEl={originEl} stageEl={stageEl} mode={mode} />

@@ -1,13 +1,14 @@
 // Everything about one task in one dialog, each change written straight to its
 // line. Opened from a card, a row or a chip on either page.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Flag, FileText, ListChecks, Plus, Trash2, X } from 'lucide-react'
+import { Flag, FileText, ListChecks, Plus, SquareKanban, Trash2, X } from 'lucide-react'
 import { PRIORITIES, addDays, checklistOf, cleanTag, isIsoDate, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
 import { basename, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import * as A from '../lib/actions.js'
 import { taskKey, useCanEdit, useTasks, useToday } from '../lib/planner.js'
+import { listsOf, placeOf } from '../lib/projects.js'
 import { Modal } from './ui.jsx'
 import { colorFor } from '../lib/util.js'
 import { PRIORITY_LABEL, TaskBox, TaskMeta } from './TaskParts.jsx'
@@ -18,7 +19,7 @@ const STATUSES = [
   ['x', 'Done'],
   ['-', 'Cancelled'],
 ]
-const REPEATS = [
+export const REPEATS = [
   ['', 'Does not repeat'],
   ['every day', 'Every day'],
   ['every weekday', 'Every weekday'],
@@ -67,7 +68,7 @@ function Field({ label, children }) {
 // one digit, a day missing. Only a whole date is one (the year has four digits).
 const isWholeDate = (v) => isIsoDate(v) && v >= '1000'
 
-function DateField({ value, onChange, today }) {
+export function DateField({ value, onChange, today }) {
   const [typed, setTyped] = useState(null) // what the input holds while it is being typed into
   const quick = [
     ['Today', today],
@@ -281,17 +282,39 @@ function TaskDialog({ at, onClose }) {
   if (!task) return null
   const change = (patch) => A.updateTask(task, patch)
   const { title: words, tags } = splitTags(task.text)
+  const place = task.indent ? null : placeOf(task) // (a checklist item isn't a card)
+  const lists = place ? listsOf(task.path) : []
 
   return (
     <Modal title={null} label="Task" onClose={onClose} className="task-dialog" bodyClass="td-shell">
       <div className="td" ref={root} tabIndex={-1}>
         <div className="td-main">
-          <button type="button" className="td-source" title={`Open ${task.path} at this line`} onClick={() => (useLayout.getState().openNote(ws, task.path, { line: task.line }), onClose())}>
-            <FileText />
-            {stripExt(basename(task.path))}
-            <span className="faint">· line {task.line + 1}</span>
-            <span className="td-source-go">Open in note →</span>
-          </button>
+          {place ? (
+            // a project's card: its board, and the list it is in (moving it there follows the project's rules)
+            <div className="td-place">
+              <button type="button" className="td-source" title={`Open the ${place.project} board`} onClick={() => (useLayout.getState().openNote(ws, task.path), onClose())}>
+                <SquareKanban />
+                {place.project}
+                <span className="td-source-go">Open board →</span>
+              </button>
+              <span className="faint">in</span>
+              <select className="cd-list" aria-label="List" value={place.list || ''} disabled={!canEdit} onChange={(e) => A.moveTaskToList(task, e.target.value)}>
+                {!lists.includes(place.list) && <option value={place.list || ''}>{place.list || '—'}</option>}
+                {lists.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <button type="button" className="td-source" title={`Open ${task.path} at this line`} onClick={() => (useLayout.getState().openNote(ws, task.path, { line: task.line }), onClose())}>
+              <FileText />
+              {stripExt(basename(task.path))}
+              <span className="faint">· line {task.line + 1}</span>
+              <span className="td-source-go">Open in note →</span>
+            </button>
+          )}
           <fieldset disabled={!canEdit}>
             <textarea
               ref={title}

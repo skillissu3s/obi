@@ -3,7 +3,7 @@ import {
   HardDrive, ChevronRight, FileText, Folder, FolderOpen, FilePlus, FolderPlus, Search, Hash, Star, Share2, Users, ChevronDown,
   MoreHorizontal, Pencil, Trash2, Copy, FolderInput, SplitSquareHorizontal, Link2, History, ListFilter, X, Image, File,
   SortAsc, PanelLeftClose, Layers, Plus, Settings2, Cloud, FolderGit2, LogOut, CheckCircle2, Globe, Shapes, ChevronsDownUp,
-  Network, ListChecks, CalendarDays, Settings,
+  Network, CalendarDays, Settings, SquareKanban,
 } from 'lucide-react'
 import { userMenu } from '../lib/userMenu.js'
 import { wsWhere } from '../lib/desktop.js'
@@ -17,6 +17,7 @@ import { WsIcon, menuFromElement, Avatar } from './ui.jsx'
 import { basename, dirname, stripExt, isNote, extname, joinPath, IMAGE_EXT } from '@shared/paths.js'
 import { debounce, timeAgo, fuzzyFilter, plainSnippet } from '../lib/util.js'
 import { isBoardPath } from '@shared/board.js'
+import { ProjectsPanel } from './ProjectsPanel.jsx'
 
 const ROW_H = 28
 
@@ -704,6 +705,7 @@ export function Sidebar({ user, closed }) {
 
   const tabs = [
     { id: 'files', icon: FileText, title: 'Files' },
+    { id: 'projects', icon: SquareKanban, title: 'Projects & tasks (Ctrl/⌘ Shift P)' },
     { id: 'search', icon: Search, title: 'Search (Ctrl/⌘ Shift F)' },
     { id: 'tags', icon: Hash, title: 'Tags' },
     { id: 'bookmarks', icon: Star, title: 'Bookmarks & recent' },
@@ -767,6 +769,7 @@ export function Sidebar({ user, closed }) {
       {leftTab === 'search' && <SearchPanel />}
       {leftTab === 'tags' && <TagsPanel />}
       {leftTab === 'bookmarks' && <BookmarksPanel />}
+      {leftTab === 'projects' && <ProjectsPanel />}
       <div className="sidebar-footer">
         {user && (
           <button className="sidebar-user" onClick={(e) => userMenu(e, user)} title="Account">
@@ -776,9 +779,6 @@ export function Sidebar({ user, closed }) {
         )}
         <button className="icon-btn" title="Graph view (Ctrl/⌘ G)" onClick={() => useLayout.getState().openView('graph')}>
           <Network />
-        </button>
-        <button className="icon-btn" title="Tasks" onClick={() => useLayout.getState().openView('tasks')}>
-          <ListChecks />
         </button>
         {/* the calendar is how you reach any other day; Ctrl/⌘ D still jumps straight to today */}
         <button className="icon-btn" title="Calendar — today's note is Ctrl/⌘ D" onClick={() => useLayout.getState().openView('calendar')}>

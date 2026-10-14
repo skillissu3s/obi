@@ -1,5 +1,6 @@
-// The Tasks page: every task in the workspace as a board (a column for each
-// status, day or priority) or a list, with the filters and the Schedule beside it.
+// The All tasks page: every task in the workspace — the cards of every project
+// and the tasks written in notes — as a board (a column for each status, day or
+// priority) or a list, with the filters and the Schedule beside it.
 import { useMemo, useState } from 'react'
 import { CalendarDays, LayoutGrid, List as ListIcon, ListChecks } from 'lucide-react'
 import { BOARD_GROUPS, boardColumns, columnOf, compareFinished, compareTasks, isOpen, taskDate } from '@shared/tasks.js'
@@ -120,7 +121,7 @@ export function TasksView() {
   return (
     <div className="tasks-view pl" ref={root}>
       <header className="pl-head">
-        <h2>Tasks</h2>
+        <h2>All tasks</h2>
         <span className="badge">{counts.open} open</span>
         {counts.overdue > 0 && <span className="badge danger">{counts.overdue} overdue</span>}
         <span className="badge success">{counts.done} done</span>

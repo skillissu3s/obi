@@ -2,12 +2,14 @@
 // and the card, row and chip they are put together in. The dialog that opens
 // from any of them is in TaskDialog.jsx.
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import { Ban, CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Hourglass, ListChecks, Pencil, Play, Plus, Repeat, Trash2, X } from 'lucide-react'
+import { Ban, CalendarDays, CheckCircle2, Circle, ExternalLink, FileText, Flag, Hourglass, ListChecks, Pencil, Play, Plus, Repeat, SquareKanban, Trash2, X } from 'lucide-react'
 import { PRIORITIES, addDays, isOpen, parseQuickAdd, splitTags, todayIso, weekStartOf } from '@shared/tasks.js'
 import { basename, stripExt } from '@shared/paths.js'
 import { colorFor, dateOfIso, dueLabel, formatDate } from '../lib/util.js'
 import { renderInline } from '../lib/render.js'
 import { plainTitle, startDrag, toggleTag } from '../lib/planner.js'
+import { inboxPath, placeOf, projectName, taskTarget, useProjects } from '../lib/projects.js'
+import { usePlanner } from '../store/planner.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
@@ -162,22 +164,42 @@ export function TaskMeta({ task, today }) {
   )
 }
 
-// The note a task is written in; the icon matters: a daily note is called
-// "2026-09-17", which without it reads like a due date sitting among the real ones
+// Where a task is: a project's card shows its project and list, any other task
+// its note. The icon matters: a daily note is called "2026-09-17", which without
+// it reads like a due date sitting among the real ones.
 function Source({ task, ws }) {
+  const place = placeOf(task)
   return (
     <button
       type="button"
       className="task-source"
-      title={`Open ${task.path}`}
+      title={place ? `Open the ${place.project} board` : `Open ${task.path}`}
       onClick={(e) => {
         e.stopPropagation()
-        useLayout.getState().openNote(ws, task.path, { line: task.line })
+        useLayout.getState().openNote(ws, task.path, place ? {} : { line: task.line })
       }}
     >
-      <FileText />
-      {stripExt(basename(task.path))}
+      {place ? <SquareKanban /> : <FileText />}
+      {place ? `${place.project}${place.list ? ` · ${place.list}` : ''}` : stripExt(basename(task.path))}
     </button>
+  )
+}
+
+/** Where new tasks go: the Inbox or another project (remembered for next time) */
+export function ProjectPicker() {
+  const projects = useProjects()
+  usePlanner((s) => s.project) // (follows a pick made elsewhere)
+  const target = taskTarget()
+  const inbox = inboxPath()
+  const options = projects.some((p) => p.path === inbox) ? projects : [{ path: inbox, name: projectName(inbox) }, ...projects]
+  return (
+    <select className="input task-add-proj" value={target} title="The project it goes to" aria-label="Project" onChange={(e) => usePlanner.getState().set({ project: e.target.value })}>
+      {options.map((p) => (
+        <option key={p.path} value={p.path}>
+          {p.name}
+        </option>
+      ))}
+    </select>
   )
 }
 
@@ -352,8 +374,8 @@ export const TaskRow = memo(function TaskRow({ task, today, ws, canEdit, onOpen,
 
 /**
  * Adds a task: its words, and a day and a priority if you like — typed ("Call Sam
- * tomorrow !high every week") or picked. Without `day` it goes in today's note;
- * with one, in that day's note, due that day unless another date was typed.
+ * tomorrow !high every week") or picked. It goes to a project (the Inbox unless
+ * another is picked); with `day`, due that day unless another date was typed.
  */
 export function QuickAdd({ day = null, autoFocus = false }) {
   const [text, setText] = useState('')
@@ -371,7 +393,7 @@ export function QuickAdd({ day = null, autoFocus = false }) {
   const submit = async () => {
     if (!parsed.title || busy) return
     setBusy(true)
-    const r = await A.addTask({ title: parsed.title, day: day || undefined, due: when || day || undefined, priority: pri || undefined, recurrence: parsed.recurrence || undefined })
+    const r = await A.addTask({ title: parsed.title, due: when || day || undefined, priority: pri || undefined, recurrence: parsed.recurrence || undefined })
     setBusy(false)
     if (r) {
       setText('')
@@ -390,7 +412,7 @@ export function QuickAdd({ day = null, autoFocus = false }) {
           className="task-add-input"
           autoFocus={autoFocus}
           aria-label="New task"
-          placeholder={day ? `Add a task for ${formatDate(dateOfIso(day), 'ddd D MMM')}…` : 'Add a task… try “Call Sam tomorrow !high”'}
+          placeholder={day ? `Add a task for ${formatDate(dateOfIso(day), 'ddd D MMM')}…` : `Add a task to ${projectName(taskTarget())}… try “Call Sam tomorrow !high”`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -414,6 +436,7 @@ export function QuickAdd({ day = null, autoFocus = false }) {
                 <input type="date" className="input task-add-date" value={when} onChange={(e) => setDue(e.target.value)} title="Due date" aria-label="Due date" />
               </>
             )}
+            <ProjectPicker />
             <select className="input task-add-pri" value={pri} onChange={(e) => setPriority(e.target.value)} title="Priority" aria-label="Priority">
               <option value="">Priority</option>
               {PRIORITIES.map((p) => (

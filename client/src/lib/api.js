@@ -99,6 +99,7 @@ export const api = {
   updateTask: (id, body) => request('POST', `${W(id)}/tasks/update`, body),
   updateTasks: (id, body) => request('POST', `${W(id)}/tasks/update-many`, body),
   addTask: (id, body) => request('POST', `${W(id)}/tasks/add`, body),
+  moveTask: (id, body) => request('POST', `${W(id)}/tasks/move`, body),
   removeTask: (id, body) => request('POST', `${W(id)}/tasks/remove`, body),
   restoreTask: (id, body) => request('POST', `${W(id)}/tasks/restore`, body),
   history: (id, path) => request('GET', `${W(id)}/history${q({ path })}`),

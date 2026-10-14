@@ -16,6 +16,7 @@ import { extname, isNote, basename, dirname, safeName, joinPath } from '../share
 import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
 import { scanDir } from './fsutil.js'
 import { MAX_TASK_EDITS, MAX_RESTORE_LINES, addSubtask, applyTaskEdit, applyTaskEdits, appendTask, insertNext, newTaskLine, isIsoDate, toggleTaskLine, removeTask, restoreTaskBlock, TaskChangedError } from '../shared/tasks.js'
+import { isBoardContent, applyStatusRules, addCardToText, moveCardInText } from '../shared/kanban.js'
 import path from 'node:path'
 
 export const wsRouter = express.Router()
@@ -340,7 +341,13 @@ wsRouter.post('/:id/tasks/update', async (req, res) => {
     await rt.updateNote(
       p,
       (text) => {
-        result = applyTaskEdit(text, { line, title, patch, today: taskDay(req.body.today), dropNext: req.body.dropNext === true })
+        const today = taskDay(req.body.today)
+        result = applyTaskEdit(text, { line, title, patch, today, dropNext: req.body.dropNext === true })
+        // a card of a project whose status changed: the project's rules (it may move to another list)
+        if (patch.status != null && result.task) {
+          const ruled = applyStatusRules(result.text, [{ line: result.line, status: result.task.status }], { today })
+          if (ruled.text !== result.text) result = { ...result, text: ruled.text, line: ruled.lines[0] ?? result.line }
+        }
         return result.text
       },
       { userId: req.user.id },
@@ -394,7 +401,12 @@ wsRouter.post('/:id/tasks/update-many', async (req, res) => {
           const edits = at.map((i) => ({ line: items[i].line, title: items[i].title, patch: items[i].patch, dropNext: items[i].dropNext === true }))
           const r = applyTaskEdits(text, edits, { today })
           at.forEach((i, n) => (results[i] = r.results[n]))
-          return r.text
+          // cards of a project whose status changed: the project's rules
+          const changed = at.filter((i) => items[i].patch.status != null && results[i]?.task)
+          if (!changed.length) return r.text
+          const ruled = applyStatusRules(r.text, changed.map((i) => ({ line: results[i].line, status: results[i].task.status })), { today })
+          changed.forEach((i, n) => ruled.lines[n] != null && (results[i] = { ...results[i], line: ruled.lines[n] }))
+          return ruled.text
         },
         { userId: req.user.id },
       )
@@ -423,7 +435,7 @@ wsRouter.post('/:id/tasks/toggle', async (req, res) => {
       lines[line] = r.line
       if (r.next) insertNext(lines, line, r.next)
       task = r.line
-      return lines.join('\n')
+      return applyStatusRules(lines.join('\n'), [{ line, status: /\[(.)\]/.exec(r.line)[1] }], { today: taskDay(req.body?.today) }).text
     },
     { userId: req.user.id },
   )
@@ -432,7 +444,8 @@ wsRouter.post('/:id/tasks/toggle', async (req, res) => {
 
 // Adds a task to the end of a note (made if it isn't there yet), or with `under`
 // ({ line, title }, as for an update) as a subtask of a task in it:
-// { path, title, status ('/'), due, scheduled, start, priority, recurrence, today, template, under }
+// { path, title, status ('/'), due, scheduled, start, priority, recurrence, today, template, under, list }
+// In a project (a board note) the task is a card, in the list `list` or the first.
 wsRouter.post('/:id/tasks/add', async (req, res) => {
   const p = safePath(req.body?.path)
   notePathAccess(req, 'editor', p)
@@ -463,6 +476,11 @@ wsRouter.post('/:id/tasks/add', async (req, res) => {
           at = r.line
           return r.text
         }
+        if (isBoardContent(text)) {
+          const r = addCardToText(text, line, { list: typeof req.body.list === 'string' ? req.body.list : null, today: taskDay(req.body.today) })
+          at = r.line
+          return r.text
+        }
         const next = appendTask(text, line)
         at = next.replace(/\n$/, '').split('\n').length - 1
         return next
@@ -474,6 +492,29 @@ wsRouter.post('/:id/tasks/add', async (req, res) => {
     throw e
   }
   res.json({ path: p, line: at })
+})
+
+// Moves a card of a project to another of its lists: { path, line, title, list, today },
+// the card found as for an update. The project's rules for leaving and entering
+// lists apply. Answers { line }: where the card is now.
+wsRouter.post('/:id/tasks/move', async (req, res) => {
+  const p = safePath(req.body?.path)
+  notePathAccess(req, 'editor', p)
+  const { line, title, list } = req.body || {}
+  if (!Number.isInteger(line) || line < 0 || typeof list !== 'string' || !list.trim()) throw new HttpError(400, 'A card line and a list are required')
+  const rt = await getRuntime(req.ws.id)
+  let at = line
+  await rt.updateNote(
+    p,
+    (text) => {
+      const r = isBoardContent(text) ? moveCardInText(text, { line, title }, list, { today: taskDay(req.body.today) }) : null
+      if (!r) throw new HttpError(409, 'That card has changed — refresh and try again')
+      at = r.line
+      return r.text
+    },
+    { userId: req.user.id },
+  )
+  res.json({ line: at })
 })
 
 // Deletes a task, with its checklist: { path, line, title } as for an update.

@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
-import { FilePlus, CalendarDays, Search, Network, FileText, Clock, Star, ListChecks, Sparkles, Upload, FolderGit2, Cloud, LayoutGrid, Shapes, PencilRuler } from 'lucide-react'
+import { FilePlus, CalendarDays, Search, Network, FileText, Clock, Star, ListChecks, Sparkles, Upload, FolderGit2, Cloud, Shapes, SquareKanban, Plus, Inbox } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
-import { useUI } from '../store/ui.js'
+import { useUI, promptDialog } from '../store/ui.js'
 import * as A from '../lib/actions.js'
 import { runCommand } from '../lib/commands.js'
+import { createProject, useProjects } from '../lib/projects.js'
 import { timeAgo, modKey, formatDate, dueLabel, plainSnippet } from '../lib/util.js'
 import { basename, stripExt } from '@shared/paths.js'
 import { compareTasks, isOpen, taskDate, todayIso } from '@shared/tasks.js'
@@ -20,6 +21,11 @@ export function Home() {
   const recent = useMemo(() => A.recentNotes(8), [version])
   const stats = useMemo(() => A.workspaceStats(), [version])
   const bookmarks = (prefs.bookmarks[wsId] || []).slice(0, 6)
+  const projects = useProjects()
+  const newProject = async () => {
+    const name = await promptDialog({ title: 'New project', message: 'A board of lists and cards, kept as a markdown note in your Projects folder.', placeholder: 'Project name', confirmText: 'Create' })
+    if (name?.trim()) createProject(name)
+  }
   // open tasks whose day has come (or gone), most pressing first
   const tasks = useMemo(() => {
     const today = todayIso()
@@ -94,6 +100,31 @@ export function Home() {
             </div>
           </div>
         )}
+
+        <div className="home-projects">
+          <h3>
+            <SquareKanban /> Projects
+            <button className="btn btn-ghost btn-sm" onClick={() => useLayout.getState().setLeftTab('projects')} title={`All projects (${modKey} ⇧ P)`}>
+              All →
+            </button>
+          </h3>
+          <div className="hp-grid">
+            {projects.slice(0, 7).map((p) => (
+              <button key={p.path} className="hp-tile" style={{ '--pj': p.color }} onClick={(e) => useLayout.getState().openNote(wsId, p.path, { newTab: e.metaKey || e.ctrlKey })}>
+                <span className="hp-name">
+                  {p.inbox && <Inbox />}
+                  {p.name}
+                </span>
+                <span className="hp-meta">{p.total ? `${p.open} open · ${p.total} ${p.total === 1 ? 'card' : 'cards'}` : 'No cards yet'}</span>
+              </button>
+            ))}
+            {ws?.role !== 'viewer' && (
+              <button className="hp-tile hp-new" onClick={newProject}>
+                <Plus /> New project
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="home-cols">
           <div className="home-section">

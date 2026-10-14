@@ -6,8 +6,10 @@ import { usePrefs } from '../store/prefs.js'
 import { toast, confirmDialog, promptDialog, useUI } from '../store/ui.js'
 import { basename, dirname, stripExt, joinPath, isNote, safeName, extname } from '@shared/paths.js'
 import { isBoardPath, emptyBoard } from '@shared/board.js'
-import { formatDate, isoDate, dateOfIso, downloadUrl, copyText } from './util.js'
+import { formatDate, isoDate, downloadUrl, copyText } from './util.js'
 import { MAX_TASK_EDITS, previewEdit, todayIso } from '@shared/tasks.js'
+import { newProjectContent } from '@shared/kanban.js'
+import { isArchived, projectName, taskTarget } from './projects.js'
 import { fetchNote } from './render.js'
 import { conn } from './socket.js'
 
@@ -571,14 +573,16 @@ export function recentNotes(limit = 8) {
 // shows them can tell which ones changed.
 const withPath = new WeakMap()
 
-// every task in the workspace, each with the note it is in
+// every task in the workspace, each with the note it is in (but the cards a
+// project has archived: those are put away)
 export function allTasks() {
   const out = []
-  for (const [path, meta] of app().notes) {
+  const notes = app().notes
+  for (const [path, meta] of notes) {
     for (const task of meta.tasks || []) {
       let t = withPath.get(task)
       if (!t) withPath.set(task, (t = { ...task, path }))
-      out.push(t)
+      if (!isArchived(t, notes)) out.push(t)
     }
   }
   return out
@@ -666,24 +670,37 @@ export async function updateTasks(items, { ws = app().wsId } = {}) {
 }
 
 /**
- * Adds a task to a day's note — today's, or `day`'s (yyyy-mm-dd) — made from its
- * template if that day has none yet. `fields`: status ('/'), due, scheduled,
- * start, priority, recurrence. `quiet`: no toast, for when the task shows up
- * where the person is looking.
+ * Adds a task, as a card of a project: `project` (its path), else the one last
+ * picked, else the Inbox (made if it isn't there yet). It goes in the list
+ * `list`, else where the project's rules put a task of its status (the first
+ * list for an open one). `day` makes it due that day unless `due` says otherwise.
+ * `fields`: status ('/'), due, scheduled, start, priority, recurrence. `quiet`:
+ * no toast, for when the task shows up where the person is looking.
  */
-export async function addTask({ title, day, quiet = false, ...fields }) {
+export async function addTask({ title, day, project, list, quiet = false, ...fields }) {
   const s = app()
   const ws = s.wsId
-  const date = day ? dateOfIso(day) : new Date()
-  const path = dailyNotePath(date)
+  const path = project || taskTarget()
+  if (day && !fields.due && !fields.scheduled && !fields.start) fields.due = day
   try {
-    const template = s.treeMap.has(path) ? undefined : await newDailyContent(ws, date, wsSettings())
-    const r = await api.addTask(ws, { path, title, ...fields, today: todayIso(), template })
+    const template = s.treeMap.has(path) ? undefined : newProjectContent()
+    const r = await api.addTask(ws, { path, title, ...fields, list: list || undefined, today: todayIso(), template })
     if (!s.treeMap.has(path)) s.addEntry(path)
-    if (!quiet) toast.success(`Added to ${formatDate(date, 'ddd D MMM')}'s note`, { action: { label: 'Open', run: () => openPath(ws, path, { line: r.line }) } })
+    if (!quiet) toast.success(`Added to ${projectName(path)}`, { action: { label: 'Open', run: () => openPath(ws, path) } })
     return r
   } catch (e) {
     toast.error(e)
+    return null
+  }
+}
+
+/** Moves a project's card (a task of a board note) to another of its lists; the project's rules apply */
+export async function moveTaskToList(task, list, { ws = app().wsId } = {}) {
+  try {
+    return await api.moveTask(ws, { path: task.path, line: task.line, title: task.text, list, today: todayIso() })
+  } catch (e) {
+    toast.error(e)
+    if (ws === app().wsId) app().refreshIndex()
     return null
   }
 }

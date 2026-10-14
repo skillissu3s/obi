@@ -15,7 +15,7 @@ import { basename, stripExt } from '@shared/paths.js'
 import * as A from '../lib/actions.js'
 
 const KIND_ICON = { note: FileText, graph: Network, tasks: ListChecks, calendar: CalendarDays, home: HomeIcon }
-const KIND_TITLE = { graph: 'Graph', tasks: 'Tasks', calendar: 'Calendar' }
+const KIND_TITLE = { graph: 'Graph', tasks: 'All tasks', calendar: 'Calendar' }
 
 export function Pane({ pane, isActive, multi }) {
   const panes = useLayout((s) => s.panes)

@@ -1124,7 +1124,7 @@ function AboutSection() {
         </li>
         <li>Paste or drag images straight into a note — they upload automatically.</li>
         <li>
-          Add <span className="code-inline">kanban-plugin: basic</span> to a note's front matter to turn it into a board.
+          Projects (<span className="code-inline">Ctrl/⌘ Shift P</span>) are boards of lists and cards, kept as markdown notes that Obsidian's Kanban plugin opens too.
         </li>
         <li>Notes with the same GitHub repo stay in sync with Obsidian on your desktop.</li>
       </ul>
