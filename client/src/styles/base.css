@@ -719,8 +719,12 @@ a {
   background-position: right 10px center;
   cursor: pointer;
 }
-.select option {
-  background: var(--bg-elev);
+/* the open list is drawn by the browser over white when the box is translucent
+   (--bg-input is): every select's options get a solid colour of the theme */
+select option,
+select optgroup {
+  background-color: var(--bg-elev);
+  color: var(--text);
 }
 .field {
   display: flex;
