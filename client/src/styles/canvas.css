@@ -1469,57 +1469,15 @@ h3.shortcut-group {
 
 /* ---------- drawing spaces (editor/spaces.js) ----------
    ⚠ LAYOUT CONTRACT: a space is exactly as tall as its height says (the
-   published page's .obi-space is the same) — no margins, and its outline and
-   dots are drawn inside it. Empty room to draw in: the outline, the grip and
-   the remove button only show when it is pointed at, the dots while the canvas
-   tools are out. */
+   published page's .obi-space is the same) — no margins. Plain empty room to
+   draw in, with no lines of its own: only its grip and remove button show,
+   when it is pointed at. */
 .cm-obi-space {
   position: relative;
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   cursor: default;
-}
-/* its edges: faint lines running the width of the page, not a box, so a drawing
-   wider than the text doesn't sit half in and half out of something */
-.cm-obi-space::before,
-.cm-obi-space::after {
-  content: '';
-  position: absolute;
-  left: -100vw;
-  right: -100vw;
-  height: 0;
-  border-top: 1px dashed transparent;
-  pointer-events: none;
-  transition: border-color var(--t-fast);
-}
-.cm-obi-space::before {
-  top: 0;
-}
-.cm-obi-space::after {
-  bottom: 0;
-}
-.nc-bar-open .cm-obi-space::before,
-.nc-bar-open .cm-obi-space::after {
-  border-color: rgb(var(--tint) / 0.08);
-}
-.cm-obi-space:hover::before,
-.cm-obi-space:hover::after,
-.cm-obi-space.is-resizing::before,
-.cm-obi-space.is-resizing::after {
-  border-color: rgb(var(--tint) / 0.2);
-}
-.cm-obi-space-label {
-  position: absolute;
-  top: 8px;
-  left: 0;
-  color: var(--text-faint);
-  font-family: var(--font-ui);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--t-fast);
 }
 .cm-obi-space-x {
   position: absolute;
@@ -1566,8 +1524,8 @@ h3.shortcut-group {
 .cm-obi-space.is-resizing .cm-obi-space-grip span {
   background: var(--accent);
 }
-.cm-obi-space:hover :is(.cm-obi-space-label, .cm-obi-space-x, .cm-obi-space-grip),
-.cm-obi-space.is-resizing :is(.cm-obi-space-label, .cm-obi-space-grip) {
+.cm-obi-space:hover :is(.cm-obi-space-x, .cm-obi-space-grip),
+.cm-obi-space.is-resizing .cm-obi-space-grip {
   opacity: 1;
 }
 @media (pointer: coarse) {

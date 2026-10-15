@@ -52,9 +52,6 @@ class SpaceWidget extends WidgetType {
     const actions = () => view.state.facet(spaceActions)
     if (actions()?.readOnly) return dom
 
-    const label = document.createElement('span')
-    label.className = 'cm-obi-space-label'
-    label.textContent = 'Drawing space'
     const remove = document.createElement('button')
     remove.type = 'button'
     remove.className = 'cm-obi-space-x'
@@ -99,7 +96,7 @@ class SpaceWidget extends WidgetType {
       window.addEventListener('pointerup', end)
       window.addEventListener('pointercancel', end)
     })
-    dom.append(label, remove, grip)
+    dom.append(remove, grip)
     return dom
   }
 
