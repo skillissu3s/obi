@@ -11,6 +11,7 @@ import { Modal } from './ui.jsx'
 import { PRIORITY_LABEL } from './TaskParts.jsx'
 import { DateField, REPEATS } from './TaskDialog.jsx'
 import { Label, StatusIcon, dueTone } from './CardParts.jsx'
+import { colorLabel } from '../lib/colors.js'
 
 const STATUSES = [
   [' ', 'To do'],
@@ -49,17 +50,32 @@ const grow = (el) => {
   el.style.height = `${el.scrollHeight}px`
 }
 
-function Labels({ tags, known, onChange }) {
+// A row of colours to pick from (and none), the one in use marked
+function Swatches({ value, onPick, small }) {
+  return (
+    <div className={`cd-swatches ${small ? 'small' : ''}`}>
+      {[null, ...K.PROJECT_COLORS].map((c) => (
+        <button key={c || 'none'} type="button" className={`pb-swatch ${value === c ? 'on' : ''}`} data-color={c || undefined} title={colorLabel(c)} aria-label={colorLabel(c)} aria-pressed={value === c} onClick={() => onPick(c)}>
+          {!c && <X />}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function Labels({ tags, known, onChange, colorOf, colorNameOf, onColor }) {
   const [typed, setTyped] = useState('')
+  const [picking, setPicking] = useState(null) // the label whose colour is being picked
   const add = () => {
     const tag = cleanTag(typed)
     setTyped('')
     if (tag && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) onChange([...tags, tag])
   }
   return (
+    <>
     <div className="cd-labels">
       {tags.map((t) => (
-        <Label key={t} tag={t} onRemove={() => onChange(tags.filter((x) => x !== t))} />
+        <Label key={t} tag={t} color={colorOf(t)} onClick={onColor ? () => setPicking(picking === t ? null : t) : undefined} onRemove={() => onChange(tags.filter((x) => x !== t))} />
       ))}
       <input
         className="cd-label-input"
@@ -77,6 +93,20 @@ function Labels({ tags, known, onChange }) {
         ))}
       </datalist>
     </div>
+    {picking && tags.includes(picking) && (
+      <div className="cd-label-colors">
+        <span>#{picking} on this board:</span>
+        <Swatches
+          small
+          value={colorNameOf(picking)}
+          onPick={(c) => {
+            onColor(picking, c)
+            setPicking(null)
+          }}
+        />
+      </div>
+    )}
+    </>
   )
 }
 
@@ -262,7 +292,7 @@ function RepeatField({ value, onChange }) {
 }
 
 /** `hit`: the card and its list, as findCard gives them; `change(fn)`: fn(board, card, lane) changes them */
-export function CardDialog({ board, hit, ws, path, readOnly, today, change, onArchive, onDelete, onClose }) {
+export function CardDialog({ board, hit, ws, path, readOnly, today, change, labelColor, onArchive, onDelete, onClose }) {
   const { card, lane } = hit
   const task = K.cardTask(card)
   const status = card.status ?? ' '
@@ -272,14 +302,23 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, onAr
   useLayoutEffect(() => grow(titleEl.current), [title])
   const opts = { today }
   const edit = (patch) => change((b, c) => void K.editCard(c, patch, opts))
+  // a new title: the card's cover (kept by its title) goes with it
+  const retitle = (t) =>
+    change((b, c) => {
+      const was = K.cardKey(c)
+      K.editCard(c, { title: joinTags(t, tags) }, opts)
+      K.moveCover(b, was, c)
+    })
   const typingTitle = useKeepOnClose(title, (next) => {
     const t = next.replace(/\s+/g, ' ').trim()
-    if (t) edit({ title: joinTags(t, tags) })
+    if (t) retitle(t)
   })
+  const cover = K.cardCover(board, card)
   const known = [...new Set(board.lanes.flatMap((l) => l.items.flatMap((c) => K.cardTask(c)?.tags || [])))]
 
   return (
     <Modal title={null} label="Card" onClose={onClose} className="card-dialog" bodyClass="cd-shell">
+      {cover && <div className="cd-cover" data-color={cover} />}
       <div className="cd">
         <header className="cd-head">
           <button type="button" className={`pb-check cd-check ${isOpen(status) ? '' : 'on'}`} disabled={readOnly} aria-label={isOpen(status) ? 'Mark done' : 'Mark not done'} onClick={() => change((b, c) => K.setCardStatus(b, c, isOpen(status) ? 'x' : ' ', opts))}>
@@ -303,7 +342,7 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, onAr
                 const next = e.target.value.replace(/\s+/g, ' ').trim()
                 typingTitle(null)
                 if (!next) e.target.value = title
-                else if (next !== title) edit({ title: joinTags(next, tags) })
+                else if (next !== title) retitle(next)
               }}
             />
             <div className="cd-where">
@@ -356,7 +395,17 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, onAr
                 <RepeatField value={task?.recurrence} onChange={(v) => edit({ recurrence: v })} />
               </Field>
               <Field label="Labels" wide>
-                <Labels tags={tags} known={known} onChange={(next) => change((b, c) => K.setCardTags(c, next, opts))} />
+                <Labels
+                  tags={tags}
+                  known={known}
+                  colorOf={labelColor}
+                  colorNameOf={(t) => K.labelColor(board, t)}
+                  onColor={readOnly ? null : (t, c) => change((b) => K.setLabelColor(b, t, c))}
+                  onChange={(next) => change((b, c) => K.setCardTags(c, next, opts))}
+                />
+              </Field>
+              <Field label="Cover" wide>
+                <Swatches value={cover} onPick={(c) => change((b, cd) => K.setCardCover(b, cd, c))} />
               </Field>
             </div>
             <Description text={description} ws={ws} path={path} readOnly={readOnly} onSave={(t) => change((b, c) => K.setDescription(c, t))} />

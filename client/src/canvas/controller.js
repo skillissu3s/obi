@@ -452,13 +452,17 @@ export class CanvasController {
 
   // kind: 'plain' types exactly what you type; 'markdown' follows the same
   // rules as a note, in a block you can size yourself.
+  // A new text block, centred (on the point, for a block of fixed width) unless
+  // the text style says otherwise
   createTextAt(p, kind = 'plain') {
     const s = this.styleFor('text')
     const fs = s.fs || DEFAULTS.fs
+    const align = s.align || 'center'
+    const w = 320
     const el =
       kind === 'markdown'
-        ? this.base('text', { x: p.x, y: p.y - fs * 0.7, w: 320, h: fs * 2, text: '', align: 'left', md: true, wrap: true, font: 'sans' })
-        : this.base('text', { x: p.x, y: p.y - fs * 0.7, w: 8, h: fs * 1.3, text: '', align: 'left' })
+        ? this.base('text', { x: align === 'center' ? p.x - w / 2 : p.x, y: p.y - fs * 0.7, w, h: fs * 2, text: '', align, md: true, wrap: true, font: 'sans' })
+        : this.base('text', { x: p.x, y: p.y - fs * 0.7, w: 8, h: fs * 1.3, text: '', align })
     this.addElement(el, { edit: true })
     if (!this.state.lockTool) this.set({ tool: 'select' })
   }

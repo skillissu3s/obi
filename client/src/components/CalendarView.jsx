@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, FilePlus, FileText, Filter, PanelRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FilePlus, FileText, Filter, PanelRight, Plus, Share2 } from 'lucide-react'
 import { addDays, addMonths, compareTasks, dateKeyOf, isIsoDate, isOpen, monthDays, taskDate, weekStartOf } from '@shared/tasks.js'
 import { basename, isNote, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
@@ -14,6 +14,7 @@ import { QuickAdd, TaskChip, TaskRow, dueClass } from './TaskParts.jsx'
 import { TaskFilters } from './TaskFilters.jsx'
 import { useTaskDialog } from './TaskDialog.jsx'
 import { PAGE } from './TaskBoard.jsx'
+import { shareWorkspace } from '../lib/projects.js'
 
 const MODES = [
   ['month', 'Month'],
@@ -375,6 +376,9 @@ export function CalendarView() {
             </div>
             <button type="button" className={`btn btn-sm ${filters ? 'on' : ''}`} aria-expanded={!!filtering} onClick={(e) => setFiltering(filtering ? null : e.currentTarget)}>
               <Filter /> Filter {filters > 0 && <span className="badge accent">{filters}</span>}
+            </button>
+            <button type="button" className="btn btn-sm" title="Plan together: share the calendar with your team" onClick={() => shareWorkspace('calendar')}>
+              <Share2 /> Share
             </button>
             <button type="button" className={`icon-btn ${panel ? 'active' : ''}`} title={panel ? 'Hide the side panel' : 'Show the side panel'} aria-label="Side panel" aria-pressed={panel} onClick={() => set({ panel: !panel })}>
               <PanelRight />

@@ -855,15 +855,23 @@ wsRouter.post('/:id/import', access('editor'), express.raw({ type: () => true, l
 })
 
 // ---------------- misc: shared-with-me, users ----------------
-miscRouter.get('/shared', (req, res) => {
+miscRouter.get('/shared', async (req, res) => {
   const rows = all(
     `SELECT s.workspace_id, s.path, s.role, s.created_at, w.name AS ws_name, w.icon AS ws_icon, u.display_name AS by_name
      FROM note_shares s JOIN workspaces w ON w.id = s.workspace_id LEFT JOIN users u ON u.id = s.shared_by
      WHERE s.user_id = ? ORDER BY s.created_at DESC`,
     req.user.id,
   )
+  // which of them are projects (boards), for the Projects list
+  const boards = new Set()
+  for (const wsId of new Set(rows.map((r) => r.workspace_id))) {
+    try {
+      const rt = await getRuntime(wsId)
+      for (const r of rows) if (r.workspace_id === wsId && 'kanban-plugin' in (rt.meta.get(r.path)?.frontmatter || {})) boards.add(`${wsId}\0${r.path}`)
+    } catch {}
+  }
   res.json({
-    notes: rows.map((r) => ({ ws: r.workspace_id, path: r.path, role: r.role, sharedAt: r.created_at, workspaceName: r.ws_name, workspaceIcon: r.ws_icon, sharedBy: r.by_name })),
+    notes: rows.map((r) => ({ ws: r.workspace_id, path: r.path, role: r.role, sharedAt: r.created_at, workspaceName: r.ws_name, workspaceIcon: r.ws_icon, sharedBy: r.by_name, board: boards.has(`${r.workspace_id}\0${r.path}`) || undefined })),
   })
 })
 

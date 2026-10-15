@@ -28,7 +28,8 @@ import { StorageWarning } from '../components/StorageWarning.jsx'
 import { ConnectionBanner } from '../components/ConnectionBanner.jsx'
 import { EdgeToggles } from '../components/EdgeToggles.jsx'
 import { userMenu } from '../lib/userMenu.js'
-import { basename, stripExt } from '@shared/paths.js'
+import { basename, stripExt, isNote } from '@shared/paths.js'
+import { isBoardMeta } from '@shared/kanban.js'
 import { isDesktop } from '../lib/desktop.js'
 import { DesktopWelcome, NewVaultModal } from '../components/Desktop.jsx'
 
@@ -84,6 +85,15 @@ export default function AppShell() {
   const activeTab = useLayout((s) => {
     const pane = s.panes.find((p) => p.id === s.activePane)
     return pane?.tabs.find((t) => t.id === pane.active)
+  })
+  // The right panel is about the note in front (its outline, links, info): on a
+  // whiteboard, the calendar, the task pages or a project board it has nothing to
+  // show, so it steps aside there, and comes back with the next note if it was open.
+  const panelFits = useApp((s) => {
+    const t = activeTab
+    if (t?.kind !== 'note' || !isNote(t.path)) return false
+    const board = t.ws === s.wsId && isBoardMeta(s.notes.get(t.path))
+    return !(board && (!t.mode || t.mode === 'board'))
   })
   const lastUrl = useRef(null)
   useEffect(() => {
@@ -208,9 +218,9 @@ export default function AppShell() {
           )}
         </div>
         {mobile
-          ? layout.right && !layout.focus && <RightPanel tab={activeTab} />
-          : !layout.focus && <RightPanel tab={activeTab} closed={!layout.right} />}
-        {layout.right && mobile && <div className="scrim" onClick={() => layout.toggleRight(false)} />}
+          ? layout.right && panelFits && !layout.focus && <RightPanel tab={activeTab} />
+          : !layout.focus && <RightPanel tab={activeTab} closed={!layout.right || !panelFits} />}
+        {layout.right && panelFits && mobile && <div className="scrim" onClick={() => layout.toggleRight(false)} />}
         {!mobile && !layout.focus && <EdgeToggles />}
       </div>
       <StatusBar />

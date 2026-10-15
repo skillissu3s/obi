@@ -139,6 +139,7 @@ export function parseNote(content) {
   }
 
   const aliases = frontmatter ? fmList(frontmatter.aliases ?? frontmatter.alias).filter(Boolean) : []
+  const board = frontmatter && 'kanban-plugin' in frontmatter ? boardInfo(body) : null
   return {
     links,
     tags: [...tagSet.values()],
@@ -147,6 +148,22 @@ export function parseNote(content) {
     frontmatter: frontmatter && Object.keys(frontmatter).length ? frontmatter : null,
     aliases,
     words,
+    ...(board && { board }),
+  }
+}
+
+// What the list of projects shows about a board (shared/kanban.js) that only its
+// settings block holds, a comment the rest of the parse skips: its colour.
+const BOARD_COLORS = new Set(['gray', 'red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink'])
+function boardInfo(body) {
+  const at = body.lastIndexOf('%% kanban:settings')
+  if (at < 0) return null
+  const m = /```\s*\n([\s\S]*?)\n\s*```/.exec(body.slice(at))
+  try {
+    const color = JSON.parse(m?.[1] || 'null')?.obi?.color
+    return BOARD_COLORS.has(color) ? { color } : null
+  } catch {
+    return null
   }
 }
 

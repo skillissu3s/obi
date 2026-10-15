@@ -89,7 +89,7 @@ front matter) to under the block's last line (`spaceEnds`):
 
 - **Editor**: a block widget of exactly `h` px under the line
   (`client/src/editor/spaces.js`, `.cm-obi-space` in `canvas.css`: no margins,
-  its outline is drawn inside it). CodeMirror counts it in the line's block, so
+  its edges are absolutely placed lines, adding no height). CodeMirror counts it in the line's block, so
   the line's own top stays put and every line below moves down by `h`.
 - **Published page**: `placeSpaces` in `main.js` puts a `.obi-space` block of
   `h` px just before the element of the next marked line (before a `<pre>` or

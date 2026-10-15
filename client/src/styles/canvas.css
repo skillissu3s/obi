@@ -1480,28 +1480,39 @@ h3.shortcut-group {
   padding: 0;
   cursor: default;
 }
-.cm-obi-space::before {
+/* its edges: faint lines running the width of the page, not a box, so a drawing
+   wider than the text doesn't sit half in and half out of something */
+.cm-obi-space::before,
+.cm-obi-space::after {
   content: '';
   position: absolute;
-  inset: 4px 0;
-  border: 1.5px dashed transparent;
-  border-radius: 10px;
+  left: -100vw;
+  right: -100vw;
+  height: 0;
+  border-top: 1px dashed transparent;
   pointer-events: none;
-  transition: border-color var(--t-fast), background-color var(--t-fast);
+  transition: border-color var(--t-fast);
 }
-.nc-bar-open .cm-obi-space::before {
-  background-image: radial-gradient(rgb(var(--tint) / 0.16) 1px, transparent 1.2px);
-  background-size: 16px 16px;
-  background-position: 8px 8px;
+.cm-obi-space::before {
+  top: 0;
+}
+.cm-obi-space::after {
+  bottom: 0;
+}
+.nc-bar-open .cm-obi-space::before,
+.nc-bar-open .cm-obi-space::after {
+  border-color: rgb(var(--tint) / 0.08);
 }
 .cm-obi-space:hover::before,
-.cm-obi-space.is-resizing::before {
-  border-color: rgb(var(--tint) / 0.18);
+.cm-obi-space:hover::after,
+.cm-obi-space.is-resizing::before,
+.cm-obi-space.is-resizing::after {
+  border-color: rgb(var(--tint) / 0.2);
 }
 .cm-obi-space-label {
   position: absolute;
-  top: 10px;
-  left: 12px;
+  top: 8px;
+  left: 0;
   color: var(--text-faint);
   font-family: var(--font-ui);
   font-size: 11px;
@@ -1512,8 +1523,8 @@ h3.shortcut-group {
 }
 .cm-obi-space-x {
   position: absolute;
-  top: 9px;
-  right: 6px;
+  top: 6px;
+  right: 0;
   display: grid;
   place-items: center;
   width: 22px;

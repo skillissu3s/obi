@@ -220,3 +220,40 @@ test('the list a task is in, from the index', () => {
   const t = meta.tasks.find((x) => x.text.startsWith('Set up'))
   assert.equal(laneOfTask(meta, t.line), 'Done')
 })
+
+test('colours: a card cover follows its card, labels and the board keep theirs', async () => {
+  const { setCardCover, cardCover, moveCover, cardKey, editCard, setLabelColor, labelColor, setBoardColor, boardColor, deleteCard } = await import('./kanban.js')
+  const b = parseBoard(newProjectContent())
+  const { card } = addCard(b, b.lanes[0], 'Design the logo #brand', {}, { today })
+  const { card: other } = addCard(b, b.lanes[0], 'Other', {}, { today })
+  setCardCover(b, card, 'blue')
+  assert.equal(cardCover(b, card), 'blue')
+  // done (a ✅ stamp) or retagged, it is the same card
+  setCardStatus(b, card, 'x', { today })
+  assert.equal(cardCover(b, card), 'blue')
+  const was = cardKey(card)
+  editCard(card, { title: 'Design the new logo #brand' }, { today })
+  moveCover(b, was, card)
+  assert.equal(cardCover(b, card), 'blue')
+  setLabelColor(b, 'Brand', 'pink')
+  assert.equal(labelColor(b, 'brand'), 'pink')
+  setBoardColor(b, 'purple')
+  assert.equal(boardColor(b), 'purple')
+  setBoardColor(b, 'not-a-colour')
+  assert.equal(boardColor(b), null)
+  // a cover of a card that is gone is dropped the next time covers change
+  deleteCard(b, card)
+  setCardCover(b, other, 'green')
+  assert.deepEqual(b.settings.obi.covers, { other: 'green' })
+  // and it all survives being written and read again
+  const again = parseBoard(serializeBoard(b))
+  assert.equal(cardCover(again, again.lanes[0].items[0]), 'green')
+  assert.equal(labelColor(again, 'brand'), 'pink')
+})
+
+test('the index knows a board’s colour', () => {
+  const b = parseBoard(newProjectContent())
+  b.settings.obi.color = 'teal'
+  assert.deepEqual(parseNote(serializeBoard(b)).board, { color: 'teal' })
+  assert.equal(parseNote('# plain note\n').board, undefined)
+})

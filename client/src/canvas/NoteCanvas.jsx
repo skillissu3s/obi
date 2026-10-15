@@ -632,7 +632,9 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
   )
 
   // Opens a drawing space under line `n` (1-based) — under the nearest line with
-  // text at or above it, which is what it can be pinned to.
+  // text at or above it, which is what it can be pinned to — and puts the text
+  // cursor on a line under the space to go on writing: the empty line already
+  // there, or a new one.
   const addSpace = useCallback(
     (n) => {
       if (!view || !store || store.readOnly) return
@@ -647,6 +649,13 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       if (!has(k)) return toast.info('Write a line first: a drawing space opens under a line of text.')
       store.checkpoint()
       store.add({ id: newElementId(), type: 'space', anchor: makeLineAnchor(doc, k), h: SPACE_DEFAULT, z: store.minZ() - 1, by: conn.user?.id })
+      // the space opens under the block the line is in, if that can't be split (spaceEnds)
+      const end = Math.min(doc.lines, (spaceEnds(doc.toString())[k - 1] ?? k - 1) + 1)
+      const at = doc.line(end)
+      const next = end < doc.lines ? doc.line(end + 1) : null
+      if (next && !next.text.trim()) view.dispatch({ selection: { anchor: next.from }, scrollIntoView: true })
+      else view.dispatch({ changes: { from: at.to, insert: '\n' }, selection: { anchor: at.to + 1 }, scrollIntoView: true })
+      view.focus()
       bump()
     },
     [view, store, bump],

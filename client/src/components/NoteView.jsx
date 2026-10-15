@@ -380,7 +380,7 @@ export function NoteView({ tab, paneId, active }) {
         </button>
         {/* Opens the panel from the side it lives on. Once it is open, the
             panel's own close button is the only one, so this steps aside. */}
-        {!rightOpen && (
+        {!rightOpen && mode !== 'board' && (
           <button className="icon-btn" title="Open right panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight(true)}>
             <PanelRight />
           </button>

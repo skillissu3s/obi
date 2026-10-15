@@ -15,7 +15,8 @@ export const useLayout = create((set, get) => ({
   panes: [emptyPane()],
   activePane: 'main',
   left: !isMobile(),
-  right: !isMobile() && window.innerWidth > 1280,
+  // the right panel starts closed; once opened it stays open (for notes, see AppShell)
+  right: !isMobile() && readFlag('obi:right'),
   leftTab: 'files',
   rightTab: 'outline',
   focus: false,
@@ -236,13 +237,16 @@ export const useLayout = create((set, get) => ({
     set({ left: force ?? !get().left })
   },
   toggleRight(force) {
-    set({ right: force ?? !get().right })
+    const right = force ?? !get().right
+    set({ right })
+    if (!isMobile()) writeFlag('obi:right', right)
   },
   setLeftTab(leftTab) {
     set({ leftTab, left: true })
   },
   setRightTab(rightTab) {
     set({ rightTab, right: true })
+    if (!isMobile()) writeFlag('obi:right', true)
   },
   toggleFocus(force) {
     set({ focus: force ?? !get().focus })
@@ -255,6 +259,19 @@ export const useLayout = create((set, get) => ({
 }))
 
 let persistTimer
+function readFlag(key) {
+  try {
+    return localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+function writeFlag(key, on) {
+  try {
+    localStorage.setItem(key, on ? '1' : '0')
+  } catch {}
+}
+
 function persist(state, immediate = false) {
   if (!state.wsId) return
   clearTimeout(persistTimer)

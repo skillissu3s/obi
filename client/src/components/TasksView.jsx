@@ -2,7 +2,7 @@
 // and the tasks written in notes — as a board (a column for each status, day or
 // priority) or a list, with the filters and the Schedule beside it.
 import { useMemo, useState } from 'react'
-import { CalendarDays, LayoutGrid, List as ListIcon, ListChecks } from 'lucide-react'
+import { CalendarDays, LayoutGrid, List as ListIcon, ListChecks, Share2 } from 'lucide-react'
 import { BOARD_GROUPS, boardColumns, columnOf, compareFinished, compareTasks, isOpen, taskDate } from '@shared/tasks.js'
 import { basename, dirname, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
@@ -14,6 +14,7 @@ import { TaskFilters } from './TaskFilters.jsx'
 import { TaskBoard, PAGE } from './TaskBoard.jsx'
 import { ScheduleRail } from './ScheduleRail.jsx'
 import { useTaskDialog } from './TaskDialog.jsx'
+import { shareWorkspace } from '../lib/projects.js'
 
 function Section({ section, lists, depths, today, ws, canEdit, onOpen }) {
   const [limit, setLimit] = useState(PAGE)
@@ -143,6 +144,9 @@ export function TasksView() {
           </div>
           <button type="button" className={`btn btn-sm ${rail ? 'on' : ''}`} aria-pressed={rail} title="Schedule: a month to drop cards on" onClick={() => set({ rail: !rail })}>
             <CalendarDays /> Schedule
+          </button>
+          <button type="button" className="btn btn-sm" title="Work together: share your tasks with your team" onClick={() => shareWorkspace('task list')}>
+            <Share2 /> Share
           </button>
         </div>
       </header>

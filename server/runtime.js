@@ -231,6 +231,7 @@ class WorkspaceRuntime {
       fm: m.frontmatter,
       aliases: m.aliases.length ? m.aliases : undefined,
       words: m.words,
+      board: m.board,
     }
   }
 

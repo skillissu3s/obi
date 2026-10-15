@@ -5,7 +5,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlignLeft, Archive, ArchiveRestore, ArrowRight, CalendarDays, CircleCheckBig, Flag, ListChecks, ListFilter, MoreHorizontal,
-  Palette, Pencil, Plus, Repeat, Search, SortAsc, Trash2, X, Zap, FileText,
+  Palette, Pencil, Plus, Repeat, Search, SortAsc, Trash2, X, Zap, FileText, Share2,
 } from 'lucide-react'
 import { applyToYText } from '@shared/textdiff.js'
 import * as K from '@shared/kanban.js'
@@ -21,6 +21,8 @@ import { ParsedChips, PRIORITY_LABEL, useQuickParse } from './TaskParts.jsx'
 import { CardDialog } from './CardDialog.jsx'
 import { Label, StatusIcon, dueTone } from './CardParts.jsx'
 import { Automation, ruleCount } from './Automation.jsx'
+import { useBoardDrag } from './boardDrag.js'
+import { colorHex, colorLabel } from '../lib/colors.js'
 
 export const LIST_COLORS = K.PROJECT_COLORS
 
@@ -105,7 +107,7 @@ function wordsHtml(text, ws, path) {
   return html.get(k)
 }
 
-const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, onOpen, onToggle, onMenu, onDragStart }) {
+const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, cover, labelColor, onOpen, onToggle, onMenu, onPress, quiet }) {
   const task = K.cardTask(card)
   const status = card.status ?? ' '
   const { title, tags } = splitTags(task?.text ?? card.text)
@@ -118,10 +120,10 @@ const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, onOpe
       className={`pb-card ${done ? 'done' : ''} ${status === '/' ? 'doing' : ''} ${hidden ? 'is-dragging' : ''}`}
       data-card={card.id}
       tabIndex={0}
-      draggable={!readOnly}
       aria-label={`${title}${task?.due ? `, due ${dueLabel(task.due)}` : ''}${done ? ', done' : ''}`}
-      onDragStart={onDragStart}
+      onPointerDown={onPress}
       onClick={(e) => {
+        if (quiet()) return // (the click that ends a drag)
         const a = e.target.closest('a')
         if (a?.dataset.href) {
           e.preventDefault()
@@ -141,10 +143,11 @@ const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, onOpe
       }}
       onContextMenu={onMenu}
     >
+      {cover && <div className="pb-cover" data-color={cover} />}
       {tags.length > 0 && (
         <div className="pb-labels">
           {tags.map((t) => (
-            <Label key={t} tag={t} />
+            <Label key={t} tag={t} color={labelColor(t)} />
           ))}
         </div>
       )}
@@ -292,15 +295,6 @@ function AddList({ onAdd }) {
 
 // ---------- the board ----------
 
-// Where among `els` (cards or lists, in order) a pointer at `pos` drops something: the index of the first whose middle is past it
-function slot(els, pos, axis) {
-  for (let i = 0; i < els.length; i++) {
-    const r = els[i].getBoundingClientRect()
-    if (pos < (axis === 'x' ? r.left + r.width / 2 : r.top + r.height / 2)) return i
-  }
-  return els.length
-}
-
 const sortBy = {
   due: (a, b) => (K.cardTask(a)?.due || '9999').localeCompare(K.cardTask(b)?.due || '9999'),
   priority: (a, b) => priorityRank(K.cardTask(b)?.priority) - priorityRank(K.cardTask(a)?.priority),
@@ -324,9 +318,6 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
   const [panel, setPanel] = useState(null) // 'automation' | 'archive'
   const [filterAt, setFilterAt] = useState(null) // the filter button, while its card is open
   const [colorAt, setColorAt] = useState(null) // { el, lane } while a list's colours are open
-  const drag = useRef(null) // { kind: 'card' | 'list', id, height }
-  const [hiding, setHiding] = useState(null) // what is being dragged, hidden where it was
-  const [drop, setDrop] = useState(null) // { lane, index } for a card, { list: index } for a list
   const lanesEl = useRef(null)
   const opts = useMemo(() => ({ today }), [today])
 
@@ -413,7 +404,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
   )
 
   const cardMenu = (e, card, lane) => {
-    if (e.target.closest('a')) return
+    if (e.target.closest('a') || drag) return
     const task = K.cardTask(card)
     const open_ = isOpen(card.status ?? ' ')
     const set = (patch) => () => changeCard(card.id, (b, c) => void K.editCard(c, patch, opts))
@@ -495,10 +486,16 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
     ])
   }
 
+  // with people: the note's own sharing (or, in a private workspace, why it can't be)
+  const share = () => useUI.getState().openModal('share', { ws, path })
+  const barMenu = useRef(null)
+
   const boardMenu = (e) => {
     const archived = board.archive?.length || 0
     useUI.getState().showContextMenu(menuFromElement(e.currentTarget), [
+      { label: 'Share…', icon: Share2, run: share },
       { label: 'Automation', icon: Zap, run: () => setPanel('automation') },
+      !readOnly && { label: 'Board colour…', icon: Palette, run: () => setColorAt({ el: barMenu.current, board: true }) },
       { label: archived ? `Archived cards (${archived})` : 'Archived cards', icon: Archive, run: () => setPanel('archive') },
       'divider',
       onMarkdown && { label: 'Open as markdown', icon: FileText, run: onMarkdown },
@@ -507,68 +504,32 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
     ])
   }
 
-  // ---------- dragging ----------
+  // ---------- dragging (boardDrag.js) ----------
 
-  useEffect(() => {
-    const end = () => {
-      drag.current = null
-      setHiding(null)
-      setDrop(null)
+  // where a card or list starts from: its own place, so letting go there changes nothing
+  const startDrop = (item) => {
+    const b = boardRef.current
+    if (item.kind === 'list') return { list: b.lanes.findIndex((l) => l.id === item.id) }
+    const lane = b.lanes.find((l) => l.id === item.lane)
+    return { lane: item.lane, index: lane ? lane.items.filter(shown).findIndex((c) => c.id === item.id) : 0 }
+  }
+  const onDrop = (item, where) => {
+    if (item.kind === 'list') {
+      return mutate((b) => {
+        const at = b.lanes.findIndex((l) => l.id === item.id)
+        if (at < 0 || where.list == null) return false
+        const [lane] = b.lanes.splice(at, 1)
+        b.lanes.splice(Math.min(where.list, b.lanes.length), 0, lane)
+      })
     }
-    window.addEventListener('dragend', end)
-    window.addEventListener('drop', end)
-    return () => {
-      window.removeEventListener('dragend', end)
-      window.removeEventListener('drop', end)
-    }
-  }, [])
-
-  const startCard = (e, card, lane) => {
-    drag.current = { kind: 'card', id: card.id, height: e.currentTarget.offsetHeight }
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/obi-card', card.id)
-    e.dataTransfer.setData('text/plain', K.cardTask(card)?.text ?? card.text)
-    const visible = lane.items.filter(shown)
-    setTimeout(() => {
-      setHiding(card.id)
-      setDrop({ lane: lane.id, index: visible.findIndex((c) => c.id === card.id) })
-    })
-  }
-
-  const startList = (e, lane) => {
-    if (e.target.closest('input, button')) return
-    drag.current = { kind: 'list', id: lane.id }
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/obi-list', lane.id)
-    const at = board.lanes.findIndex((l) => l.id === lane.id)
-    setTimeout(() => {
-      setHiding(lane.id)
-      setDrop({ list: at })
-    })
-  }
-
-  const overList = (e, lane) => {
-    const d = drag.current
-    if (d?.kind !== 'card') return
-    e.preventDefault()
-    e.stopPropagation()
-    e.dataTransfer.dropEffect = 'move'
-    const cards = [...e.currentTarget.querySelectorAll('.pb-card:not(.is-dragging)')]
-    const index = slot(cards, e.clientY, 'y')
-    if (drop?.lane !== lane.id || drop.index !== index) setDrop({ lane: lane.id, index })
-  }
-
-  const dropCard = (e, lane) => {
-    const d = drag.current
-    if (d?.kind !== 'card') return
-    e.preventDefault()
-    e.stopPropagation()
-    const index = drop?.lane === lane.id ? drop.index : null
-    const visible = lane.items.filter((c) => shown(c) && c.id !== d.id)
-    const before = index != null ? visible[index]?.id : null
+    // `index` counts the cards shown in the lane (a filter may hide some), the dragged one aside
+    const target = boardRef.current.lanes.find((l) => l.id === where.lane)
+    if (!target) return
+    const visible = target.items.filter((c) => shown(c) && c.id !== item.id)
+    const before = visible[where.index]?.id
     const after = before ? null : visible[visible.length - 1]?.id
-    changeCard(d.id, (b, c) => {
-      const to = b.lanes.find((l) => l.id === lane.id)
+    changeCard(item.id, (b, c) => {
+      const to = b.lanes.find((l) => l.id === where.lane)
       if (!to) return false
       let at = null
       if (before) at = to.items.findIndex((x) => x.id === before)
@@ -576,29 +537,12 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
       return K.moveCard(b, c, to, at, opts)
     })
   }
+  const { drag, drop, press, justDragged } = useBoardDrag({ lanesRef: lanesEl, onDrop, startDrop })
+  const hiding = drag?.id ?? null
 
-  const overBoard = (e) => {
-    const d = drag.current
-    if (d?.kind !== 'list') return
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    const lists = [...lanesEl.current.querySelectorAll(':scope > .pb-list:not(.is-dragging):not(.pb-list-placeholder)')]
-    const index = slot(lists, e.clientX, 'x')
-    if (drop?.list !== index) setDrop({ list: index })
-  }
-
-  const dropList = (e) => {
-    const d = drag.current
-    if (d?.kind !== 'list') return
-    e.preventDefault()
-    const index = drop?.list
-    mutate((b) => {
-      const at = b.lanes.findIndex((l) => l.id === d.id)
-      if (at < 0 || index == null) return false
-      const [lane] = b.lanes.splice(at, 1)
-      b.lanes.splice(index, 0, lane)
-    })
-  }
+  // ---------- colours ----------
+  const labelColors = board.settings?.obi?.labels
+  const labelColor = useCallback((tag) => colorHex(K.labelColor(board, tag)), [labelColors]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- drawing ----------
 
@@ -609,8 +553,9 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
 
   const nFilters = filterCount(filter)
   let listSlot = 0 // lists drawn so far, but the one being dragged
-  const color = projectColor(path)
+  const color = colorHex(K.boardColor(board)) || projectColor(path)
   const placeholder = (key, h) => <div key={key} className="pb-placeholder" style={{ height: h || 38 }} />
+  const dragging = drag?.kind
 
   return (
     <div className="pb" style={{ '--project': color }}>
@@ -633,22 +578,25 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
         <button type="button" className={`btn btn-sm ${panel === 'automation' ? 'on' : ''}`} title="Rules: what happens when a card moves or is marked done" onClick={() => setPanel(panel === 'automation' ? null : 'automation')}>
           <Zap /> Automation <span className="pb-pill">{ruleCount(board)}</span>
         </button>
-        <button type="button" className="icon-btn" title="Board menu" onClick={boardMenu}>
+        <button type="button" className="btn btn-sm" title="Share this board with people to work on it together" onClick={share}>
+          <Share2 /> Share
+        </button>
+        <button type="button" className="icon-btn" title="Board menu" ref={barMenu} onClick={boardMenu}>
           <MoreHorizontal />
         </button>
       </div>
 
       <div className="pb-body">
-        <div className="pb-lanes" ref={lanesEl} onDragOver={overBoard} onDrop={dropList}>
+        <div className="pb-lanes" ref={lanesEl}>
           {board.lanes.map((lane) => {
             const visible = lane.items.filter(shown)
             const lc = K.laneColor(board, lane)
-            const dropping = drop?.lane === lane.id && drag.current?.kind === 'card'
+            const dropping = dragging === 'card' && drop?.lane === lane.id
             // (what is being dragged stays in the page, hidden, so its drag goes on; the gap shows where it would land)
             const items = []
             let n = 0
             for (const c of visible) {
-              if (dropping && c.id !== hiding && n === drop.index) items.push(placeholder('ph', drag.current?.height))
+              if (dropping && c.id !== hiding && n === drop.index) items.push(placeholder('ph', drag.height))
               items.push(
                 <Card
                   key={c.id}
@@ -658,28 +606,33 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
                   path={path}
                   readOnly={readOnly}
                   hidden={c.id === hiding}
+                  cover={K.cardCover(board, c)}
+                  labelColor={labelColor}
+                  quiet={justDragged}
                   onOpen={() => openCard(c.id)}
                   onToggle={() => toggle(c)}
                   onMenu={(e) => cardMenu(e, c, lane)}
-                  onDragStart={(e) => startCard(e, c, lane)}
+                  onPress={readOnly ? undefined : (e) => press(e, { kind: 'card', id: c.id, lane: lane.id })}
                 />,
               )
               if (c.id !== hiding) n++
             }
-            if (dropping && drop.index >= n) items.push(placeholder('ph', drag.current?.height))
+            if (dropping && drop.index >= n) items.push(placeholder('ph', drag.height))
             const out = []
-            if (drag.current?.kind === 'list' && hiding !== lane.id && drop?.list === listSlot) out.push(<div key={`lph-${lane.id}`} className="pb-list pb-list-placeholder" />)
+            if (dragging === 'list' && hiding !== lane.id && drop?.list === listSlot) out.push(<div key={`lph-${lane.id}`} className="pb-list pb-list-placeholder" style={{ height: drag.height }} />)
             if (hiding !== lane.id) listSlot++
             out.push(
               <section
                 key={lane.id}
                 className={`pb-list ${hiding === lane.id ? 'is-dragging' : ''} ${dropping ? 'over' : ''}`}
                 data-color={lc || undefined}
+                data-lane={lane.id}
                 aria-label={`${lane.title}, ${visible.length} ${visible.length === 1 ? 'card' : 'cards'}`}
-                onDragOver={(e) => overList(e, lane)}
-                onDrop={(e) => dropCard(e, lane)}
               >
-                <header className="pb-list-head" draggable={!readOnly && renaming !== lane.id} onDragStart={(e) => startList(e, lane)}>
+                <header
+                  className="pb-list-head"
+                  onPointerDown={readOnly || renaming === lane.id ? undefined : (e) => press(e, { kind: 'list', id: lane.id, el: e.currentTarget.closest('.pb-list') })}
+                >
                   {renaming === lane.id ? (
                     <input
                       className="input pb-rename"
@@ -701,7 +654,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
                       }}
                     />
                   ) : (
-                    <h3 onClick={() => !readOnly && setRenaming(lane.id)} title={readOnly ? undefined : 'Rename list'}>
+                    <h3 onClick={() => !readOnly && !justDragged() && setRenaming(lane.id)} title={readOnly ? undefined : 'Rename list'}>
                       {lane.title}
                     </h3>
                   )}
@@ -731,7 +684,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
             )
             return out
           })}
-          {drag.current?.kind === 'list' && drop?.list >= listSlot && <div className="pb-list pb-list-placeholder" />}
+          {dragging === 'list' && drop?.list >= listSlot && <div className="pb-list pb-list-placeholder" style={{ height: drag.height }} />}
           {!readOnly && <AddList onAdd={(t) => mutate((b) => void b.lanes.push({ title: t, items: [], extra: [], complete: false }))} />}
         </div>
 
@@ -756,17 +709,19 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
       )}
       {colorAt && (
         <Popover anchor={colorAt.el} onClose={() => setColorAt(null)} className="pb-colors">
+          <div className="pb-colors-title">{colorAt.board ? 'Board colour' : 'List colour'}</div>
           <div className="pb-colors-grid">
             {[null, ...LIST_COLORS].map((c) => (
               <button
                 key={c || 'none'}
                 type="button"
-                className="pb-swatch"
+                className={`pb-swatch ${(colorAt.board ? K.boardColor(board) : K.laneColor(board, board.lanes.find((l) => l.id === colorAt.lane) || {})) === c ? 'on' : ''}`}
                 data-color={c || undefined}
-                aria-label={c ? `${c[0].toUpperCase()}${c.slice(1)}` : 'No colour'}
-                title={c ? `${c[0].toUpperCase()}${c.slice(1)}` : 'No colour'}
+                aria-label={colorLabel(c)}
+                title={colorLabel(c)}
                 onClick={() => {
-                  mutate((b) => K.setLaneColor(b, b.lanes.find((l) => l.id === colorAt.lane), c))
+                  if (colorAt.board) mutate((b) => K.setBoardColor(b, c))
+                  else mutate((b) => K.setLaneColor(b, b.lanes.find((l) => l.id === colorAt.lane), c))
                   setColorAt(null)
                 }}
               >
@@ -786,6 +741,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
           readOnly={readOnly}
           today={today}
           change={(fn) => changeCard(open, fn)}
+          labelColor={labelColor}
           onArchive={() => archive(openHit.card)}
           onDelete={() => removeCard(openHit.card)}
           onClose={() => setOpen(null)}

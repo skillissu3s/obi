@@ -12,13 +12,21 @@ export function dueTone(due, status, today) {
   return due === addDays(today, 1) ? 'soon' : ''
 }
 
-/** A card's #tag as a label, in the colour the tag has everywhere */
-export function Label({ tag, onRemove }) {
+/** A card's #tag as a label: in the colour picked for it on its board (`color`), else the one the tag has everywhere */
+export function Label({ tag, color, onRemove, onClick }) {
   return (
-    <span className="pb-label" style={{ '--label': colorFor(tag.split('/')[0].toLowerCase()) }} title={`#${tag}`}>
+    <span className={`pb-label ${onClick ? 'pickable' : ''}`} style={{ '--label': color || colorFor(tag.split('/')[0].toLowerCase()) }} title={onClick ? `#${tag} — click to change its colour` : `#${tag}`} onClick={onClick}>
       {tag}
       {onRemove && (
-        <button type="button" aria-label={`Remove ${tag}`} title="Remove this label" onClick={onRemove}>
+        <button
+          type="button"
+          aria-label={`Remove ${tag}`}
+          title="Remove this label"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
+        >
           <X />
         </button>
       )}

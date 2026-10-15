@@ -1,13 +1,14 @@
 // The Projects tab of the sidebar: every task at a glance, the calendar, and the
 // workspace's projects — each a board of lists and cards (see ProjectBoard).
 import { useMemo, useState } from 'react'
-import { CalendarDays, ExternalLink, FolderOpen, Inbox, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, ExternalLink, FolderOpen, Inbox, ListChecks, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { isOpen } from '@shared/tasks.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
 import * as A from '../lib/actions.js'
-import { createProject, useProjects } from '../lib/projects.js'
+import { createProject, projectName, useProjects } from '../lib/projects.js'
+import { colorFor } from '../lib/util.js'
 import { useTasks } from '../lib/planner.js'
 
 function NewProject({ onDone }) {
@@ -46,6 +47,8 @@ export function ProjectsPanel() {
     return pane?.tabs.find((t) => t.id === pane.active) || null
   })
   const [adding, setAdding] = useState(false)
+  // boards other people shared with this person (from any workspace)
+  const shared = useApp((s) => s.shared).filter((n) => n.board)
   const open = (e, path) => useLayout.getState().openNote(ws, path, { newTab: e.metaKey || e.ctrlKey })
 
   const menu = (e, p) => {
@@ -108,6 +111,26 @@ export function ProjectsPanel() {
               New project
             </button>
           ))}
+        {shared.length > 0 && (
+          <>
+            <div className="pj-label">Shared with me</div>
+            {shared.map((n) => (
+              <button
+                key={`${n.ws}:${n.path}`}
+                type="button"
+                className={`pj-row ${active?.kind === 'note' && active.ws === n.ws && active.path === n.path ? 'active' : ''}`}
+                title={`${n.workspaceName} · shared by ${n.sharedBy || 'someone'}${n.role === 'viewer' ? ' · view only' : ''}`}
+                onClick={(e) => useLayout.getState().openNote(n.ws, n.path, { newTab: e.metaKey || e.ctrlKey })}
+              >
+                <span className="pj-tile" style={{ '--pj': colorFor(projectName(n.path).toLowerCase()) }}>
+                  <Users />
+                </span>
+                <span className="truncate">{projectName(n.path)}</span>
+                <span className="count">{n.sharedBy?.split(' ')[0] || ''}</span>
+              </button>
+            ))}
+          </>
+        )}
         {!projects.length && (
           <p className="pj-empty">
             A project is a board of lists and cards, kept as a markdown note in your Projects folder. New tasks go to the Inbox until you make more.

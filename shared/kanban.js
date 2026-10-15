@@ -380,6 +380,51 @@ export function setLaneColor(board, lane, color) {
   setObi(board, { colors })
 }
 
+export const setBoardColor = (board, color) => setObi(board, { color: PROJECT_COLORS.includes(color) ? color : undefined })
+
+// A card's cover colour is kept by its title (without tags and fields, which
+// change while it is the same card): cards have no id of their own in markdown.
+export const cardKey = (c) => splitTags(cardTask(c)?.text ?? c.text).title.trim().toLowerCase()
+
+export const cardCover = (board, c) => {
+  const v = obiOf(board).covers?.[cardKey(c)]
+  return PROJECT_COLORS.includes(v) ? v : null
+}
+
+export function setCardCover(board, c, color) {
+  const covers = { ...(obiOf(board).covers || {}) }
+  const k = cardKey(c)
+  if (PROJECT_COLORS.includes(color)) covers[k] = color
+  else delete covers[k]
+  // covers of cards that are gone go too
+  const live = new Set([...board.lanes.flatMap((l) => l.items), ...(board.archive || [])].map(cardKey))
+  for (const key of Object.keys(covers)) if (!live.has(key)) delete covers[key]
+  setObi(board, { covers })
+}
+
+/** The card `c` was retitled (its key was `was`): its cover goes with it */
+export function moveCover(board, was, c) {
+  const covers = obiOf(board).covers
+  const k = cardKey(c)
+  if (!covers || !(was in covers) || k === was) return
+  const { [was]: color, ...rest } = covers
+  setObi(board, { covers: { ...rest, [k]: color } })
+}
+
+/** A label's colour (#tag, by its name), or null for the one its name gives it */
+export const labelColor = (board, tag) => {
+  const v = obiOf(board).labels?.[String(tag).toLowerCase()]
+  return PROJECT_COLORS.includes(v) ? v : null
+}
+
+export function setLabelColor(board, tag, color) {
+  const labels = { ...(obiOf(board).labels || {}) }
+  const k = String(tag).toLowerCase()
+  if (PROJECT_COLORS.includes(color)) labels[k] = color
+  else delete labels[k]
+  setObi(board, { labels })
+}
+
 // ---------- automation ----------
 //
 // A rule: when something happens to a card, do one thing to it — Trello's Butler,
