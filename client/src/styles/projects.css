@@ -1448,3 +1448,146 @@ html:has(.boards-dock.resizing) * {
     opacity: 1;
   }
 }
+
+/* ---------- priority on a card: its flag in the priority's colour ---------- */
+.pb-badge.task-pri.pri-highest {
+  color: var(--danger);
+}
+.pb-badge.task-pri.pri-high {
+  color: var(--warning);
+}
+.pb-badge.task-pri.pri-medium {
+  color: var(--accent);
+}
+.pb-badge.task-pri.pri-low {
+  color: var(--text-3);
+}
+.pb-badge.task-pri.pri-lowest {
+  color: var(--text-faint);
+}
+.pb-badge.task-pri svg {
+  fill: currentColor;
+}
+
+/* ---------- labels on a card: thin bars of colour (a click shows their names) ---------- */
+.pb-labels {
+  cursor: pointer;
+}
+.pb-labels.thin {
+  gap: 4px;
+  margin-bottom: 7px;
+}
+.pb-labels.thin .pb-label {
+  width: 36px;
+  height: 6px;
+  padding: 0;
+  border-radius: 3px;
+  background: var(--label);
+  color: transparent;
+  font-size: 0;
+}
+.pb-labels.thin .pb-label:hover {
+  filter: brightness(1.15);
+}
+
+/* ---------- the card's label picker (CardDialog Labels) ---------- */
+.cd-label-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 5px;
+  background: var(--bg-input);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cd-label-add:hover,
+.cd-label-add.on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.cd-label-add svg {
+  width: 13px;
+  height: 13px;
+}
+.cd-label-pick {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 9px;
+  background: var(--bg-input);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.cd-label-search {
+  height: 30px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.cd-label-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.cd-label-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.cd-label-row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cd-label-row:hover {
+  background: var(--bg-hover);
+}
+.cd-label-row input {
+  accent-color: var(--accent);
+}
+.cd-label-bar {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--lc) 30%, transparent);
+  box-shadow: inset 4px 0 0 var(--lc);
+  color: color-mix(in srgb, var(--lc) 60%, var(--text));
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cd-label-list li .icon-btn {
+  opacity: 0.5;
+}
+.cd-label-list li:hover .icon-btn {
+  opacity: 1;
+}
+.cd-label-recolor {
+  flex-basis: 100%;
+  padding: 4px 0 6px 28px;
+}
+.cd-label-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}

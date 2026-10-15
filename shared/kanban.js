@@ -411,18 +411,41 @@ export function moveCover(board, was, c) {
   setObi(board, { covers: { ...rest, [k]: color } })
 }
 
-/** A label's colour (#tag, by its name), or null for the one its name gives it */
+// A board's labels: the ones it offers for any of its cards, each a #tag with a
+// colour ({ name: colour } under "labels" in its settings). A board that never
+// changed them has these.
+export const DEFAULT_LABELS = { feature: 'green', review: 'yellow', important: 'orange', urgent: 'red', idea: 'purple', research: 'blue' }
+
+const labelMap = (board) => {
+  const own = obiOf(board).labels
+  return own && typeof own === 'object' ? own : DEFAULT_LABELS
+}
+
+/** The board's labels, as [{ name, color }] in the order they were made */
+export const boardLabels = (board) =>
+  Object.entries(labelMap(board)).map(([name, color]) => ({ name, color: PROJECT_COLORS.includes(color) ? color : 'gray' }))
+
+/** A label's colour (#tag, by its name), or null for one the board doesn't have (its name gives it one) */
 export const labelColor = (board, tag) => {
-  const v = obiOf(board).labels?.[String(tag).toLowerCase()]
+  const v = labelMap(board)[String(tag).toLowerCase()]
   return PROJECT_COLORS.includes(v) ? v : null
 }
 
+const cleanLabel = (name) => String(name || '').trim().replace(/^#+/, '').replace(/\s+/g, '-').toLowerCase()
+
+/** Adds a label to the board (or recolours one it has) */
 export function setLabelColor(board, tag, color) {
-  const labels = { ...(obiOf(board).labels || {}) }
-  const k = String(tag).toLowerCase()
-  if (PROJECT_COLORS.includes(color)) labels[k] = color
-  else delete labels[k]
-  setObi(board, { labels })
+  const k = cleanLabel(tag)
+  if (!k) return
+  setObi(board, { labels: { ...labelMap(board), [k]: PROJECT_COLORS.includes(color) ? color : labelMap(board)[k] || 'gray' } })
+}
+export const addBoardLabel = setLabelColor
+
+/** Takes a label off the board's list (cards that have it keep it, as a #tag) */
+export function removeBoardLabel(board, tag) {
+  const { [cleanLabel(tag)]: gone, ...rest } = labelMap(board)
+  void gone
+  setObi(board, { labels: rest })
 }
 
 // ---------- automation ----------

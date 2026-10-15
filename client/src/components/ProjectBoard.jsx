@@ -107,7 +107,7 @@ function wordsHtml(text, ws, path) {
   return html.get(k)
 }
 
-const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, cover, labelColor, onOpen, onToggle, onMenu, onPress, quiet }) {
+const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, cover, labelColor, labelNames, onLabelNames, onOpen, onToggle, onMenu, onPress, quiet }) {
   const task = K.cardTask(card)
   const status = card.status ?? ' '
   const { title, tags } = splitTags(task?.text ?? card.text)
@@ -145,7 +145,15 @@ const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, cover
     >
       {cover && <div className="pb-cover" data-color={cover} />}
       {tags.length > 0 && (
-        <div className="pb-labels">
+        // thin bars of colour; a click on one shows (or hides) every label's name
+        <div
+          className={`pb-labels ${labelNames ? '' : 'thin'}`}
+          title={labelNames ? undefined : tags.map((t) => `#${t}`).join('  ')}
+          onClick={(e) => {
+            e.stopPropagation()
+            onLabelNames()
+          }}
+        >
           {tags.map((t) => (
             <Label key={t} tag={t} color={labelColor(t)} />
           ))}
@@ -326,11 +334,30 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
     const cards = board.lanes.flatMap((l) => l.items)
     return { total: cards.length, open: cards.filter((c) => isOpen(c.status ?? ' ')).length }
   }, [board])
+  // to filter by: the board's labels, and any other tag a card has
   const labels = useMemo(() => {
-    const seen = new Map()
-    for (const l of board.lanes) for (const c of l.items) for (const t of K.cardTask(c)?.tags || []) seen.set(t.toLowerCase(), t)
+    const seen = new Map(K.boardLabels(board).map((l) => [l.name, l.name]))
+    for (const l of board.lanes) for (const c of l.items) for (const t of K.cardTask(c)?.tags || []) if (!seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t)
     return [...seen.values()].sort((a, b) => a.localeCompare(b))
   }, [board])
+  // labels as thin bars, or with their names (remembered, for every board)
+  const [labelNames, setLabelNames] = useState(() => {
+    try {
+      return localStorage.getItem('obi:labelNames') === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleLabelNames = useCallback(
+    () =>
+      setLabelNames((v) => {
+        try {
+          localStorage.setItem('obi:labelNames', v ? '0' : '1')
+        } catch {}
+        return !v
+      }),
+    [],
+  )
 
   // a change to the card `id`; the dialog follows it to its new id
   const changeCard = useCallback(
@@ -608,6 +635,8 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
                   hidden={c.id === hiding}
                   cover={K.cardCover(board, c)}
                   labelColor={labelColor}
+                  labelNames={labelNames}
+                  onLabelNames={toggleLabelNames}
                   quiet={justDragged}
                   onOpen={() => openCard(c.id)}
                   onToggle={() => toggle(c)}

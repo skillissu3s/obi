@@ -2,7 +2,7 @@
 // a Trello card. Each change is written to the board at once (`change` runs on a
 // copy of the board, see ProjectBoard), and the project's rules apply to it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AlignLeft, Archive, Flag, ListChecks, Plus, Trash2, X } from 'lucide-react'
+import { AlignLeft, Archive, Flag, ListChecks, Palette, Plus, Trash2, X } from 'lucide-react'
 import * as K from '@shared/kanban.js'
 import { PRIORITIES, cleanTag, isOpen, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
 import { renderMarkdown } from '../lib/render.js'
@@ -51,10 +51,10 @@ const grow = (el) => {
 }
 
 // A row of colours to pick from (and none), the one in use marked
-function Swatches({ value, onPick, small }) {
+function Swatches({ value, onPick, small, none = true }) {
   return (
     <div className={`cd-swatches ${small ? 'small' : ''}`}>
-      {[null, ...K.PROJECT_COLORS].map((c) => (
+      {[...(none ? [null] : []), ...K.PROJECT_COLORS].map((c) => (
         <button key={c || 'none'} type="button" className={`pb-swatch ${value === c ? 'on' : ''}`} data-color={c || undefined} title={colorLabel(c)} aria-label={colorLabel(c)} aria-pressed={value === c} onClick={() => onPick(c)}>
           {!c && <X />}
         </button>
@@ -63,49 +63,95 @@ function Swatches({ value, onPick, small }) {
   )
 }
 
-function Labels({ tags, known, onChange, colorOf, colorNameOf, onColor }) {
+/**
+ * A card's labels, and the board's to pick from: tick one to put it on the card,
+ * type a name to find one or make a new one (in the colour picked below), and
+ * recolour or take a label off the board from its row.
+ */
+function Labels({ tags, board, readOnly, colorOf, onChange, onColor, onRemoveFromBoard }) {
+  const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
-  const [picking, setPicking] = useState(null) // the label whose colour is being picked
-  const add = () => {
-    const tag = cleanTag(typed)
+  const [color, setColor] = useState('blue') // for a label made here
+  const [recolor, setRecolor] = useState(null) // the label whose colour is being picked
+  const has = (name) => tags.some((t) => t.toLowerCase() === name.toLowerCase())
+  const toggle = (name) => onChange(has(name) ? tags.filter((t) => t.toLowerCase() !== name.toLowerCase()) : [...tags, name])
+  const offered = K.boardLabels(board)
+  const want = cleanTag(typed)
+  const shown = offered.filter((l) => !want || l.name.includes(want.toLowerCase()))
+  const isNew = want && !offered.some((l) => l.name === want.toLowerCase())
+  const create = () => {
+    if (!isNew) return shown[0] && toggle(shown[0].name)
+    onColor(want, color)
+    if (!has(want)) onChange([...tags, want])
     setTyped('')
-    if (tag && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) onChange([...tags, tag])
   }
   return (
     <>
-    <div className="cd-labels">
-      {tags.map((t) => (
-        <Label key={t} tag={t} color={colorOf(t)} onClick={onColor ? () => setPicking(picking === t ? null : t) : undefined} onRemove={() => onChange(tags.filter((x) => x !== t))} />
-      ))}
-      <input
-        className="cd-label-input"
-        list="cd-known-labels"
-        aria-label="Add a label"
-        placeholder={tags.length ? '+ Add' : '+ Add a label'}
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ',') && (e.preventDefault(), add())}
-        onBlur={add}
-      />
-      <datalist id="cd-known-labels">
-        {known.filter((k) => !tags.some((t) => t.toLowerCase() === k.toLowerCase())).map((k) => (
-          <option key={k} value={k} />
+      <div className="cd-labels">
+        {tags.map((t) => (
+          <Label key={t} tag={t} color={colorOf(t)} onRemove={readOnly ? undefined : () => onChange(tags.filter((x) => x !== t))} />
         ))}
-      </datalist>
-    </div>
-    {picking && tags.includes(picking) && (
-      <div className="cd-label-colors">
-        <span>#{picking} on this board:</span>
-        <Swatches
-          small
-          value={colorNameOf(picking)}
-          onPick={(c) => {
-            onColor(picking, c)
-            setPicking(null)
-          }}
-        />
+        {!readOnly && (
+          <button type="button" className={`cd-label-add ${open ? 'on' : ''}`} aria-expanded={open} onClick={() => setOpen(!open)}>
+            <Plus /> {tags.length ? 'Labels' : 'Add a label'}
+          </button>
+        )}
       </div>
-    )}
+      {open && !readOnly && (
+        <div className="cd-label-pick">
+          <input
+            className="input cd-label-search"
+            autoFocus
+            aria-label="Find or make a label"
+            placeholder="Find or make a label…"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.preventDefault(), create())
+              else if (e.key === 'Escape') (e.stopPropagation(), setOpen(false))
+            }}
+          />
+          <ul className="cd-label-list">
+            {shown.map((l) => (
+              <li key={l.name}>
+                <label className="cd-label-row">
+                  <input type="checkbox" checked={has(l.name)} onChange={() => toggle(l.name)} />
+                  <span className="cd-label-bar" data-color={l.color}>
+                    {l.name}
+                  </span>
+                </label>
+                <button type="button" className="icon-btn sm" title="Colour" aria-label={`Colour of ${l.name}`} onClick={() => setRecolor(recolor === l.name ? null : l.name)}>
+                  <Palette />
+                </button>
+                <button type="button" className="icon-btn sm" title="Take it off this board (cards keep it)" aria-label={`Remove ${l.name} from the board`} onClick={() => onRemoveFromBoard(l.name)}>
+                  <Trash2 />
+                </button>
+                {recolor === l.name && (
+                  <div className="cd-label-recolor">
+                    <Swatches
+                      small
+                      none={false}
+                      value={l.color}
+                      onPick={(c) => {
+                        onColor(l.name, c)
+                        setRecolor(null)
+                      }}
+                    />
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+          {isNew && (
+            <div className="cd-label-new">
+              <Swatches small none={false} value={color} onPick={setColor} />
+              <button type="button" className="btn btn-primary btn-sm" onClick={create}>
+                Create “{want}”
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </>
   )
 }
@@ -314,7 +360,6 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
     if (t) retitle(t)
   })
   const cover = K.cardCover(board, card)
-  const known = [...new Set(board.lanes.flatMap((l) => l.items.flatMap((c) => K.cardTask(c)?.tags || [])))]
 
   return (
     <Modal title={null} label="Card" onClose={onClose} className="card-dialog" bodyClass="cd-shell">
@@ -397,10 +442,11 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
               <Field label="Labels" wide>
                 <Labels
                   tags={tags}
-                  known={known}
+                  board={board}
+                  readOnly={readOnly}
                   colorOf={labelColor}
-                  colorNameOf={(t) => K.labelColor(board, t)}
-                  onColor={readOnly ? null : (t, c) => change((b) => K.setLabelColor(b, t, c))}
+                  onColor={(t, c) => change((b) => K.setLabelColor(b, t, c))}
+                  onRemoveFromBoard={(t) => change((b) => K.removeBoardLabel(b, t))}
                   onChange={(next) => change((b, c) => K.setCardTags(c, next, opts))}
                 />
               </Field>
