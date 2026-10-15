@@ -337,7 +337,7 @@ function hostOf(url) {
  */
 export function boardToSvg(elements, opts = {}) {
   const padding = opts.padding ?? 24
-  const list = elements.filter((e) => e.type !== 'highlight' && (opts.position || !e.anchor)).sort((a, b) => (a.z || 0) - (b.z || 0))
+  const list = elements.filter((e) => e.type !== 'highlight' && e.type !== 'space' && (opts.position || !e.anchor)).sort((a, b) => (a.z || 0) - (b.z || 0))
   const byId = new Map(list.map((e) => [e.id, e]))
   const target = elementTarget(byId)
   const resolved = new Map()

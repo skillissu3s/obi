@@ -78,6 +78,26 @@ several lines (`repinSplitGroups`), without moving anything.
 This only changes what is stored (`anchor` and `dy`, as before), never how a
 pinned element is placed, so the published page needs nothing new.
 
+## Also: drawing spaces
+
+Room can be opened under any line to draw in, without blank lines in the
+markdown: a canvas element `{ type: 'space', anchor, h }` in the layer, pinned
+to its line like a drawing (`client/src/canvas/spaces.js`). Both sides place
+spaces with the same `spacePlacements`, which also moves a space asked for
+inside a block shown whole (a code fence, math block, table, callout, the
+front matter) to under the block's last line (`spaceEnds`):
+
+- **Editor**: a block widget of exactly `h` px under the line
+  (`client/src/editor/spaces.js`, `.cm-obi-space` in `canvas.css`: no margins,
+  its outline is drawn inside it). CodeMirror counts it in the line's block, so
+  the line's own top stays put and every line below moves down by `h`.
+- **Published page**: `placeSpaces` in `main.js` puts a `.obi-space` block of
+  `h` px just before the element of the next marked line (before a `<pre>` or
+  `<table>`, never inside one), and `measure` gives the line right under it the
+  space's bottom as its top (it may be a blank line, which the page doesn't mark).
+
+`resolveLayout` and `boardToSvg` skip spaces: they are room, not drawings.
+
 ## Also: lines drawn out of a phrase end where the text ends
 
 An arrow bound to a phrase leaves it through the gap between two lines of text,
@@ -132,6 +152,7 @@ below**. Put spacing inside the box (padding, or a transparent border with
 `shared/markdown.js` (the `sourceLines` parts) · `server/public.js` (page and
 routes) · `client/src/canvas/layout.js` (`resolveLayout`, `measureMarkdown`) ·
 `client/src/canvas/anchors.js` · `client/src/canvas/wordreach.js` ·
+`client/src/canvas/spaces.js` · `client/src/editor/spaces.js` ·
 `client/src/canvas/NoteCanvas.jsx` (`env`, `anchorFor`) ·
 `client/src/canvas/ElementView.jsx` (`textStyle`) ·
 `shared/boardsvg.js` (`textBlock`, `boardToSvg`) · `shared/boardgeom.js`

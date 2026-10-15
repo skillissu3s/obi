@@ -1170,3 +1170,34 @@ button.status-item:disabled {
 .update-line .bad {
   color: var(--danger);
 }
+
+/* the note width, from the status bar (StatusBar.jsx WidthChip) */
+.status-item.active {
+  color: var(--text);
+}
+.width-pop {
+  width: 260px;
+  padding: 12px;
+}
+.width-pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.width-pop-head span {
+  color: var(--text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.width-pop .range {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.width-pop-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}

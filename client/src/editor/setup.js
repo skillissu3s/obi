@@ -15,6 +15,7 @@ import { listHang } from './listHang.js'
 import { wikiCompletion, tagCompletion, slashCompletion, emojiCompletion } from './completions.js'
 import { markdownKeymapFor } from './commands.js'
 import { annotationField } from './annotations.js'
+import { spaceField } from './spaces.js'
 import { writingExtensions } from './writing.js'
 
 export const obiHighlight = HighlightStyle.define([
@@ -93,6 +94,7 @@ export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFo
     comps.collab.of([]),
     comps.prefs.of(prefsExtensions(prefs)),
     annotationField,
+    spaceField,
     comps.canvas.of([]),
   ]
   if (placeholderText) exts.push(cmPlaceholder(placeholderText))

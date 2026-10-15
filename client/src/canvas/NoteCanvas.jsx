@@ -4,7 +4,7 @@ import { EditorView } from '@codemirror/view'
 import { ySyncAnnotation } from 'y-codemirror.next'
 import {
   PencilRuler, Highlighter, StickyNote, Link2, MoveUpRight, X, LocateFixed, Copy, Trash2, BringToFront, SendToBack, Lock,
-  ClipboardPaste, Bold, Italic, Strikethrough, Code, Link as LinkIcon, ChevronLeft, ChevronRight,
+  ClipboardPaste, Bold, Italic, Strikethrough, Code, Link as LinkIcon, ChevronLeft, ChevronRight, UnfoldVertical,
 } from 'lucide-react'
 import { toggleWrap, insertLink } from '../editor/commands.js'
 import { HIGHLIGHT_COLORS, highlightCss } from '@shared/boardsvg.js'
@@ -14,9 +14,10 @@ import { conn } from '../lib/socket.js'
 import * as A from '../lib/actions.js'
 import { renderMarkdown } from '../lib/render.js'
 import { usePrefs } from '../store/prefs.js'
-import { useUI } from '../store/ui.js'
+import { useUI, toast } from '../store/ui.js'
 import { useNoteZoom } from '../store/zoom.js'
 import { setAnnotations, annotationAt } from '../editor/annotations.js'
+import { setSpaces, spaceActions, onSpace } from '../editor/spaces.js'
 import { useBoardStore, useCanvasCtx, pickImageFiles } from './BoardCanvas.jsx'
 import { CanvasController } from './controller.js'
 import { CanvasLayer, useController } from './CanvasLayer.jsx'
@@ -25,6 +26,7 @@ import { AnchorTracker, makeAnchor, makeLineAnchor } from './anchors.js'
 import { newElementId, newSeed } from './store.js'
 import { visualBounds, source } from './layout.js'
 import { wordReach } from './wordreach.js'
+import { SPACE_DEFAULT, spaceEnds, spacePlacements } from './spaces.js'
 
 function useLayerHandle(ws, path) {
   const [handle, setHandle] = useState(null)
@@ -232,7 +234,8 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         const g = geom()
         const x = (cx - g.ox) / g.z
         const y = (cy - g.oy) / g.z
-        return x >= g.colLeft - 10 && x <= g.colRight + 10 && y >= g.textTop && y <= g.textBottom
+        // (a drawing space, though inside the column, is room for the canvas)
+        return x >= g.colLeft - 10 && x <= g.colRight + 10 && y >= g.textTop && y <= g.textBottom && !onSpace(cx, cy)
       },
       anchorFor: (y) => {
         const g = geom()
@@ -415,7 +418,23 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       if (u.docChanged || u.geometryChanged || u.heightChanged || u.viewportChanged) bump()
       if (u.selectionSet || u.focusChanged || u.docChanged || u.geometryChanged) updateBubble()
     })
-    view.dispatch({ effects: view.obiComps.canvas.reconfigure(listener) })
+    // what the drawing spaces' grip and button do (editor/spaces.js)
+    const actions = spaceActions.of({
+      get readOnly() {
+        return store.readOnly
+      },
+      resize: (id, h) => {
+        store.checkpoint()
+        store.update([[id, { h }]])
+        bump()
+      },
+      remove: (id) => {
+        store.checkpoint()
+        store.remove([id])
+        bump()
+      },
+    })
+    view.dispatch({ effects: view.obiComps.canvas.reconfigure([listener, actions]) })
     const onDown = () => {
       mouseDownRef.current = true
       setBubble(null)
@@ -573,6 +592,105 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     [view],
   )
 
+  // ----- drawing spaces: room opened under a line, shown by the editor (editor/spaces.js) -----
+  // ⚠ LAYOUT CONTRACT — publish/main.js places the same spaces with the same
+  // spacePlacements, under the same lines.
+  const spaceSig = useRef('')
+  const endsRef = useRef({ text: null, ends: [] })
+  useEffect(() => {
+    if (!view || !store) return
+    const els = store.getSnapshot().list
+    let list = []
+    if (els.some((el) => el.type === 'space')) {
+      syncText()
+      const tracker = trackerRef.current
+      const doc = view.state.doc
+      if (endsRef.current.text !== tracker.text) endsRef.current = { text: tracker.text, ends: spaceEnds(tracker.text) }
+      const lineOf = (a) => {
+        const e = tracker.get(a)
+        return e ? doc.lineAt(Math.min(e.from, doc.length)).number - 1 : null
+      }
+      list = spacePlacements(els, lineOf, endsRef.current.ends).map((sp) => ({ ...sp, line: sp.line + 1 }))
+    }
+    const sig = list.map((sp) => `${sp.id}:${sp.line}:${sp.h}`).join('|')
+    if (sig === spaceSig.current) return
+    spaceSig.current = sig
+    queueMicrotask(() => {
+      try {
+        view.dispatch({ effects: setSpaces.of(list) })
+      } catch {}
+    })
+  })
+  useEffect(
+    () => () => {
+      spaceSig.current = ''
+      try {
+        view?.dispatch({ effects: setSpaces.of([]) })
+      } catch {}
+    },
+    [view],
+  )
+
+  // Opens a drawing space under line `n` (1-based) — under the nearest line with
+  // text at or above it, which is what it can be pinned to.
+  const addSpace = useCallback(
+    (n) => {
+      if (!view || !store || store.readOnly) return
+      const doc = view.state.doc
+      const has = (k) => !!doc.line(k).text.trim()
+      let k = Math.max(1, Math.min(n, doc.lines))
+      while (k > 1 && !has(k)) k--
+      if (!has(k)) {
+        k = Math.max(1, Math.min(n, doc.lines))
+        while (k < doc.lines && !has(k)) k++
+      }
+      if (!has(k)) return toast.info('Write a line first: a drawing space opens under a line of text.')
+      store.checkpoint()
+      store.add({ id: newElementId(), type: 'space', anchor: makeLineAnchor(doc, k), h: SPACE_DEFAULT, z: store.minZ() - 1, by: conn.user?.id })
+      bump()
+    },
+    [view, store, bump],
+  )
+  // from the editor (the /Drawing space command)
+  useEffect(() => {
+    const onAdd = (e) => e.detail?.view === view && addSpace(e.detail.line)
+    window.addEventListener('obi:add-space', onAdd)
+    return () => window.removeEventListener('obi:add-space', onAdd)
+  }, [view, addSpace])
+
+  // "Make room": the next click opens a space under the line clicked; until then a
+  // guide shows where (`guide`: the world y of the bottom of the line under the pointer)
+  const [placing, setPlacingState] = useState(false)
+  const placingRef = useRef(false)
+  const [guide, setGuide] = useState(null)
+  const setPlacing = useCallback((on) => {
+    placingRef.current = on
+    setPlacingState(on)
+    if (!on) setGuide(null)
+  }, [])
+  const lineAtY = useCallback(
+    (clientY) => {
+      const g = measure()
+      if (!view || !g) return null
+      const docY = (clientY - g.oy) / g.z - g.docTop
+      const block = view.lineBlockAtHeight(Math.max(0, docY) * g.z)
+      const line = view.state.doc.lineAt(block.from)
+      return { n: line.number, bottom: lineBlock(view, g, line.from).bottom }
+    },
+    [view, measure],
+  )
+  useEffect(() => {
+    if (!placing) return undefined
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      setPlacing(false)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [placing, setPlacing])
+
   // ----- pointer / keyboard plumbing on the scroll area -----
   useEffect(() => {
     if (!scrollEl || !ctl) return
@@ -581,7 +699,15 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     let swipe = null
     const onPointerDown = (e) => {
       if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .nc-edge, .cv-pop, .cv-style-bud, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
-      if (e.target.closest?.('.cv-edit, .cv-edit-frame')) return
+      if (e.target.closest?.('.cv-edit, .cv-edit-frame, .cm-obi-space-x, .cm-obi-space-grip')) return
+      if (placingRef.current && e.button === 0) {
+        e.preventDefault()
+        e.stopPropagation()
+        const at = lineAtY(e.clientY)
+        setPlacing(false)
+        if (at) addSpace(at.n)
+        return
+      }
       measure()
       const handled = ctl.onPointerDown(e)
       if (handled) {
@@ -606,6 +732,11 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         return
       }
       pointerRef.current = toWorld(e.clientX, e.clientY)
+      if (placingRef.current) {
+        const at = lineAtY(e.clientY)
+        setGuide(at ? at.bottom : null)
+        return
+      }
       ctl.hoverAt(e)
     }
     const endSwipe = (e) => {
@@ -713,7 +844,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
       scrollEl.removeEventListener('contextmenu', onContext)
       window.removeEventListener('blur', onBlur)
     }
-  }, [scrollEl, ctl, toWorld, measure, setPan, view])
+  }, [scrollEl, ctl, toWorld, measure, setPan, view, lineAtY, addSpace, setPlacing])
 
   // cursor feedback on the scroll area
   useEffect(() => {
@@ -725,8 +856,10 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     cls.toggle('nc-hand', !state.panning && (tool === 'hand' || state.spaceDown))
     cls.toggle('nc-panning', !!state.panning)
     cls.toggle('nc-over-el', tool === 'select' && !!state.hover)
-    return () => cls.remove('nc-drawing', 'nc-erasing', 'nc-hand', 'nc-panning', 'nc-over-el')
-  }, [scrollEl, state.tool, state.panning, state.spaceDown, state.hover])
+    cls.toggle('nc-placing-space', placing)
+    cls.toggle('nc-bar-open', !!prefs.canvasBar)
+    return () => cls.remove('nc-drawing', 'nc-erasing', 'nc-hand', 'nc-panning', 'nc-over-el', 'nc-placing-space', 'nc-bar-open')
+  }, [scrollEl, state.tool, state.panning, state.spaceDown, state.hover, placing, prefs.canvasBar])
 
   // toggling the toolbar from the command palette
   useEffect(() => {
@@ -903,6 +1036,11 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         <>
           <CanvasLayer ctl={ctl} ctx={ctx} zoom={zoom} />
           <CanvasExtent ctl={ctl} />
+          {placing && guide != null && geomRef.current && (
+            <div className="nc-space-guide" style={{ top: Math.round(guide), left: geomRef.current.colLeft, width: geomRef.current.colRight - geomRef.current.colLeft }}>
+              <span>Click to open a drawing space here</span>
+            </div>
+          )}
         </>,
         portalHost,
       )}
@@ -986,8 +1124,25 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
         {open ? (
           <Toolbar
             ctl={ctl}
+            extra={
+              !readOnly && (
+                <button
+                  className={`cv-tool ${placing ? 'active' : ''}`}
+                  title="Make room: click under a line to open a drawing space there (no blank lines needed, the note's text stays as it is)"
+                  aria-pressed={placing}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    ctl.setTool('select')
+                    setPlacing(!placing)
+                  }}
+                >
+                  <UnfoldVertical />
+                </button>
+              )
+            }
             onCollapse={() => {
               ctl.setTool('select')
+              setPlacing(false)
               usePrefs.getState().set({ canvasBar: false })
             }}
           />

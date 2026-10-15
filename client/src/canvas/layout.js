@@ -23,7 +23,8 @@ export function resolveLayout(snapshot, env = null) {
   const list = []
   const byId = new Map()
   for (const el of snapshot.list) {
-    if (el.type === 'highlight') continue
+    // highlights are marks in the text, and drawing spaces room between its lines (canvas/spaces.js)
+    if (el.type === 'highlight' || el.type === 'space') continue
     let r = el
     if (env && el.anchor) {
       const top = env.lineTop(el.anchor)

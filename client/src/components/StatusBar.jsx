@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, Check, CloudOff, AlertTriangle, Cloud, Wifi, WifiOff, GitBranch, Users, FileText, Loader2, Minus, Plus } from 'lucide-react'
+import { RefreshCw, Check, CloudOff, AlertTriangle, Cloud, Wifi, WifiOff, GitBranch, Users, FileText, Loader2, Minus, Plus, MoveHorizontal } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
 import { useNoteZoom, zoomLabel, ZOOM_MIN, ZOOM_MAX } from '../store/zoom.js'
+import { usePrefs, NOTE_WIDTH, noteWidthOf } from '../store/prefs.js'
+import { Popover } from './ui.jsx'
 import { syncNow } from '../lib/actions.js'
 import { conn } from '../lib/socket.js'
 import { timeAgo, readingTime } from '../lib/util.js'
@@ -52,6 +54,55 @@ function ZoomChip() {
         <Plus />
       </button>
     </span>
+  )
+}
+
+// The width of the note column, in reach: a slider, a few sizes, or the full pane
+const WIDTHS = [
+  ['Narrow', 560],
+  ['Medium', 700],
+  ['Wide', 900],
+]
+function WidthChip() {
+  const width = noteWidthOf(usePrefs((s) => s.lineWidth))
+  const readable = usePrefs((s) => s.readableWidth)
+  const [at, setAt] = useState(null)
+  const set = (patch) => usePrefs.getState().set(patch)
+  return (
+    <>
+      <button className={`status-item desktop-only ${at ? 'active' : ''}`} title="Note width" aria-label="Note width" onClick={(e) => setAt(at ? null : e.currentTarget)}>
+        <MoveHorizontal />
+        {readable ? width : 'Full'}
+      </button>
+      {at && (
+        <Popover anchor={at} onClose={() => setAt(null)} className="width-pop">
+          <div className="width-pop-head">
+            <b>Note width</b>
+            <span>{readable ? `${width} px` : 'Full width'}</span>
+          </div>
+          <input
+            type="range"
+            className="range"
+            min={NOTE_WIDTH.min}
+            max={NOTE_WIDTH.max}
+            step={NOTE_WIDTH.step}
+            value={width}
+            aria-label="Note width"
+            onChange={(e) => set({ lineWidth: Number(e.target.value), readableWidth: true })}
+          />
+          <div className="width-pop-sizes">
+            {WIDTHS.map(([label, px]) => (
+              <button key={label} type="button" className={`te-quick ${readable && width === px ? 'on' : ''}`} onClick={() => set({ lineWidth: px, readableWidth: true })}>
+                {label}
+              </button>
+            ))}
+            <button type="button" className={`te-quick ${readable ? '' : 'on'}`} onClick={() => set({ readableWidth: !readable })}>
+              Full
+            </button>
+          </div>
+        </Popover>
+      )}
+    </>
   )
 }
 
@@ -171,6 +222,7 @@ export function StatusBar() {
       <span className="status-spacer" />
       <UpdatePill />
       {/* markdown notes only: a whiteboard zooms by itself (its own controls) */}
+      {tab?.kind === 'note' && isNote(tab.path) && <WidthChip />}
       {tab?.kind === 'note' && isNote(tab.path) && <ZoomChip />}
       {tab?.kind === 'note' && tab.ws === wsId && treeMap.get(tab.path)?.mtime > 0 && (
         <span className="status-item desktop-only" title={new Date(treeMap.get(tab.path).mtime).toLocaleString()}>

@@ -153,6 +153,20 @@ export function slashCompletion(context) {
     { label: '/Current time', displayLabel: 'Current time', detail: formatDate(now, 'HH:mm'), type: 'block', apply: formatDate(now, 'HH:mm'), section: 'Insert' },
     { label: '/Date & time', displayLabel: 'Date & time', detail: formatDate(now, 'YYYY-MM-DD HH:mm'), type: 'block', apply: formatDate(now, 'YYYY-MM-DD HH:mm'), section: 'Insert' },
   )
+  // room to draw under this line, without blank lines in the markdown (canvas/spaces.js; NoteCanvas makes it)
+  options.unshift({
+    label: '/Drawing space',
+    displayLabel: 'Drawing space',
+    detail: 'canvas',
+    info: 'Open room under this line to draw in — the note’s text stays as it is',
+    type: 'block',
+    section: 'Blocks',
+    boost: 3,
+    apply: (view, c, from2, to) => {
+      view.dispatch({ changes: { from: from2, to } })
+      window.dispatchEvent(new CustomEvent('obi:add-space', { detail: { view, line: view.state.doc.lineAt(from2).number } }))
+    },
+  })
   const ctx = context.state.facet(editorCtx)
   if (ctx.insertWhiteboard) {
     options.unshift({

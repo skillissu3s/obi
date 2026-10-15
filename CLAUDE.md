@@ -19,6 +19,8 @@ change the matching rule on the other side in the same commit:
 - `server/public.js` — the published page and its routes
 - `client/src/canvas/layout.js`, `anchors.js`, `wordreach.js`, `NoteCanvas.jsx`
   (`env`, `anchorFor`), `ElementView.jsx` (`textStyle`)
+- `client/src/canvas/spaces.js`, `client/src/editor/spaces.js` — drawing spaces
+  (room under a line), mirrored by `placeSpaces` in `publish/main.js`
 - `shared/boardsvg.js` — `textBlock`, `boardToSvg`
 - `client/src/lib/themesnapshot.js`
 

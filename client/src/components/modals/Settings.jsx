@@ -5,7 +5,7 @@ import {
   Download, Upload, Plus, Check, X, Shield, Cloud, AlertTriangle, ExternalLink, Copy, CalendarDays, FileText, Clock,
 } from 'lucide-react'
 import { Modal, Switch, Segmented, Spinner, Avatar, WsIcon, EmojiPicker } from '../ui.jsx'
-import { usePrefs, ACCENTS, PALETTES } from '../../store/prefs.js'
+import { usePrefs, ACCENTS, PALETTES, NOTE_WIDTH, noteWidthOf } from '../../store/prefs.js'
 import { useApp } from '../../store/app.js'
 import { useUI, toast, confirmDialog } from '../../store/ui.js'
 import { api } from '../../lib/api.js'
@@ -447,22 +447,21 @@ function AppearanceSection() {
       <Setting name="Line height" desc={String(prefs.lineHeight)}>
         <input type="range" min="1.3" max="2.2" step="0.05" value={prefs.lineHeight} onChange={(e) => prefs.set({ lineHeight: Number(e.target.value) })} className="range" />
       </Setting>
-      <Setting name="Readable line width" desc="Keep lines comfortably short instead of full width.">
-        <Switch checked={prefs.readableWidth} onChange={(v) => prefs.set({ readableWidth: v })} />
+      <Setting name="Note width" desc={prefs.readableWidth ? `${noteWidthOf(prefs.lineWidth)} px — how wide a line of text gets before it wraps. Also in the status bar.` : 'Full width: lines run the width of the pane.'}>
+        <input
+          type="range"
+          className="range"
+          min={NOTE_WIDTH.min}
+          max={NOTE_WIDTH.max}
+          step={NOTE_WIDTH.step}
+          value={noteWidthOf(prefs.lineWidth)}
+          aria-label="Note width"
+          onChange={(e) => prefs.set({ lineWidth: Number(e.target.value), readableWidth: true })}
+        />
       </Setting>
-      {prefs.readableWidth && (
-        <Setting name="Line width" desc="How wide a line of text gets before it wraps.">
-          <Segmented
-            value={prefs.lineWidth}
-            onChange={(v) => prefs.set({ lineWidth: v })}
-            options={[
-              { value: 'narrow', label: 'Narrow' },
-              { value: 'normal', label: 'Normal' },
-              { value: 'wide', label: 'Wide' },
-            ]}
-          />
-        </Setting>
-      )}
+      <Setting name="Full width" desc="Let lines run the whole width of the pane instead.">
+        <Switch checked={!prefs.readableWidth} onChange={(v) => prefs.set({ readableWidth: !v })} />
+      </Setting>
       <Setting name="Strike through completed tasks">
         <Switch checked={prefs.strikeDone} onChange={(v) => prefs.set({ strikeDone: v })} />
       </Setting>

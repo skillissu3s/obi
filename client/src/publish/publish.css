@@ -109,6 +109,15 @@ main {
   vertical-align: top;
 }
 
+/* a drawing space (main.js placeSpaces), as tall as .cm-obi-space in the
+   editor: exactly its height, no margins (they would collapse into a gap) */
+#content .obi-space {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 /* ---- headings: .cm-lp-h1 … .cm-lp-h6 ---- */
 #content h1:not(svg *),
 #content h2:not(svg *),

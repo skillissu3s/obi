@@ -35,6 +35,12 @@ export const ACCENTS = [
 ]
 
 const PREFS_VERSION = 2
+
+/** How wide the note column can be made (px), and the steps the slider takes */
+export const NOTE_WIDTH = { min: 480, max: 1280, step: 20 }
+const PRESET_WIDTH = { narrow: 560, normal: 620, wide: 800 }
+/** The note column's width in px, from the setting (a number, or one of the old presets) */
+export const noteWidthOf = (v) => Math.min(NOTE_WIDTH.max, Math.max(NOTE_WIDTH.min, Math.round(typeof v === 'number' && Number.isFinite(v) ? v : PRESET_WIDTH[v] ?? 620)))
 // accents that used to be defaults — cleared once so the palette's own accent shows through
 const LEGACY_ACCENTS = new Set(['#8b7cf6', '#4f8cff', '#14b8a6', '#3ecf8e', '#f5a524', '#f26b5b', '#ec5fa8', '#9aa0ab', '#2f9e78'])
 
@@ -48,7 +54,7 @@ export const DEFAULT_PREFS = {
   editorFont: 'sans',
   readableWidth: true,
   pasteMarkdown: true, // rich text from the clipboard arrives as markdown
-  lineWidth: 'normal', // narrow | normal | wide
+  lineWidth: 620, // the note column's width in px (NOTE_WIDTH); older versions kept narrow | normal | wide
   lineHeight: 1.7,
   defaultMode: 'live',
   spellcheck: true,
@@ -149,7 +155,7 @@ export function applyPrefs(p = snapshot(usePrefs.getState())) {
   else root.style.removeProperty('--accent-user')
   root.style.setProperty('--editor-font-size', `${p.fontSize}px`)
   root.style.setProperty('--editor-line-height', String(p.lineHeight))
-  root.style.setProperty('--note-width', { narrow: '560px', normal: '620px', wide: '800px' }[p.lineWidth] || '620px')
+  root.style.setProperty('--note-width', `${noteWidthOf(p.lineWidth)}px`)
   root.dataset.editorFont = p.editorFont
   root.dataset.uiScale = p.uiScale
   applyWallpaper(p.wallpaper)

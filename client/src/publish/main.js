@@ -11,6 +11,7 @@ import './publish.css'
 import { resolveLayout, measureMarkdown } from '../canvas/layout.js'
 import { resolveAnchor } from '../canvas/anchors.js'
 import { wordReach } from '../canvas/wordreach.js'
+import { spaceEnds, spacePlacements } from '../canvas/spaces.js'
 import { boardToSvg, highlightCss } from '@shared/boardsvg.js'
 
 const article = document.getElementById('content')
@@ -76,6 +77,12 @@ function measure() {
       if (!tops.has(last)) tops.set(last, r.bottom + window.scrollY - oy)
     }
     bottoms.set(n, r.bottom + window.scrollY - oy)
+  }
+  // a line right under a drawing space starts where the space ends, as in the
+  // editor (it may be a blank line, which the page doesn't mark)
+  for (const sp of article.querySelectorAll('.obi-space')) {
+    const n = Number(sp.dataset.after) + 1
+    if (!tops.has(n)) tops.set(n, sp.getBoundingClientRect().bottom + window.scrollY - oy)
   }
   const known = [...tops.keys()].sort((a, b) => a - b)
   // a client rect in world pixels
@@ -286,7 +293,37 @@ function firstContent(li) {
   return range.getClientRects()[0] || null
 }
 
+// ⚠ LAYOUT CONTRACT — drawing spaces (canvas/spaces.js): room the author opened
+// under a line to draw in. The editor shows each as a block of its height under
+// its line (editor/spaces.js); here it is a block put in just before the next
+// line's element, so every line below moves down by the same amount. Never
+// inside a code block or a table, which spacePlacements doesn't split either.
+function placeSpaces() {
+  for (const sp of article.querySelectorAll('.obi-space')) sp.remove()
+  if (!data?.elements?.some((el) => el.type === 'space') || typeof data.text !== 'string') return
+  const ends = spaceEnds(data.text)
+  const lineOfAnchor = (a) => {
+    const r = resolveAnchor(data.text, a)
+    return r ? lineOf(data.text, r.from) : null
+  }
+  const marked = [...article.querySelectorAll('[data-line]:not(input)')].filter((el) => !el.closest('svg'))
+  for (const { line, h } of spacePlacements(data.elements, lineOfAnchor, ends)) {
+    const sp = document.createElement('span')
+    sp.className = 'obi-space'
+    sp.dataset.after = String(line)
+    sp.style.height = `${h}px`
+    const next = marked.find((el) => Number(el.getAttribute('data-line')) > line)
+    if (!next) {
+      article.append(sp)
+      continue
+    }
+    const at = next.closest('pre, table') || next
+    at.parentNode.insertBefore(sp, at)
+  }
+}
+
 function render() {
+  placeSpaces()
   hangListItems()
   fitMarkdownBlocks()
   if (!article || !data?.elements?.length) {

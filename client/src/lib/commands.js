@@ -3,14 +3,14 @@ import {
   Maximize2, SplitSquareHorizontal, X, RefreshCw, Share2, Globe, History, Pencil, Trash2, Copy, Link2, Star, Shuffle,
   Download, Upload, LogOut, ShieldCheck, Command, FolderInput, Keyboard, Plus, BookOpen, Undo2, Redo2,
   Bold, Italic, Quote, IndentIncrease, IndentDecrease, Hash, Users, Layers, Palette, Shapes, PencilRuler, PanelLeftOpen,
-  Printer, ZoomIn, ZoomOut, SquareKanban,
+  Printer, ZoomIn, ZoomOut, SquareKanban, UnfoldVertical, MoveHorizontal,
 } from 'lucide-react'
 import { indentMore, indentLess, undo, redo } from '@codemirror/commands'
 import { yUndoManagerKeymap } from 'y-codemirror.next'
 import { openSearchPanel } from '@codemirror/search'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
-import { usePrefs, PALETTES } from '../store/prefs.js'
+import { usePrefs, PALETTES, NOTE_WIDTH, noteWidthOf } from '../store/prefs.js'
 import { useUI, toast, confirmDialog, promptDialog } from '../store/ui.js'
 import { useNoteZoom } from '../store/zoom.js'
 import { navigate } from './router.js'
@@ -77,6 +77,10 @@ export function buildCommands() {
     { id: 'new-folder', name: 'New folder', icon: FolderPlus, group: 'File', run: () => A.createFolder(currentFolder()) },
     { id: 'new-whiteboard', name: 'New whiteboard', icon: Shapes, hotkey: 'Alt+B', group: 'File', run: () => A.createWhiteboard({ folder: currentFolder() }) },
     { id: 'insert-whiteboard', name: 'Insert a new whiteboard into this note', icon: Shapes, group: 'Editor', hidden: !activeView, run: () => insertWhiteboard() },
+    { id: 'add-space', name: 'Add a drawing space under this line', icon: UnfoldVertical, hotkey: 'Alt+Enter', group: 'Editor', hidden: !activeView, run: () => {
+        const v = activeView
+        if (v) window.dispatchEvent(new CustomEvent('obi:add-space', { detail: { view: v, line: v.state.doc.lineAt(v.state.selection.main.head).number } }))
+      } },
     { id: 'canvas-tools', name: 'Toggle canvas tools on notes', icon: PencilRuler, hotkey: 'Alt+C', group: 'View', run: () => window.dispatchEvent(new CustomEvent('obi:canvas-bar')) },
     { id: 'new-project', name: 'New project (a board of lists and cards)', icon: SquareKanban, group: 'File', run: async () => {
         const name = await promptDialog({ title: 'New project', placeholder: 'Project name', confirmText: 'Create' })
@@ -132,6 +136,8 @@ export function buildCommands() {
     { id: 'new-tab', name: 'New tab', icon: Plus, hotkey: 'Alt+T', group: 'View', run: () => layout.newTab() },
     { id: 'theme', name: `Switch to ${document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'} theme`, icon: document.documentElement.dataset.theme === 'dark' ? Sun : Moon, group: 'View', run: () => prefs.set({ theme: document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark' }) },
     { id: 'readable-width', name: prefs.readableWidth ? 'Use full width' : 'Use readable line width', icon: BookOpen, group: 'View', run: () => prefs.set({ readableWidth: !prefs.readableWidth }) },
+    { id: 'wider-notes', name: 'Make notes wider', icon: MoveHorizontal, group: 'View', run: () => prefs.set({ lineWidth: Math.min(NOTE_WIDTH.max, noteWidthOf(prefs.lineWidth) + 80), readableWidth: true }) },
+    { id: 'narrower-notes', name: 'Make notes narrower', icon: MoveHorizontal, group: 'View', run: () => prefs.set({ lineWidth: Math.max(NOTE_WIDTH.min, noteWidthOf(prefs.lineWidth) - 80), readableWidth: true }) },
     ...PALETTES.map((p) => ({
       id: `palette-${p.id}`,
       name: `Colour theme: ${p.name}${prefs.palette === p.id ? ' ✓' : ''}`,
