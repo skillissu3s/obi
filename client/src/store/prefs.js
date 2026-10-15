@@ -66,6 +66,7 @@ export const DEFAULT_PREFS = {
   confirmDelete: true,
   sortBy: 'name',
   canvasBar: false,
+  showBoardFiles: false, // boards in the Projects folder show in the file list too (they are in the Boards section)
   weekStart: 'monday', // monday | sunday — where a week begins on the calendars
   canvasTextKind: 'markdown', // what double-clicking empty canvas writes: markdown | plain
   typewriter: false,

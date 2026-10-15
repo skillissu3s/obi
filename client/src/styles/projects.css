@@ -1351,3 +1351,100 @@ html.pb-dragging .pb-card:hover {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* ---------- the Boards section at the foot of the Files tab (ProjectsPanel.jsx BoardsDock) ----------
+   Like a VS Code side panel: a header that opens and closes it, a body of a
+   height of its own, and an edge on top to drag it taller or shorter. */
+.boards-dock {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}
+.boards-dock-sash {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: 7px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.boards-dock-sash::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background var(--t-fast) 120ms;
+}
+.boards-dock-sash:hover::after,
+.boards-dock.resizing .boards-dock-sash::after {
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+html:has(.boards-dock.resizing),
+html:has(.boards-dock.resizing) * {
+  cursor: ns-resize !important;
+  user-select: none !important;
+}
+.boards-dock-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 6px 0 6px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.boards-dock-head:hover,
+.boards-dock-head:focus-visible {
+  color: var(--text-2);
+}
+.boards-dock-chev {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: rotate var(--t-fast) var(--ease);
+}
+.boards-dock.open .boards-dock-chev {
+  rotate: 90deg;
+}
+.boards-dock-count {
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--bg-active);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.boards-dock-head .icon-btn {
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.boards-dock-head:hover .icon-btn,
+.boards-dock-head:focus-within .icon-btn {
+  opacity: 1;
+}
+.boards-dock-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 0;
+}
+@media (pointer: coarse) {
+  .boards-dock-head .icon-btn {
+    opacity: 1;
+  }
+}

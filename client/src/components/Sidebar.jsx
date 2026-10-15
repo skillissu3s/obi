@@ -17,7 +17,9 @@ import { WsIcon, menuFromElement, Avatar } from './ui.jsx'
 import { basename, dirname, stripExt, isNote, extname, joinPath, IMAGE_EXT } from '@shared/paths.js'
 import { debounce, timeAgo, fuzzyFilter, plainSnippet } from '../lib/util.js'
 import { isBoardPath } from '@shared/board.js'
-import { ProjectsPanel } from './ProjectsPanel.jsx'
+import { ProjectsPanel, BoardsDock } from './ProjectsPanel.jsx'
+import { isBoardMeta } from '@shared/kanban.js'
+import { projectsFolder } from '../lib/projects.js'
 
 const ROW_H = 28
 
@@ -47,6 +49,21 @@ function buildTree(entries, sortBy) {
   }
   sortRec(root)
   return root
+}
+
+// The file list without the boards kept in the Projects folder (`hidden`, their
+// paths): those are in the Boards section below it. A folder left with nothing
+// to show (the Projects folder, usually) goes too.
+function withoutBoards(entries, hidden, folder) {
+  if (!hidden.size) return entries
+  const keep = entries.filter((e) => !hidden.has(e.path))
+  const filled = new Set()
+  for (const e of keep) {
+    if (e.type !== 'file') continue
+    for (let d = dirname(e.path); d; d = dirname(d)) filled.add(d)
+  }
+  const inFolder = (p) => p === folder || p.startsWith(`${folder}/`)
+  return keep.filter((e) => e.type !== 'folder' || !inFolder(e.path) || filled.has(e.path))
 }
 
 function flatten(node, expanded, depth = 0, out = []) {
@@ -85,7 +102,16 @@ export function FileTree() {
   const me = useApp((s) => s.user?.id)
   const pending = useApp((s) => s.pending)
   const loadingWs = useApp((s) => s.loadingWs)
-  const rootNode = useMemo(() => buildTree(tree, prefs.sortBy), [tree, prefs.sortBy])
+  // the boards in the Projects folder, unless they are to show here too (only a change to which there are redraws the list)
+  const boardPaths = useApp((s) => {
+    if (usePrefs.getState().showBoardFiles) return ''
+    const folder = `${projectsFolder()}/`
+    const out = []
+    for (const [p, m] of s.notes) if (p.startsWith(folder) && isBoardMeta(m)) out.push(p)
+    return out.sort().join('\n')
+  })
+  const shown = useMemo(() => withoutBoards(tree, new Set(prefs.showBoardFiles || !boardPaths ? [] : boardPaths.split('\n')), projectsFolder()), [tree, boardPaths, prefs.showBoardFiles])
+  const rootNode = useMemo(() => buildTree(shown, prefs.sortBy), [shown, prefs.sortBy])
   const rows = useMemo(() => flatten(rootNode, expanded), [rootNode, expanded])
 
   useEffect(() => {
@@ -766,6 +792,7 @@ export function Sidebar({ user, closed }) {
         </div>
       )}
       {leftTab === 'files' && <FileTree />}
+      {leftTab === 'files' && <BoardsDock />}
       {leftTab === 'search' && <SearchPanel />}
       {leftTab === 'tags' && <TagsPanel />}
       {leftTab === 'bookmarks' && <BookmarksPanel />}

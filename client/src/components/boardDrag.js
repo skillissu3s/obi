@@ -198,16 +198,20 @@ export function useBoardDrag({ lanesRef, onDrop, startDrop }) {
       g.ghost.style.translate = `${to.left - g.rect.left}px ${to.top - g.rect.top}px`
       setTimeout(() => {
         const where = dropRef.current
-        if (commit && where && !sameDrop(where, g.first)) cbs.current.onDrop(g.item, where)
-        dropRef.current = null
-        setDragState(null)
-        setDropState(null)
-        quietUntil.current = Date.now() + 250
-        requestAnimationFrame(() => {
-          g.ghost.remove()
-          document.documentElement.classList.remove('pb-dragging')
-        })
-        live.current = null
+        try {
+          if (commit && where && !sameDrop(where, g.first)) cbs.current.onDrop(g.item, where)
+        } finally {
+          // whatever the move did, the drag is over: nothing stays hidden or held open
+          dropRef.current = null
+          setDragState(null)
+          setDropState(null)
+          quietUntil.current = Date.now() + 250
+          requestAnimationFrame(() => {
+            g.ghost.remove()
+            document.documentElement.classList.remove('pb-dragging')
+          })
+          live.current = null
+        }
       }, SETTLE)
     })
   }
