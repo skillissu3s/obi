@@ -11,8 +11,21 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  /* the project's colour, faintly, behind its lists (the wallpaper still shows) */
-  background: linear-gradient(165deg, color-mix(in srgb, var(--project) 10%, transparent), transparent 60%);
+  isolation: isolate; /* (the tint below sits behind the lists, above what is under the board) */
+}
+/* A board with a colour: that colour, faintly, behind its lists (the wallpaper still
+   shows). It glows from the top left and fades out smoothly every way, and it fades
+   in from the board's top edge too, so it meets the bar above without a hard line. */
+.pb.tinted::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 95% at 8% 0%, color-mix(in srgb, var(--project) 16%, transparent) 0%, color-mix(in srgb, var(--project) 7%, transparent) 40%, transparent 78%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 90px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 90px);
 }
 [data-theme='light'] .pb {
   --pb-list: color-mix(in srgb, rgb(var(--tint)) 6%, var(--bg));
@@ -125,7 +138,7 @@
   overflow-y: hidden;
 }
 .pb-list {
-  width: 304px;
+  width: 324px;
   flex-shrink: 0;
   max-height: 100%;
   display: flex;
@@ -277,14 +290,12 @@
   height: 11px;
 }
 .pb-card-title {
-  position: relative;
   display: flex;
   align-items: flex-start;
-  padding-right: 24px; /* (room for the check, kept whether it shows or not) */
 }
-/* the round check: in the title's top-right corner, out of sight until the card is
-   pointed at, and always there once it is done or under way. It sits in room kept
-   for it, so showing it never moves the words. */
+/* the round check: on the left of the title, as Trello has it, out of sight until the
+   card is pointed at, and always there once it is done or under way. Its room is
+   always kept (the lists are a little wider for it), so showing it moves nothing. */
 .pb-check {
   display: grid;
   place-items: center;
@@ -299,9 +310,8 @@
   transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
 }
 .pb-card .pb-check {
-  position: absolute;
-  top: -1px;
-  right: -4px;
+  flex-shrink: 0;
+  margin: -1px 5px 0 -4px;
   opacity: 0;
 }
 .pb-check svg {
@@ -343,6 +353,10 @@
   align-items: center;
   gap: 4px 6px;
   margin-top: 6px;
+}
+/* (under the words, past the check's room) */
+.pb-card .pb-badges {
+  padding-left: 23px;
 }
 .pb-badge {
   display: inline-flex;
@@ -680,14 +694,6 @@
   background: var(--accent-soft);
   color: var(--accent-text);
   font-weight: 600;
-}
-.pb-colors {
-  padding: 10px;
-}
-.pb-colors-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 30px);
-  gap: 6px;
 }
 .pb-swatch {
   display: grid;
@@ -1310,27 +1316,17 @@ html.pb-dragging .pb-card:hover {
 
 /* ---------- colours: covers, labels, the board ---------- */
 .pb-cover {
-  height: 30px;
+  height: 40px;
   margin: -9px -11px 9px;
   background: var(--lc);
 }
 .pb-card:has(.pb-cover) .pb-labels {
   margin-top: 0;
 }
-.cd-cover {
-  height: 44px;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  transition: background var(--t) var(--ease);
-}
-.cd-cover.on {
-  background: var(--lc);
-}
-.cd-cover + .cd {
-  padding-top: 6px;
-}
-/* the dialog's × stays readable on a cover */
-.card-dialog > .icon-btn {
-  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
+/* a card with a cover: a border of the cover's colour around its dialog (drawn inside
+   it, so it takes no room and moves nothing) */
+.card-dialog.has-cover {
+  box-shadow: inset 0 0 0 3px var(--cover), var(--shadow-lg);
 }
 .pb-label.pickable {
   cursor: pointer;
@@ -1362,12 +1358,6 @@ html.pb-dragging .pb-card:hover {
   background: var(--bg-input);
   color: var(--text-2);
   font-size: 12px;
-}
-.pb-colors-title {
-  margin-bottom: 8px;
-  color: var(--text-2);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* ---------- the Boards section at the foot of the Files tab (ProjectsPanel.jsx BoardsDock) ----------
@@ -1541,7 +1531,8 @@ html:has(.boards-dock.resizing) * {
    Trello's way: a card floating over the dialog, so the dialog never moves or
    grows under it; × , Escape or a click outside closes it. */
 .label-pop,
-.cover-pop {
+.cover-pop,
+.color-pop {
   width: 304px;
   padding: 0 0 14px;
 }

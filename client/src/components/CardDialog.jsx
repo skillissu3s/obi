@@ -2,7 +2,7 @@
 // a Trello card. Each change is written to the board at once (`change` runs on a
 // copy of the board, see ProjectBoard), and the project's rules apply to it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AlignLeft, Archive, Check, ChevronLeft, Flag, ListChecks, Palette, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { AlignLeft, Archive, Flag, ListChecks, Palette, Pencil, Plus, Trash2 } from 'lucide-react'
 import * as K from '@shared/kanban.js'
 import { PRIORITIES, cleanTag, isOpen, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
 import { renderMarkdown } from '../lib/render.js'
@@ -10,8 +10,8 @@ import { openLink } from '../lib/actions.js'
 import { Modal, Popover } from './ui.jsx'
 import { PRIORITY_LABEL } from './TaskParts.jsx'
 import { DateField, REPEATS } from './TaskDialog.jsx'
-import { Label, StatusIcon, dueTone } from './CardParts.jsx'
-import { colorLabel } from '../lib/colors.js'
+import { Colors, Label, PopHead, StatusIcon, dueTone } from './CardParts.jsx'
+import { colorHex, colorLabel } from '../lib/colors.js'
 
 const STATUSES = [
   [' ', 'To do'],
@@ -48,38 +48,6 @@ const grow = (el) => {
   if (!el) return
   el.style.height = 'auto'
   el.style.height = `${el.scrollHeight}px`
-}
-
-/** The head of a popover: its title in the middle, a way back on the left (if any), × on the right */
-function PopHead({ title, onBack, onClose }) {
-  return (
-    <div className="pop-head">
-      {onBack ? (
-        <button type="button" className="icon-btn sm" aria-label="Back" title="Back" onClick={onBack}>
-          <ChevronLeft />
-        </button>
-      ) : (
-        <span />
-      )}
-      <b>{title}</b>
-      <button type="button" className="icon-btn sm" aria-label="Close" title="Close" onClick={onClose}>
-        <X />
-      </button>
-    </div>
-  )
-}
-
-/** The colours to pick from, as wide tiles; the one in use ticked */
-function Colors({ value, onPick }) {
-  return (
-    <div className="lp-colors" role="radiogroup" aria-label="Colour">
-      {K.PROJECT_COLORS.map((c) => (
-        <button key={c} type="button" role="radio" className={`lp-color ${value === c ? 'on' : ''}`} data-color={c} title={colorLabel(c)} aria-label={colorLabel(c)} aria-checked={value === c} onClick={() => onPick(c)}>
-          {value === c && <Check />}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 /**
@@ -455,9 +423,7 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
   const cover = K.cardCover(board, card)
 
   return (
-    <Modal title={null} label="Card" onClose={onClose} className="card-dialog" bodyClass="cd-shell">
-      {/* (always there, so a cover coming or going never moves the card under you) */}
-      <div className={`cd-cover ${cover ? 'on' : ''}`} data-color={cover || undefined} />
+    <Modal title={null} label="Card" onClose={onClose} className={`card-dialog ${cover ? 'has-cover' : ''}`} style={cover ? { '--cover': colorHex(cover) } : undefined} bodyClass="cd-shell">
       <div className="cd">
         <header className="cd-head">
           <button type="button" className={`pb-check cd-check ${isOpen(status) ? '' : 'on'}`} disabled={readOnly} aria-label={isOpen(status) ? 'Mark done' : 'Mark not done'} onClick={() => change((b, c) => K.setCardStatus(b, c, isOpen(status) ? 'x' : ' ', opts))}>

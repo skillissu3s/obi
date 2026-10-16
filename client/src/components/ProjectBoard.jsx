@@ -19,10 +19,10 @@ import { useUI, toast, confirmDialog } from '../store/ui.js'
 import { menuFromElement, Popover } from './ui.jsx'
 import { ParsedChips, PRIORITY_LABEL, useQuickParse } from './TaskParts.jsx'
 import { CardDialog } from './CardDialog.jsx'
-import { Label, StatusIcon, dueTone } from './CardParts.jsx'
+import { Colors, Label, PopHead, StatusIcon, dueTone } from './CardParts.jsx'
 import { Automation, ruleCount } from './Automation.jsx'
 import { useBoardDrag } from './boardDrag.js'
-import { colorHex, colorLabel } from '../lib/colors.js'
+import { colorHex } from '../lib/colors.js'
 
 export const LIST_COLORS = K.PROJECT_COLORS
 
@@ -580,12 +580,14 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
 
   const nFilters = filterCount(filter)
   let listSlot = 0 // lists drawn so far, but the one being dragged
-  const color = colorHex(K.boardColor(board)) || projectColor(path)
+  // (a board with no colour of its own has no tint; its dot keeps the colour its name gives it)
+  const tint = colorHex(K.boardColor(board))
+  const color = tint || projectColor(path)
   const placeholder = (key, h) => <div key={key} className="pb-placeholder" style={{ height: h || 38 }} />
   const dragging = drag?.kind
 
   return (
-    <div className="pb" style={{ '--project': color }}>
+    <div className={`pb ${tint ? 'tinted' : ''}`} style={{ '--project': color }}>
       <div className="pb-bar">
         <span className="pb-dot" />
         <h2 className="pb-name" title={readOnly ? title : 'Rename project'} onClick={() => !readOnly && onRename?.()}>
@@ -736,30 +738,25 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
           <FilterCard filter={filter} labels={labels} onChange={setFilter} />
         </Popover>
       )}
-      {colorAt && (
-        <Popover anchor={colorAt.el} onClose={() => setColorAt(null)} className="pb-colors">
-          <div className="pb-colors-title">{colorAt.board ? 'Board colour' : 'List colour'}</div>
-          <div className="pb-colors-grid">
-            {[null, ...LIST_COLORS].map((c) => (
-              <button
-                key={c || 'none'}
-                type="button"
-                className={`pb-swatch ${(colorAt.board ? K.boardColor(board) : K.laneColor(board, board.lanes.find((l) => l.id === colorAt.lane) || {})) === c ? 'on' : ''}`}
-                data-color={c || undefined}
-                aria-label={colorLabel(c)}
-                title={colorLabel(c)}
-                onClick={() => {
-                  if (colorAt.board) mutate((b) => K.setBoardColor(b, c))
-                  else mutate((b) => K.setLaneColor(b, b.lanes.find((l) => l.id === colorAt.lane), c))
-                  setColorAt(null)
-                }}
-              >
-                {!c && <X />}
-              </button>
-            ))}
-          </div>
-        </Popover>
-      )}
+      {colorAt &&
+        (() => {
+          // (it stays open: try a colour, then another; × , Escape or a click outside closes it)
+          const current = colorAt.board ? K.boardColor(board) : K.laneColor(board, board.lanes.find((l) => l.id === colorAt.lane) || {})
+          const pick = (c) => (colorAt.board ? mutate((b) => K.setBoardColor(b, c)) : mutate((b) => K.setLaneColor(b, b.lanes.find((l) => l.id === colorAt.lane), c)))
+          return (
+            <Popover anchor={colorAt.el} onClose={() => setColorAt(null)} className="color-pop">
+              <PopHead title={colorAt.board ? 'Board colour' : 'List colour'} onClose={() => setColorAt(null)} />
+              <div className="pop-body">
+                <Colors value={current} onPick={pick} />
+                {current && (
+                  <button type="button" className="lp-create" onClick={() => pick(null)}>
+                    Remove colour
+                  </button>
+                )}
+              </div>
+            </Popover>
+          )
+        })()}
       {openHit && openHit.lane && (
         <CardDialog
           key={opened}
