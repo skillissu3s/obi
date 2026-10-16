@@ -15,7 +15,7 @@ export function dueTone(due, status, today) {
 /** A card's #tag as a label: in the colour picked for it on its board (`color`), else the one the tag has everywhere */
 export function Label({ tag, color, onRemove, onClick }) {
   return (
-    <span className={`pb-label ${onClick ? 'pickable' : ''}`} style={{ '--label': color || colorFor(tag.split('/')[0].toLowerCase()) }} title={onClick ? `#${tag} — click to change its colour` : `#${tag}`} onClick={onClick}>
+    <span className={`pb-label ${onClick ? 'pickable' : ''}`} style={{ '--label': color || colorFor(tag.split('/')[0].toLowerCase()) }} title={onClick ? `#${tag} — click to pick labels` : `#${tag}`} onClick={onClick}>
       {tag}
       {onRemove && (
         <button

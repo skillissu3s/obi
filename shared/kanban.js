@@ -441,6 +441,34 @@ export function setLabelColor(board, tag, color) {
 }
 export const addBoardLabel = setLabelColor
 
+/**
+ * Renames a label, as Trello does: on the board's list (keeping its place and
+ * colour) and on every card that has it, archived ones too. False if there was
+ * nothing to do.
+ */
+export function renameLabel(board, from, to, opts) {
+  const a = cleanLabel(from)
+  const b = cleanLabel(to)
+  if (!a || !b || a === b) return false
+  const map = labelMap(board)
+  const next = {}
+  for (const [k, v] of Object.entries(map)) {
+    if (k === b) continue
+    next[k === a ? b : k] = v
+  }
+  if (!(a in map)) next[b] = map[b] || 'gray'
+  setObi(board, { labels: next })
+  for (const c of [...board.lanes.flatMap((l) => l.items), ...(board.archive || [])]) {
+    const t = cardTask(c)
+    if (!t) continue
+    const { tags } = splitTags(t.text)
+    if (!tags.some((x) => x.toLowerCase() === a)) continue
+    const renamed = tags.map((x) => (x.toLowerCase() === a ? b : x))
+    setCardTags(c, renamed.filter((x, i) => renamed.findIndex((y) => y.toLowerCase() === x.toLowerCase()) === i), opts)
+  }
+  return true
+}
+
 /** Takes a label off the board's list (cards that have it keep it, as a #tag) */
 export function removeBoardLabel(board, tag) {
   const { [cleanLabel(tag)]: gone, ...rest } = labelMap(board)

@@ -257,3 +257,20 @@ test('the index knows a board’s colour', () => {
   assert.deepEqual(parseNote(serializeBoard(b)).board, { color: 'teal' })
   assert.equal(parseNote('# plain note\n').board, undefined)
 })
+
+test('renaming a label renames it on the board and on every card, archive too', async () => {
+  const { renameLabel, boardLabels, labelColor } = await import('./kanban.js')
+  const b = parseBoard(['---', 'kanban-plugin: board', '---', '', '## To do', '', '- [ ] Write #review #idea', '- [ ] Ship #Review', '- [ ] Plain', '', '***', '', '## Archive', '', '- [x] Old #review', ''].join('\n'))
+  assert.equal(renameLabel(b, 'review', 'Needs review', { today }), true)
+  assert.deepEqual(boardLabels(b).map((l) => l.name), ['feature', 'needs-review', 'important', 'urgent', 'idea', 'research'])
+  assert.equal(labelColor(b, 'needs-review'), 'yellow')
+  const text = serializeBoard(b)
+  assert.match(text, /- \[ \] Write #needs-review #idea\n/)
+  assert.match(text, /- \[ \] Ship #needs-review\n/)
+  assert.match(text, /- \[ \] Plain\n/)
+  assert.match(text, /- \[x\] Old #needs-review\n/)
+  // onto a name the board has: one label, no card twice
+  renameLabel(b, 'idea', 'needs-review', { today })
+  assert.match(serializeBoard(b), /- \[ \] Write #needs-review\n/)
+  assert.equal(renameLabel(b, 'feature', 'feature'), false)
+})

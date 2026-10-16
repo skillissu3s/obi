@@ -7,7 +7,8 @@ export function Modal({ title, label, onClose, children, footer, className = '',
   const ref = useRef(null)
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') {
+      // (a popover open over the dialog closes first, on its own Escape)
+      if (e.key === 'Escape' && !document.querySelector('.pop-card')) {
         e.stopPropagation()
         onClose?.()
       }
@@ -67,20 +68,35 @@ export function Popover({ anchor, onClose, align = 'right', className = '', chil
   const ref = useRef(null)
   const [pos, setPos] = useState(null)
   useLayoutEffect(() => {
-    if (!ref.current) return
-    const r = anchor.getBoundingClientRect()
-    const w = ref.current.offsetWidth
-    const h = ref.current.offsetHeight
-    const left = align === 'right' ? r.right - w : r.left
-    // below the anchor, or above it when there is no room underneath
-    const top = r.bottom + 6 + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6
-    setPos({ left: Math.max(8, Math.min(window.innerWidth - w - 8, left)), top })
+    const el = ref.current
+    if (!el) return
+    const place = () => {
+      const r = anchor.getBoundingClientRect()
+      const w = el.offsetWidth
+      const h = el.offsetHeight
+      const left = align === 'right' ? r.right - w : r.left
+      // below the anchor, or above it when there is no room underneath
+      const top = r.bottom + 6 + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6
+      const next = { left: Math.max(8, Math.min(window.innerWidth - w - 8, left)), top }
+      setPos((p) => (p && p.left === next.left && p.top === next.top ? p : next))
+    }
+    place()
+    // (what it holds can change size: a list filtered, a form opened; it keeps its place)
+    const ro = new ResizeObserver(place)
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [anchor, align])
   useEffect(() => {
     const down = (e) => {
       if (!ref.current?.contains(e.target) && !anchor.contains(e.target)) onClose()
     }
-    const key = (e) => e.key === 'Escape' && onClose()
+    const key = (e) => {
+      if (e.key !== 'Escape') return
+      // this Escape is the popover's alone: a dialog under it mustn't close too (React
+      // redraws between listeners, so by its turn the popover would look gone already)
+      e.stopImmediatePropagation()
+      onClose()
+    }
     window.addEventListener('pointerdown', down, true)
     window.addEventListener('keydown', key, true)
     return () => {

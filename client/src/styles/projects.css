@@ -277,25 +277,32 @@
   height: 11px;
 }
 .pb-card-title {
+  position: relative;
   display: flex;
   align-items: flex-start;
+  padding-right: 24px; /* (room for the check, kept whether it shows or not) */
 }
-/* the round check: tucked away until the card is pointed at, as Trello does, and always there once it is done or under way */
+/* the round check: in the title's top-right corner, out of sight until the card is
+   pointed at, and always there once it is done or under way. It sits in room kept
+   for it, so showing it never moves the words. */
 .pb-check {
-  flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 0;
-  height: 20px;
-  margin-right: 0;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  overflow: hidden;
   border: none;
+  border-radius: 50%;
   background: none;
   color: var(--text-3);
-  opacity: 0;
   cursor: pointer;
-  transition: width var(--t) var(--ease), margin var(--t) var(--ease), opacity var(--t-fast), color var(--t-fast);
+  transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.pb-card .pb-check {
+  position: absolute;
+  top: -1px;
+  right: -4px;
+  opacity: 0;
 }
 .pb-check svg {
   width: 16px;
@@ -305,9 +312,10 @@
 .pb-card:focus-within .pb-check,
 .pb-card.done .pb-check,
 .pb-card.doing .pb-check {
-  width: 18px;
-  margin-right: 6px;
   opacity: 1;
+}
+.pb-card .pb-check:hover {
+  background: var(--bg-hover);
 }
 .pb-check:hover,
 .pb-check.on {
@@ -1310,9 +1318,19 @@ html.pb-dragging .pb-card:hover {
   margin-top: 0;
 }
 .cd-cover {
-  height: 64px;
-  background: var(--lc);
+  height: 44px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  transition: background var(--t) var(--ease);
+}
+.cd-cover.on {
+  background: var(--lc);
+}
+.cd-cover + .cd {
+  padding-top: 6px;
+}
+/* the dialog's × stays readable on a cover */
+.card-dialog > .icon-btn {
+  background: color-mix(in srgb, var(--bg-elev) 82%, transparent);
 }
 .pb-label.pickable {
   cursor: pointer;
@@ -1494,8 +1512,10 @@ html:has(.boards-dock.resizing) * {
 .cd-label-add {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  height: 24px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 8px;
   border: none;
   border-radius: 5px;
@@ -1511,83 +1531,192 @@ html:has(.boards-dock.resizing) * {
   color: var(--text);
 }
 .cd-label-add svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
-.cd-label-pick {
-  margin-top: 8px;
-  padding: 8px;
-  border-radius: 9px;
-  background: var(--bg-input);
-  box-shadow: inset 0 0 0 1px var(--border);
+.cd-labels .pb-label.pickable {
+  height: 28px;
 }
-.cd-label-search {
-  height: 30px;
-  margin-bottom: 6px;
-  font-size: 13px;
+/* ---------- popovers on a card: its labels and its cover (CardDialog) ----------
+   Trello's way: a card floating over the dialog, so the dialog never moves or
+   grows under it; × , Escape or a click outside closes it. */
+.label-pop,
+.cover-pop {
+  width: 304px;
+  padding: 0 0 14px;
 }
-.cd-label-list {
+.pop-head {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  height: 44px;
+  padding: 0 6px;
+}
+.pop-head b {
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.pop-body {
+  padding: 0 12px;
+}
+.pop-label {
+  display: block;
+  margin: 14px 0 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.lp-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  max-height: 220px;
-  margin: 0;
-  padding: 0;
+  gap: 4px;
+  max-height: 260px;
+  margin: 0 -4px;
+  padding: 0 4px;
   overflow-y: auto;
   list-style: none;
 }
-.cd-label-list li {
+.lp-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-}
-.cd-label-row {
-  display: flex;
-  flex: 1;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  padding: 3px 4px;
-  border-radius: 6px;
+}
+.lp-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
   cursor: pointer;
 }
-.cd-label-row:hover {
-  background: var(--bg-hover);
-}
-.cd-label-row input {
-  accent-color: var(--accent);
-}
-.cd-label-bar {
+.lp-bar {
+  display: flex;
   flex: 1;
+  align-items: center;
   min-width: 0;
-  padding: 4px 10px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--lc) 30%, transparent);
-  box-shadow: inset 4px 0 0 var(--lc);
-  color: color-mix(in srgb, var(--lc) 60%, var(--text));
-  font-size: 12.5px;
-  font-weight: 600;
+  height: 32px;
+  padding: 0 12px;
   overflow: hidden;
+  border: none;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--lc) 34%, var(--bg-elev));
+  box-shadow: inset 5px 0 0 var(--lc);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
 }
-.cd-label-list li .icon-btn {
-  opacity: 0.5;
+.lp-bar:hover {
+  background: color-mix(in srgb, var(--lc) 46%, var(--bg-elev));
 }
-.cd-label-list li:hover .icon-btn {
-  opacity: 1;
+.lp-bar.static {
+  cursor: default;
 }
-.cd-label-recolor {
-  flex-basis: 100%;
-  padding: 4px 0 6px 28px;
+.lp-empty {
+  padding: 8px 2px;
+  color: var(--text-3);
+  font-size: 12.5px;
 }
-.cd-label-new {
+.lp-create {
+  width: 100%;
+  height: 34px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-active);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.lp-create:hover {
+  background: var(--bg-hover-strong, var(--bg-hover));
+  filter: brightness(1.06);
+}
+.lp-preview {
   display: flex;
-  flex-wrap: wrap;
+  padding: 18px 28px;
+  background: var(--bg-input);
+}
+.lp-preview .lp-bar {
+  flex: 1;
+}
+.lp-note {
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.lp-colors {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.lp-color {
+  display: grid;
+  place-items: center;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: var(--lc);
+  color: #fff;
+  cursor: pointer;
+}
+.lp-color:hover {
+  filter: brightness(1.1);
+}
+.lp-color.on {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.lp-color svg {
+  width: 15px;
+  height: 15px;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.35));
+}
+.lp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+}
+.lp-delete {
+  color: var(--danger);
+}
+/* the cover's button in the dialog */
+.cd-cover-btn {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cd-cover-btn:hover,
+.cd-cover-btn.on {
+  background: var(--bg-active);
+  color: var(--text);
+}
+.cd-cover-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.cd-cover-chip {
+  width: 30px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--lc);
 }
