@@ -258,6 +258,13 @@ test('the index knows a board’s colour', () => {
   assert.equal(parseNote('# plain note\n').board, undefined)
 })
 
+test('the index knows a board’s label colours and covers too (for its cards seen elsewhere)', () => {
+  const b = parseBoard(newProjectContent())
+  b.settings.obi.labels = { brand: 'pink', odd: 'not-a-colour' }
+  b.settings.obi.covers = { 'ship it': 'green' }
+  assert.deepEqual(parseNote(serializeBoard(b)).board, { labels: { brand: 'pink' }, covers: { 'ship it': 'green' } })
+})
+
 test('renaming a label renames it on the board and on every card, archive too', async () => {
   const { renameLabel, boardLabels, labelColor } = await import('./kanban.js')
   const b = parseBoard(['---', 'kanban-plugin: board', '---', '', '## To do', '', '- [ ] Write #review #idea', '- [ ] Ship #Review', '- [ ] Plain', '', '***', '', '## Archive', '', '- [x] Old #review', ''].join('\n'))

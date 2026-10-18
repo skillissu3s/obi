@@ -293,9 +293,9 @@
   display: flex;
   align-items: flex-start;
 }
-/* the round check: on the left of the title, as Trello has it, out of sight until the
-   card is pointed at, and always there once it is done or under way. Its room is
-   always kept (the lists are a little wider for it), so showing it moves nothing. */
+/* the round check. On an open card it waits, unseen, in the card's top-left corner
+   and shows over it when the pointer gets there, so it takes no room and moves
+   nothing. Once the card is done or under way it stays, on the left of the title. */
 .pb-check {
   display: grid;
   place-items: center;
@@ -310,22 +310,52 @@
   transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
 }
 .pb-card .pb-check {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 2;
+  background: var(--pb-card);
+  box-shadow: 0 0 0 1px var(--border), 0 1px 4px rgb(0 0 0 / 0.22);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity var(--t-fast), transform var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+/* (the corner it answers to is a little bigger than the check) */
+.pb-card .pb-check::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+}
+.pb-card .pb-check:hover,
+.pb-card .pb-check:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+.pb-card.done .pb-check,
+.pb-card.doing .pb-check {
+  position: relative;
+  top: auto;
+  left: auto;
   flex-shrink: 0;
   margin: -1px 5px 0 -4px;
-  opacity: 0;
+  background: none;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+}
+.pb-card.done .pb-check:hover,
+.pb-card.doing .pb-check:hover {
+  background: var(--bg-hover);
+}
+/* (with no pointer to point, a tap on the corner opens the card instead) */
+@media (hover: none) {
+  .pb-card:not(.done, .doing) .pb-check {
+    pointer-events: none;
+  }
 }
 .pb-check svg {
   width: 16px;
   height: 16px;
-}
-.pb-card:hover .pb-check,
-.pb-card:focus-within .pb-check,
-.pb-card.done .pb-check,
-.pb-card.doing .pb-check {
-  opacity: 1;
-}
-.pb-card .pb-check:hover {
-  background: var(--bg-hover);
 }
 .pb-check:hover,
 .pb-check.on {
@@ -354,8 +384,9 @@
   gap: 4px 6px;
   margin-top: 6px;
 }
-/* (under the words, past the check's room) */
-.pb-card .pb-badges {
+/* (under the words, past the check, on a card that shows it) */
+.pb-card.done .pb-badges,
+.pb-card.doing .pb-badges {
   padding-left: 23px;
 }
 .pb-badge {
@@ -716,8 +747,9 @@
 }
 
 /* ---------- a card, opened ---------- */
+/* (TaskDialog uses this look too, for a task from All tasks or the calendar) */
 .card-dialog {
-  width: min(780px, calc(100vw - 32px));
+  width: min(820px, calc(100vw - 32px));
   max-width: none;
 }
 .cd-shell {
@@ -725,13 +757,13 @@
   overflow-y: auto;
 }
 .cd {
-  padding: 20px 22px 22px;
+  padding: 28px 30px 30px;
 }
 .cd-head {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 28px;
   padding-right: 32px;
 }
 .pb-check.cd-check {
@@ -774,7 +806,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-top: 3px;
+  margin-top: 6px;
   color: var(--text-3);
   font-size: 12.5px;
 }
@@ -792,10 +824,39 @@
 .cd-list:hover {
   background: var(--bg-active);
 }
+/* (a task's dialog: the board or note it is in, a link to it) */
+.cd-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cd-source:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.cd-source svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.td-more.cd-more {
+  grid-column: 1 / -1;
+  margin-top: -8px;
+}
 .cd-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px;
-  gap: 22px;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 34px;
 }
 .cd-main {
   min-width: 0;
@@ -806,7 +867,13 @@
 .cd-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 16px;
+  gap: 24px 26px;
+}
+.cd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
 }
 .cd-field.wide {
   grid-column: 1 / -1;
@@ -871,13 +938,13 @@
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .cd-section {
-  margin-top: 22px;
+  margin-top: 34px;
 }
 .cd-section-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .cd-section-head > svg {
   width: 16px;
@@ -933,11 +1000,11 @@
 .cd-row {
   display: flex;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .cd-progress {
   height: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   overflow: hidden;
   border-radius: 4px;
   background: var(--bg-active);
@@ -960,7 +1027,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 2px 4px;
+  padding: 3px 4px;
   border-radius: 6px;
 }
 .cd-item:hover {
@@ -1016,7 +1083,10 @@
 .cd-side {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+}
+.cd-side .td-label {
+  margin-bottom: 2px;
 }
 .cd-act {
   display: flex;
@@ -1074,6 +1144,19 @@
   background: var(--bg-active);
   color: var(--text);
   font-weight: 600;
+}
+/* a board being dragged up or down the list follows the pointer; the rows it passes make room */
+.pj-row.lifted {
+  position: relative;
+  z-index: 2;
+  background: var(--bg-elev);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.28), 0 0 0 1px var(--border);
+  cursor: grabbing;
+}
+.pj-row.making-room {
+  transition: transform 160ms var(--ease);
+  pointer-events: none;
 }
 .pj-row > svg {
   width: 16px;
@@ -1160,11 +1243,16 @@
     margin: 0;
     border-radius: 0;
   }
+  .cd {
+    padding: 22px 18px 24px;
+  }
   .cd-grid {
     grid-template-columns: 1fr;
+    gap: 28px;
   }
   .cd-fields {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
   .cd-side {
     flex-direction: row;
@@ -1178,16 +1266,6 @@
   max-width: 150px;
   height: 28px;
   padding: 0 6px;
-}
-.td-place {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 6px;
-  font-size: 12px;
-}
-.td-place .td-source {
-  margin-bottom: 0;
 }
 
 /* ---------- projects on Home: tiles, as Trello shows boards ---------- */
@@ -1323,10 +1401,10 @@ html.pb-dragging .pb-card:hover {
 .pb-card:has(.pb-cover) .pb-labels {
   margin-top: 0;
 }
-/* a card with a cover: a border of the cover's colour around its dialog (drawn inside
+/* a card with a cover: the top edge of its dialog in the cover's colour (drawn inside
    it, so it takes no room and moves nothing) */
 .card-dialog.has-cover {
-  box-shadow: inset 0 0 0 3px var(--cover), var(--shadow-lg);
+  box-shadow: inset 0 5px 0 var(--cover), var(--shadow-lg), 0 0 0 1px var(--border);
 }
 .pb-label.pickable {
   cursor: pointer;

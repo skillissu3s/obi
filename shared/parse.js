@@ -152,16 +152,25 @@ export function parseNote(content) {
   }
 }
 
-// What the list of projects shows about a board (shared/kanban.js) that only its
-// settings block holds, a comment the rest of the parse skips: its colour.
+// What the list of projects and the task pages show about a board (shared/kanban.js)
+// that only its settings block holds, a comment the rest of the parse skips: its
+// colour, its labels' colours ({ name: colour }) and its cards' covers (by title).
 const BOARD_COLORS = new Set(['gray', 'red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink'])
+const colorsIn = (o) => (o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).filter(([, v]) => BOARD_COLORS.has(v))) : undefined)
 function boardInfo(body) {
   const at = body.lastIndexOf('%% kanban:settings')
   if (at < 0) return null
   const m = /```\s*\n([\s\S]*?)\n\s*```/.exec(body.slice(at))
   try {
-    const color = JSON.parse(m?.[1] || 'null')?.obi?.color
-    return BOARD_COLORS.has(color) ? { color } : null
+    const obi = JSON.parse(m?.[1] || 'null')?.obi
+    if (!obi || typeof obi !== 'object') return null
+    const info = {}
+    if (BOARD_COLORS.has(obi.color)) info.color = obi.color
+    const labels = colorsIn(obi.labels)
+    if (labels) info.labels = labels
+    const covers = colorsIn(obi.covers)
+    if (covers && Object.keys(covers).length) info.covers = covers
+    return Object.keys(info).length ? info : null
   } catch {
     return null
   }

@@ -1,17 +1,19 @@
 // Everything about one task in one dialog, each change written straight to its
-// line. Opened from a card, a row or a chip on either page.
+// line. Opened from a card, a row or a chip on either page; it looks like a
+// project's card opened on its board (CardDialog), and shares its styles.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Flag, FileText, ListChecks, Plus, SquareKanban, Trash2, X } from 'lucide-react'
-import { PRIORITIES, addDays, checklistOf, cleanTag, isIsoDate, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
+import { PRIORITIES, addDays, checklistOf, cleanTag, isIsoDate, isOpen, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
 import { basename, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import * as A from '../lib/actions.js'
 import { taskKey, useCanEdit, useTasks, useToday } from '../lib/planner.js'
-import { listsOf, placeOf } from '../lib/projects.js'
+import { cardLook, listsOf, placeOf } from '../lib/projects.js'
+import { colorHex } from '../lib/colors.js'
 import { Modal } from './ui.jsx'
-import { colorFor } from '../lib/util.js'
 import { PRIORITY_LABEL, TaskBox, TaskMeta } from './TaskParts.jsx'
+import { Label, StatusIcon, dueTone } from './CardParts.jsx'
 
 const STATUSES = [
   [' ', 'To do'],
@@ -55,9 +57,9 @@ function locate(model, { path, line, text }) {
   return same.find((t) => t.line === line) || same.sort((a, b) => Math.abs(a.line - line) - Math.abs(b.line - line))[0] || tasks.find((t) => t.line === line) || null
 }
 
-function Field({ label, children }) {
+function Field({ label, children, wide }) {
   return (
-    <div className="td-field">
+    <div className={`cd-field ${wide ? 'wide' : ''}`}>
       <div className="td-label">{label}</div>
       {children}
     </div>
@@ -119,7 +121,7 @@ function Repeat({ task, change }) {
   const other = custom || (base && !preset)
   const write = (v, done = whenDone) => change({ recurrence: v ? v + (done ? ' when done' : '') : null })
   return (
-    <>
+    <div className="cd-repeat">
       <select
         className="input"
         aria-label="Repeat"
@@ -155,11 +157,12 @@ function Repeat({ task, change }) {
           Count from when it's done
         </label>
       )}
-    </>
+    </div>
   )
 }
 
-function Tags({ task, change, known }) {
+// The task's #tags, as labels (in the colours its board gave them, if it is a card)
+function Tags({ task, change, known, colorOf }) {
   const { title, tags } = splitTags(task.text)
   const [typed, setTyped] = useState('')
   const set = (next) => change({ title: joinTags(title, next) })
@@ -169,17 +172,12 @@ function Tags({ task, change, known }) {
     if (tag && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) set([...tags, tag])
   }
   return (
-    <div className="td-tags">
+    <div className="cd-labels">
       {tags.map((t) => (
-        <span key={t} className="pl-tag on" style={{ '--tag': colorFor(t.split('/')[0].toLowerCase()) }}>
-          #{t}
-          <button type="button" className="td-tag-x" aria-label={`Remove #${t}`} title="Remove this tag" onClick={() => set(tags.filter((x) => x !== t))}>
-            <X />
-          </button>
-        </span>
+        <Label key={t} tag={t} color={colorHex(colorOf(t))} onRemove={() => set(tags.filter((x) => x !== t))} />
       ))}
       <input
-        className="td-tag-input"
+        className="cd-label-input"
         list="td-known-tags"
         aria-label="Add a tag"
         placeholder={tags.length ? 'Add…' : 'Add a tag…'}
@@ -197,7 +195,7 @@ function Tags({ task, change, known }) {
   )
 }
 
-function Checklist({ task, list, today }) {
+function Checklist({ task, list, today, readOnly }) {
   const [text, setText] = useState('')
   const add = async () => {
     const title = text.trim()
@@ -206,28 +204,28 @@ function Checklist({ task, list, today }) {
     await A.addSubtask(task, title)
   }
   return (
-    <section className="td-section">
-      <div className="td-section-head">
+    <section className="cd-section">
+      <div className="cd-section-head">
         <ListChecks />
         <h3>Checklist</h3>
         {list && (
-          <span className="td-count">
+          <span className="cd-count">
             {list.done}/{list.total}
           </span>
         )}
       </div>
       {list && (
-        <div className="pl-progress td" role="progressbar" aria-label="Subtasks done" aria-valuenow={list.done} aria-valuemax={list.total}>
+        <div className={`cd-progress ${list.done === list.total ? 'full' : ''}`} role="progressbar" aria-label="Subtasks done" aria-valuenow={list.done} aria-valuemax={list.total}>
           <i style={{ width: `${(list.done / list.total) * 100}%` }} />
         </div>
       )}
-      <ul className="td-items">
+      <ul className="cd-items">
         {list?.items.map(({ task: t, depth }) => (
-          <li key={taskKey(t)} className={`td-item ${t.status === 'x' || t.status === 'X' || t.status === '-' ? 'done' : ''}`} style={depth > 1 ? { paddingLeft: (depth - 1) * 20 } : undefined}>
+          <li key={taskKey(t)} className={`cd-item ${isOpen(t.status) ? '' : 'done'}`} style={depth > 1 ? { paddingLeft: (depth - 1) * 22 } : undefined}>
             <TaskBox task={t} />
             <input
               key={t.text}
-              className="td-item-text"
+              className="cd-item-text"
               aria-label="Subtask"
               defaultValue={t.text}
               onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
@@ -243,14 +241,12 @@ function Checklist({ task, list, today }) {
           </li>
         ))}
       </ul>
-      <input
-        className="td-item-add"
-        aria-label="Add an item"
-        placeholder="Add an item…"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && add()}
-      />
+      {!readOnly && (
+        <div className="cd-item-add">
+          <Plus />
+          <input aria-label="Add an item" placeholder="Add an item…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        </div>
+      )}
     </section>
   )
 }
@@ -284,46 +280,28 @@ function TaskDialog({ at, onClose }) {
   const { title: words, tags } = splitTags(task.text)
   const place = task.indent ? null : placeOf(task) // (a checklist item isn't a card)
   const lists = place ? listsOf(task.path) : []
+  const look = cardLook(task)
+  const done = !isOpen(task.status)
+  const tone = dueTone(task.due, task.status, today)
+  const go = () => (useLayout.getState().openNote(ws, task.path, place ? {} : { line: task.line }), onClose())
 
   return (
-    <Modal title={null} label="Task" onClose={onClose} className="task-dialog" bodyClass="td-shell">
-      <div className="td" ref={root} tabIndex={-1}>
-        <div className="td-main">
-          {place ? (
-            // a project's card: its board, and the list it is in (moving it there follows the project's rules)
-            <div className="td-place">
-              <button type="button" className="td-source" title={`Open the ${place.project} board`} onClick={() => (useLayout.getState().openNote(ws, task.path), onClose())}>
-                <SquareKanban />
-                {place.project}
-                <span className="td-source-go">Open board →</span>
-              </button>
-              <span className="faint">in</span>
-              <select className="cd-list" aria-label="List" value={place.list || ''} disabled={!canEdit} onChange={(e) => A.moveTaskToList(task, e.target.value)}>
-                {!lists.includes(place.list) && <option value={place.list || ''}>{place.list || '—'}</option>}
-                {lists.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <button type="button" className="td-source" title={`Open ${task.path} at this line`} onClick={() => (useLayout.getState().openNote(ws, task.path, { line: task.line }), onClose())}>
-              <FileText />
-              {stripExt(basename(task.path))}
-              <span className="faint">· line {task.line + 1}</span>
-              <span className="td-source-go">Open in note →</span>
-            </button>
-          )}
-          <fieldset disabled={!canEdit}>
+    <Modal title={null} label="Task" onClose={onClose} className={`card-dialog ${look.cover ? 'has-cover' : ''}`} style={look.cover ? { '--cover': colorHex(look.cover) } : undefined} bodyClass="cd-shell">
+      <div className="cd" ref={root} tabIndex={-1}>
+        <header className="cd-head">
+          <button type="button" className={`pb-check cd-check ${done ? 'on' : ''}`} disabled={!canEdit} aria-label={done ? 'Mark not done' : 'Mark done'} onClick={() => change({ status: done ? ' ' : 'x' })}>
+            <StatusIcon status={task.status} />
+          </button>
+          <div className="cd-head-main">
             <textarea
               ref={title}
               key={task.text}
-              className="td-title"
+              className="cd-title"
               rows={1}
               aria-label="Title"
               placeholder="What needs doing?"
               defaultValue={words}
+              readOnly={!canEdit}
               onInput={(e) => {
                 e.target.style.height = 'auto'
                 e.target.style.height = `${e.target.scrollHeight}px`
@@ -335,59 +313,100 @@ function TaskDialog({ at, onClose }) {
                 else if (next !== words) change({ title: joinTags(next, tags) })
               }}
             />
-            <Checklist task={task} list={checklistOf(model.byPath.get(task.path), task.line)} today={today} />
-          </fieldset>
-        </div>
+            {place ? (
+              // a project's card: the list it is in (moving it there follows the project's rules), and its board
+              <div className="cd-where">
+                in list
+                <select className="cd-list" aria-label="List" value={place.list || ''} disabled={!canEdit} onChange={(e) => A.moveTaskToList(task, e.target.value)}>
+                  {!lists.includes(place.list) && <option value={place.list || ''}>{place.list || '—'}</option>}
+                  {lists.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+                on
+                <button type="button" className="cd-source" title={`Open the ${place.project} board`} onClick={go}>
+                  <SquareKanban />
+                  {place.project}
+                </button>
+              </div>
+            ) : (
+              <div className="cd-where">
+                in
+                <button type="button" className="cd-source" title={`Open ${task.path} at this line`} onClick={go}>
+                  <FileText />
+                  {stripExt(basename(task.path))}
+                </button>
+                <span>· line {task.line + 1}</span>
+              </div>
+            )}
+          </div>
+        </header>
 
-        <fieldset className="td-side" disabled={!canEdit}>
-          <Field label="Status">
-            <div className="te-seg">
-              {STATUSES.map(([v, label]) => (
-                <button key={v} type="button" className={task.status === v || (v === 'x' && task.status === 'X') ? 'active' : ''} onClick={() => task.status !== v && change({ status: v })}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Priority">
-            <div className="te-seg td-pri">
-              <button type="button" className={!task.priority ? 'active' : ''} onClick={() => change({ priority: null })}>
-                None
-              </button>
-              {PRIORITIES.map((p) => (
-                <button key={p} type="button" className={`pri-${p} ${task.priority === p ? 'active' : ''}`} title={PRIORITY_LABEL[p]} aria-label={PRIORITY_LABEL[p]} onClick={() => change({ priority: p })}>
-                  <Flag />
-                </button>
-              ))}
-            </div>
-          </Field>
-          <Field label="Due">
-            <DateField value={task.due} today={today} onChange={(v) => change({ due: v })} />
-          </Field>
-          {moreDates || task.scheduled || task.start ? (
-            <>
-              <Field label="Scheduled">
-                <DateField value={task.scheduled} today={today} onChange={(v) => change({ scheduled: v })} />
+        <div className="cd-grid">
+          <fieldset className="cd-main" disabled={!canEdit}>
+            <div className="cd-fields">
+              <Field label="Status">
+                <div className="te-seg">
+                  {STATUSES.map(([v, label]) => (
+                    <button key={v} type="button" className={task.status === v || (v === 'x' && task.status === 'X') ? 'active' : ''} onClick={() => task.status !== v && change({ status: v })}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </Field>
-              <Field label="Starts">
-                <DateField value={task.start} today={today} onChange={(v) => change({ start: v })} />
+              <Field label="Priority">
+                <div className="te-seg td-pri">
+                  <button type="button" className={!task.priority ? 'active' : ''} onClick={() => change({ priority: null })}>
+                    None
+                  </button>
+                  {PRIORITIES.map((p) => (
+                    <button key={p} type="button" className={`pri-${p} ${task.priority === p ? 'active' : ''}`} title={PRIORITY_LABEL[p]} aria-label={PRIORITY_LABEL[p]} onClick={() => change({ priority: p })}>
+                      <Flag />
+                    </button>
+                  ))}
+                </div>
               </Field>
-            </>
-          ) : (
-            <button type="button" className="td-more" onClick={() => setMoreDates(true)} title="When you plan to work on it, and the day it can start">
-              <Plus /> Scheduled and start dates
+              <Field label={<>Due date {tone && <span className={`cd-due-tone ${tone}`}>{tone.replace('soon', 'tomorrow')}</span>}</>}>
+                <DateField value={task.due} today={today} onChange={(v) => change({ due: v })} />
+              </Field>
+              <Field label="Repeat">
+                <Repeat task={task} change={change} />
+              </Field>
+              {moreDates || task.scheduled || task.start ? (
+                <>
+                  <Field label="Scheduled">
+                    <DateField value={task.scheduled} today={today} onChange={(v) => change({ scheduled: v })} />
+                  </Field>
+                  <Field label="Starts">
+                    <DateField value={task.start} today={today} onChange={(v) => change({ start: v })} />
+                  </Field>
+                </>
+              ) : (
+                <button type="button" className="td-more cd-more" onClick={() => setMoreDates(true)} title="When you plan to work on it, and the day it can start">
+                  <Plus /> Scheduled and start dates
+                </button>
+              )}
+              <Field label={place ? 'Labels' : 'Tags'} wide>
+                <Tags task={task} change={change} known={model.tags} colorOf={look.labelColor} />
+              </Field>
+            </div>
+            <Checklist task={task} list={checklistOf(model.byPath.get(task.path), task.line)} today={today} readOnly={!canEdit} />
+          </fieldset>
+
+          <aside className="cd-side">
+            <div className="td-label">Actions</div>
+            <button type="button" className="cd-act" onClick={go}>
+              {place ? <SquareKanban /> : <FileText />} {place ? 'Open board' : 'Open in note'}
             </button>
-          )}
-          <Field label="Repeat">
-            <Repeat task={task} change={change} />
-          </Field>
-          <Field label="Tags">
-            <Tags task={task} change={change} known={model.tags} />
-          </Field>
-          <button type="button" className="btn btn-sm btn-ghost td-delete" onClick={() => (A.deleteTask(task), onClose())}>
-            <Trash2 /> Delete task
-          </button>
-        </fieldset>
+            {canEdit && (
+              <button type="button" className="cd-act danger" onClick={() => (A.deleteTask(task), onClose())}>
+                <Trash2 /> Delete
+              </button>
+            )}
+          </aside>
+        </div>
       </div>
     </Modal>
   )

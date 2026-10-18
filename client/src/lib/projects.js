@@ -2,11 +2,12 @@
 // shared/kanban.js). New tasks go to one — the Inbox unless another is picked —
 // rather than into a daily note.
 import { useMemo } from 'react'
-import { isBoardMeta, laneOfTask, newProjectContent } from '@shared/kanban.js'
-import { isOpen } from '@shared/tasks.js'
+import { DEFAULT_LABELS, isBoardMeta, laneOfTask, newProjectContent } from '@shared/kanban.js'
+import { isOpen, splitTags } from '@shared/tasks.js'
 import { basename, joinPath, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
 import { usePlanner } from '../store/planner.js'
+import { usePrefs } from '../store/prefs.js'
 import { useUI, confirmDialog } from '../store/ui.js'
 import { isDesktop } from './desktop.js'
 import { colorFor } from './util.js'
@@ -47,6 +48,21 @@ export function placeOf(task, notes = useApp.getState().notes) {
   return { project: projectName(task.path), list: laneOfTask(meta, task.line) }
 }
 
+/**
+ * How a task of a board looks there, for when it is seen away from it (All tasks, the
+ * calendar): its cover's colour, if it has one, and the colour of a label of the board
+ * (null for a tag the board doesn't have).
+ */
+export function cardLook(task, notes = useApp.getState().notes) {
+  const meta = notes.get(task.path)
+  const board = isBoardMeta(meta) ? meta.board || {} : null
+  const labels = board?.labels || DEFAULT_LABELS
+  return {
+    cover: (!task.indent && board?.covers?.[splitTags(task.text).title.trim().toLowerCase()]) || null,
+    labelColor: (tag) => (board && labels[String(tag).toLowerCase()]) || null,
+  }
+}
+
 /** The lists of a project, from its index entry */
 export function listsOf(path, notes = useApp.getState().notes) {
   const meta = notes.get(path)
@@ -56,10 +72,11 @@ export function listsOf(path, notes = useApp.getState().notes) {
 }
 
 /**
- * The workspace's projects, by name, the Inbox first: { path, name, color, open,
- * total } — `open` counts the cards (top-level tasks) not done.
+ * The workspace's projects: { path, name, color, open, total } — `open` counts the
+ * cards (top-level tasks) not done. In the order they were dragged into (`order`, a
+ * list of paths), if they were; the rest by name after them, the Inbox first.
  */
-export function projectsOf(notes) {
+export function projectsOf(notes, order = []) {
   const out = []
   const inbox = inboxPath()
   for (const [path, meta] of notes) {
@@ -68,14 +85,26 @@ export function projectsOf(notes) {
     const cards = (meta.tasks || []).filter((t) => t.parent == null && t.line < stop)
     out.push({ path, name: projectName(path), color: projectColor(path, notes), open: cards.filter((t) => isOpen(t.status)).length, total: cards.length, inbox: path === inbox })
   }
-  return out.sort((a, b) => Number(b.inbox) - Number(a.inbox) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  const at = new Map(order.map((p, i) => [p, i]))
+  const rank = (p) => at.get(p.path) ?? Infinity
+  return out.sort((a, b) => rank(a) - rank(b) || Number(b.inbox) - Number(a.inbox) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
 }
 
+const NO_ORDER = []
 export function useProjects() {
   const version = useApp((s) => s.version)
   const notes = useApp((s) => s.notes)
+  const ws = useApp((s) => s.wsId)
+  const order = usePrefs((s) => s.boardOrder?.[ws]) || NO_ORDER
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => projectsOf(notes), [notes, version])
+  return useMemo(() => projectsOf(notes, order), [notes, version, order])
+}
+
+/** Keeps the boards of the workspace in this order (paths), for this person */
+export function setBoardOrder(paths) {
+  const ws = useApp.getState().wsId
+  const all = usePrefs.getState().boardOrder || {}
+  usePrefs.getState().set({ boardOrder: { ...all, [ws]: paths } })
 }
 
 /** Makes a project — the default lists and their rules — and opens it */

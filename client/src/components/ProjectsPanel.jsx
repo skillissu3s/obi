@@ -4,14 +4,14 @@
 // opens and closes like a panel in VS Code. The boards live in the Projects
 // folder; the Files tab shows them there instead of in its tree.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, ChevronRight, Eye, EyeOff, ExternalLink, FolderOpen, Inbox, ListChecks, MoreHorizontal, Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarDays, ChevronRight, Eye, EyeOff, ExternalLink, FolderOpen, Inbox, ListChecks, MoreHorizontal, Pencil, Plus, Trash2, Users } from 'lucide-react'
 import { isOpen } from '@shared/tasks.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
 import { useUI } from '../store/ui.js'
 import * as A from '../lib/actions.js'
-import { createProject, projectName, projectsFolder, useProjects } from '../lib/projects.js'
+import { createProject, projectName, projectsFolder, setBoardOrder, useProjects } from '../lib/projects.js'
 import { colorFor } from '../lib/util.js'
 import { useTasks } from '../lib/planner.js'
 import { menuFromElement } from './ui.jsx'
@@ -57,25 +57,91 @@ function revealBoard(path) {
   setTimeout(() => useApp.getState().revealPath(path))
 }
 
+/** Puts the board at `from` at `to` in the list (and keeps that order, see setBoardOrder) */
+function moveBoard(projects, from, to) {
+  if (to < 0 || to >= projects.length || to === from) return
+  const paths = projects.map((p) => p.path)
+  paths.splice(to, 0, ...paths.splice(from, 1))
+  setBoardOrder(paths)
+}
+
 /**
- * The boards as rows: this workspace's, a way to make one (`adding`, from the
- * outside, opens its name field), and the ones other people shared.
+ * Dragging a board up or down the list puts it where it belongs: the row follows the
+ * pointer and the others make room for it. Returns the drag under way ({ from, to,
+ * dy, pitch }) and what a row needs to start one.
+ */
+function useReorder(projects, canEdit) {
+  const [drag, setDrag] = useState(null)
+  const dragged = useRef(false)
+  const start = (e, from) => {
+    if (!canEdit || e.button !== 0 || projects.length < 2) return
+    const rows = [...e.currentTarget.parentElement.querySelectorAll(':scope > [data-board]')]
+    const mids = rows.map((r) => {
+      const b = r.getBoundingClientRect()
+      return b.top + b.height / 2
+    })
+    const pitch = rows.length > 1 ? mids[1] - mids[0] : e.currentTarget.offsetHeight
+    const y0 = e.clientY
+    let live = null
+    const move = (ev) => {
+      // (it stays within the list)
+      const dy = Math.min(mids[mids.length - 1] - mids[from], Math.max(mids[0] - mids[from], ev.clientY - y0))
+      if (!live && Math.abs(dy) < 4) return
+      // where it would go: after every other row whose middle it has passed
+      const y = mids[from] + dy
+      live = { from, to: mids.filter((m, i) => i !== from && m < y).length, dy, pitch }
+      setDrag(live)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      if (!live) return
+      // (the click that ends a drag doesn't open the board)
+      dragged.current = true
+      setTimeout(() => (dragged.current = false))
+      setDrag(null)
+      moveBoard(projects, live.from, live.to)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+  // how far a row is moved while a drag is under way: the dragged one with the pointer, the ones it passed make room
+  const shift = (i) => {
+    if (!drag) return undefined
+    if (i === drag.from) return drag.dy
+    if (drag.from < drag.to && i > drag.from && i <= drag.to) return -drag.pitch
+    if (drag.to < drag.from && i >= drag.to && i < drag.from) return drag.pitch
+    return 0
+  }
+  return { drag, start, shift, dragged }
+}
+
+/**
+ * The boards as rows: this workspace's (drag one up or down to put it in its place),
+ * a way to make one (`adding`, from the outside, opens its name field), and the ones
+ * other people shared.
  */
 function BoardRows({ adding, setAdding, label = true }) {
   const projects = useProjects()
   const ws = useApp((s) => s.wsId)
   const canEdit = useCanEditWs()
   const active = useActive()
+  const reorder = useReorder(projects, canEdit)
   // boards other people shared with this person (from any workspace)
   const shared = useApp((s) => s.shared).filter((n) => n.board)
   const open = (e, w, path) => useLayout.getState().openNote(w, path, { newTab: e.metaKey || e.ctrlKey })
   const isActive = (w, path) => active?.kind === 'note' && active.ws === w && active.path === path
 
-  const menu = (e, p) => {
+  const menu = (e, p, i) => {
     e.preventDefault()
     useUI.getState().showContextMenu(e, [
       { label: 'Open in new tab', icon: ExternalLink, run: () => useLayout.getState().openNote(ws, p.path, { newTab: true }) },
       { label: 'Show in files', icon: FolderOpen, run: () => revealBoard(p.path) },
+      canEdit && projects.length > 1 && 'divider',
+      canEdit && i > 0 && { label: 'Move up', icon: ArrowUp, hint: 'Alt+↑', run: () => moveBoard(projects, i, i - 1) },
+      canEdit && i < projects.length - 1 && { label: 'Move down', icon: ArrowDown, hint: 'Alt+↓', run: () => moveBoard(projects, i, i + 1) },
       canEdit && 'divider',
       canEdit && { label: 'Rename…', icon: Pencil, run: () => A.renameEntry(p.path) },
       canEdit && { label: 'Delete board', icon: Trash2, danger: true, run: () => A.deleteEntry(p.path) },
@@ -85,8 +151,26 @@ function BoardRows({ adding, setAdding, label = true }) {
   return (
     <>
       {label && <div className="pj-label">Boards</div>}
-      {projects.map((p) => (
-        <button key={p.path} type="button" className={`pj-row ${isActive(ws, p.path) ? 'active' : ''}`} title={p.path} onClick={(e) => open(e, ws, p.path)} onContextMenu={(e) => menu(e, p)}>
+      {projects.map((p, i) => (
+        <button
+          key={p.path}
+          type="button"
+          data-board={p.path}
+          className={`pj-row ${isActive(ws, p.path) ? 'active' : ''} ${reorder.drag ? (reorder.drag.from === i ? 'lifted' : 'making-room') : ''}`}
+          style={reorder.drag ? { transform: `translateY(${reorder.shift(i)}px)` } : undefined}
+          title={canEdit && projects.length > 1 ? `${p.path} — drag to move it up or down` : p.path}
+          onPointerDown={(e) => reorder.start(e, i)}
+          onClick={(e) => !reorder.dragged.current && open(e, ws, p.path)}
+          onKeyDown={(e) => {
+            if (!canEdit || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+            e.preventDefault()
+            const list = e.currentTarget.parentElement
+            moveBoard(projects, i, i + (e.key === 'ArrowUp' ? -1 : 1))
+            // (the focus stays on the board that moved)
+            requestAnimationFrame(() => list?.querySelector(`[data-board="${CSS.escape(p.path)}"]`)?.focus())
+          }}
+          onContextMenu={(e) => menu(e, p, i)}
+        >
           <span className="pj-tile" style={{ '--pj': p.color }}>
             {p.inbox ? <Inbox /> : p.name.trim()[0]?.toUpperCase()}
           </span>
