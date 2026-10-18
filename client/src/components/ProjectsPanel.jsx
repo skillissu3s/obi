@@ -13,6 +13,7 @@ import { useUI } from '../store/ui.js'
 import * as A from '../lib/actions.js'
 import { createProject, projectName, projectsFolder, setBoardOrder, useProjects } from '../lib/projects.js'
 import { colorFor } from '../lib/util.js'
+import { warmOnHover } from '../lib/socket.js'
 import { useTasks } from '../lib/planner.js'
 import { menuFromElement } from './ui.jsx'
 
@@ -160,6 +161,7 @@ function BoardRows({ adding, setAdding, label = true }) {
           style={reorder.drag ? { transform: `translateY(${reorder.shift(i)}px)` } : undefined}
           title={canEdit && projects.length > 1 ? `${p.path} — drag to move it up or down` : p.path}
           onPointerDown={(e) => reorder.start(e, i)}
+          {...warmOnHover(ws, p.path)}
           onClick={(e) => !reorder.dragged.current && open(e, ws, p.path)}
           onKeyDown={(e) => {
             if (!canEdit || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return

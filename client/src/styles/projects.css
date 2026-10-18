@@ -290,12 +290,14 @@
   height: 11px;
 }
 .pb-card-title {
+  position: relative;
   display: flex;
   align-items: flex-start;
 }
-/* the round check. On an open card it waits, unseen, in the card's top-left corner
-   and shows over it when the pointer gets there, so it takes no room and moves
-   nothing. Once the card is done or under way it stays, on the left of the title. */
+/* the round check. On an open card it waits, unseen, where the title starts (never
+   over a cover or the labels) and shows over it when the pointer gets there, so it
+   takes no room and moves nothing. Once the card is done or under way it stays, on
+   the left of the title. */
 .pb-check {
   display: grid;
   place-items: center;
@@ -311,8 +313,8 @@
 }
 .pb-card .pb-check {
   position: absolute;
-  top: 5px;
-  left: 5px;
+  top: -1px;
+  left: -4px;
   z-index: 2;
   background: var(--pb-card);
   box-shadow: 0 0 0 1px var(--border), 0 1px 4px rgb(0 0 0 / 0.22);

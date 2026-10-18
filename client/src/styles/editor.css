@@ -13,17 +13,20 @@
   align-items: center;
   gap: 3px;
   padding: 0 10px 0 6px;
+}
+/* The header rests a little faded until it is pointed at. Its contents fade, not the
+   bar itself: over a background the bar is see-through, and a faded bar would look
+   lighter than the ones beside it (and change when pointed at). */
+.note-header > * {
   opacity: 0.78;
   transition: opacity var(--t);
 }
 /* controls people aim for stay readable even when the header is resting */
-.note-header .segmented,
+.note-header > .segmented,
 .note-header > .icon-btn:last-child,
-.note-header .badge {
-  opacity: 1;
-}
-.note-header:hover,
-.note-header:focus-within {
+.note-header > .badge,
+.note-header:hover > *,
+.note-header:focus-within > * {
   opacity: 1;
 }
 .crumbs {
@@ -1468,18 +1471,5 @@
   border-radius: var(--radius-sm);
 }
 
-/* opening a note settles in rather than snapping */
-.note-inner {
-  animation: noteIn 220ms var(--ease) both;
-}
-@keyframes noteIn {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .note-inner {
-    animation: none;
-  }
-}
+/* (a note isn't faded in when it opens: from nothing, on a dark theme, that read as a
+   black blink, and it ran again each time its tab was shown) */

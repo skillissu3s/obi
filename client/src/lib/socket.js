@@ -407,6 +407,12 @@ class Connection extends Emitter {
     return d
   }
 
+  /** Starts loading a note that is about to be opened, if it isn't open already; it is then kept warm a while */
+  warmDoc(ws, path) {
+    if (!ws || !path || this.docs.has(docKey(ws, path, 'text'))) return
+    this.releaseDoc(this.openDoc(ws, path))
+  }
+
   releaseDoc(d) {
     d.refs--
     if (d.refs > 0) return
@@ -433,6 +439,20 @@ class Connection extends Emitter {
 }
 
 export const conn = new Connection()
+
+// The pointer rests on a link to a note for a moment: it starts loading, so a click
+// opens it at once rather than showing it loading first. Spread on the link.
+let warmTimer = null
+export function warmOnHover(ws, path) {
+  if (!/\.md$/i.test(path || '')) return undefined
+  return {
+    onPointerEnter: () => {
+      clearTimeout(warmTimer)
+      warmTimer = setTimeout(() => conn.warmDoc(ws, path), 80)
+    },
+    onPointerLeave: () => clearTimeout(warmTimer),
+  }
+}
 
 window.addEventListener('beforeunload', (e) => {
   if (conn.hasUnsyncedChanges()) {

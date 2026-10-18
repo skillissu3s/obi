@@ -1067,50 +1067,6 @@ button.status-item:disabled {
   background: var(--bg-hover);
   color: var(--text);
 }
-.edge-toggles {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 60;
-}
-.edge-toggle {
-  position: absolute;
-  width: 18px;
-  height: 42px;
-  margin-top: -21px;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: var(--bg-elev);
-  color: var(--text-2);
-  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border-strong);
-  opacity: 0;
-  transform: scale(0.7);
-  /* no transition on `top`: it should appear where the pointer is, not
-     travel there */
-  transition: opacity 90ms var(--ease), transform 120ms var(--ease-spring), background var(--t-fast), color var(--t-fast);
-  pointer-events: none;
-  cursor: pointer;
-}
-.edge-toggle.show {
-  opacity: 1;
-  transform: scale(1);
-  pointer-events: auto;
-}
-.edge-toggle:hover {
-  color: var(--accent-fg);
-  background: var(--accent);
-  box-shadow: var(--shadow);
-}
-.edge-toggle svg {
-  width: 14px;
-  height: 14px;
-}
-.focus-mode .edge-toggles {
-  display: none;
-}
 .rp-tabs .icon-btn.rp-close {
   flex: 0 0 30px;
   color: var(--text-3);

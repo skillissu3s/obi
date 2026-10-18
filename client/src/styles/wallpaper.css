@@ -359,22 +359,19 @@
     html[data-wallpaper] :is(.ribbon, .sidebar, .statusbar, .mobile-header) {
       backdrop-filter: blur(var(--wp-glass, 22px)) saturate(1.3);
     }
-    /* a project board: no plate under it, glass for its bar, its lists and its panels */
+    /* A project board: no plate under it, glass for its lists and its panels. Its tabs,
+       header and bar are one band of the frame's colour, edge to edge with no gap, and
+       not blurred: a blur there picked up the edge of the lists below as a dark patch
+       whenever the board was redrawn. */
     html[data-wallpaper] .pane:has(.pb) {
       background: transparent;
     }
-    html[data-wallpaper] .pane:has(.pb) :is(.tabbar, .note-header) {
+    html[data-wallpaper] .pane:has(.pb) :is(.tabbar, .note-header),
+    html[data-wallpaper] .pb-bar {
       background: color-mix(in srgb, var(--bg-sidebar) var(--wp-panel), transparent);
-      backdrop-filter: blur(var(--wp-glass, 22px)) saturate(1.3);
     }
     html[data-wallpaper] .pb {
       background: none;
-    }
-    html[data-wallpaper] .pb-bar {
-      margin: 8px 12px 0;
-      border-radius: 12px;
-      background: color-mix(in srgb, var(--bg-sidebar) var(--wp-pane), transparent);
-      backdrop-filter: blur(var(--wp-glass, 22px)) saturate(1.3);
     }
     html[data-wallpaper] :is(.pb-list, .pb-add-list, .pb-panel) {
       background: color-mix(in srgb, var(--bg-sidebar) var(--wp-pane), transparent);

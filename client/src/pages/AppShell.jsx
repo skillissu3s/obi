@@ -26,7 +26,6 @@ import { Modal, WsIcon, Avatar, Spinner, menuFromElement } from '../components/u
 import { PasswordInput } from './Auth.jsx'
 import { StorageWarning } from '../components/StorageWarning.jsx'
 import { ConnectionBanner } from '../components/ConnectionBanner.jsx'
-import { EdgeToggles } from '../components/EdgeToggles.jsx'
 import { userMenu } from '../lib/userMenu.js'
 import { basename, stripExt, isNote } from '@shared/paths.js'
 import { isBoardMeta } from '@shared/kanban.js'
@@ -221,7 +220,6 @@ export default function AppShell() {
           ? layout.right && panelFits && !layout.focus && <RightPanel tab={activeTab} />
           : !layout.focus && <RightPanel tab={activeTab} closed={!layout.right || !panelFits} />}
         {layout.right && panelFits && mobile && <div className="scrim" onClick={() => layout.toggleRight(false)} />}
-        {!mobile && !layout.focus && <EdgeToggles />}
       </div>
       <StatusBar />
       {layout.focus && (

@@ -20,6 +20,7 @@ import { isBoardPath } from '@shared/board.js'
 import { ProjectsPanel, BoardsDock } from './ProjectsPanel.jsx'
 import { isBoardMeta } from '@shared/kanban.js'
 import { projectsFolder } from '../lib/projects.js'
+import { warmOnHover } from '../lib/socket.js'
 
 const ROW_H = 28
 
@@ -282,6 +283,7 @@ export function FileTree() {
             }}
             onDrop={(e) => onDrop(e, node)}
             onClick={(e) => onRowClick(node, e)}
+            {...(node.type === 'file' ? warmOnHover(wsId, node.path) : null)}
             onAuxClick={(e) => {
               if (e.button === 1 && node.type === 'file' && isDoc(node.path)) {
                 e.preventDefault()
