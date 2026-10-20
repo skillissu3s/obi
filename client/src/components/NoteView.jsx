@@ -55,9 +55,12 @@ function useHandleState(handle) {
 // how it lays out: its lines wrap exactly where they do at 100%, so the
 // drawings pinned to them stay where they were put. A transform leaves the
 // layout size alone, so the margin stands in for the height the scaled note
-// takes up and the page scrolls to the right length. `reflow` (reading view,
-// which has no canvas to keep in place) lets the text re-wrap to the room there
-// is instead, as browser zoom does.
+// takes up and the page scrolls to the right length. `reflow` (reading view of a
+// note with no drawings to keep in place) lets the text re-wrap to the room there
+// is instead, as browser zoom does: the note is laid out as wide as the pane is
+// at this zoom and scaled from its left edge, so it fills the pane exactly. (Laid
+// out wider than the pane and scaled about its middle, a zoomed-out note slid
+// off to the right.)
 function ZoomFrame({ zoom, reflow, children }) {
   const ref = useRef(null)
   const [size, setSize] = useState({ height: 0, room: 0, column: 0 }) // layout px: the note, the pane it scrolls in, the column inside it
@@ -91,17 +94,33 @@ function ZoomFrame({ zoom, reflow, children }) {
   const style =
     zoom === 1
       ? undefined
-      : {
-          transform: `translateX(${shift}px) scale(${zoom})`,
-          transformOrigin: '50% 0',
-          marginBottom: (zoom - 1) * height,
-          ...(reflow ? { width: `${100 / zoom}%`, marginInline: 'auto' } : null),
-        }
+      : reflow
+        ? { width: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: '0 0', marginBottom: (zoom - 1) * height }
+        : { transform: `translateX(${shift}px) scale(${zoom})`, transformOrigin: '50% 0', marginBottom: (zoom - 1) * height }
   return (
     <div className="note-zoom" ref={ref} style={style}>
       {children}
     </div>
   )
+}
+
+// How many drawings a note's canvas has (null until its layer has loaded): the
+// reading view of a note with drawings shows them, over the note laid out as it is
+// for editing, so they stay on the lines they were pinned to
+function useDrawingCount(ws, path, enabled) {
+  const [count, setCount] = useState(null)
+  useEffect(() => {
+    if (!enabled || !ws || !path) return setCount(null)
+    const h = conn.openDoc(ws, path, 'layer')
+    const update = () => setCount(h.status === 'loading' ? null : h.status === 'ready' ? h.ymap.size : 0)
+    update()
+    const offs = ['status', 'change', 'reset', 'synced'].map((t) => h.on(t, update))
+    return () => {
+      offs.forEach((off) => off())
+      conn.releaseDoc(h)
+    }
+  }, [ws, path, enabled])
+  return count
 }
 
 export function NoteView({ tab, paneId, active }) {
@@ -135,6 +154,14 @@ export function NoteView({ tab, paneId, active }) {
   const isBoard = useMemo(() => (handle?.status === 'ready' ? isBoardContent(content.slice(0, 400)) : false), [handle?.status, content.slice(0, 400)])
   const mode = tab.mode || (isBoard ? 'board' : prefs.defaultMode)
   const readOnly = handle?.role === 'viewer'
+  // Reading view: a note with drawings is shown as it is laid out for editing (read
+  // only, the drawings over it, view only), so every drawing stays on its line and
+  // a zoom scales the two together; one without is rendered for reading. Printing
+  // takes the rendered one (the editor only draws the lines on screen).
+  const [printing, setPrinting] = useState(false)
+  const drawings = useDrawingCount(tab.ws, tab.path, mode === 'read' && !printing)
+  const readingDrawings = mode === 'read' && !printing && drawings > 0
+  const rendered = mode === 'read' && !readingDrawings
 
   // register the focused editor for global commands
   useEffect(() => {
@@ -222,11 +249,11 @@ export function NoteView({ tab, paneId, active }) {
   // Printing reads the page, and live preview only renders the lines on screen —
   // so switch to reading view first and let it lay out.
   const printNote = async () => {
-    if (mode !== 'read') {
-      setMode('read')
-      await new Promise((r) => setTimeout(r, 450))
-    }
+    setPrinting(true)
+    if (mode !== 'read') setMode('read')
+    await new Promise((r) => setTimeout(r, 450))
     window.print()
+    setPrinting(false)
   }
 
   const downloadNote = async () => {
@@ -253,7 +280,8 @@ export function NoteView({ tab, paneId, active }) {
           </div>
         </div>
       )
-    if (!handle || handle.status === 'loading')
+    // (a reading view waits for the drawings too, to know which kind it is)
+    if (!handle || handle.status === 'loading' || (mode === 'read' && !printing && drawings == null))
       // same column, title and line rhythm as the real note, so nothing jumps when it arrives
       return (
         <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`}>
@@ -281,23 +309,23 @@ export function NoteView({ tab, paneId, active }) {
         </div>
       )
     return (
-      <ZoomFrame zoom={zoom} reflow={mode === 'read'}>
-        <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`} ref={mode === 'read' ? undefined : setInnerEl}>
-          {mode !== 'read' && <div className="nc-origin" ref={setOriginEl} />}
+      <ZoomFrame zoom={zoom} reflow={rendered}>
+        <div className={`note-inner ${prefs.readableWidth ? '' : 'full'}`} ref={rendered ? undefined : setInnerEl}>
+          {!rendered && <div className="nc-origin" ref={setOriginEl} />}
           {prefs.inlineTitle && <InlineTitle tab={tab} title={title} readOnly={readOnly || foreign} view={view} />}
           {readOnly && (
             <div className="note-banner">
               <Eye /> You have view-only access to this note.
             </div>
           )}
-          {mode === 'read' ? (
+          {rendered ? (
             <Reader handle={handle} onStats={setStats} readOnly={readOnly} />
           ) : (
             <Editor
               handle={handle}
               tabId={tab.id}
-              mode={mode}
-              readOnly={readOnly}
+              mode={readingDrawings ? 'live' : mode}
+              readOnly={readOnly || readingDrawings}
               onStats={setStats}
               onViewReady={setView}
               line={tab.line}
@@ -403,8 +431,8 @@ export function NoteView({ tab, paneId, active }) {
         </div>
       )}
       {view && mode !== 'read' && <OffscreenCursors collab={collab} view={view} scrollEl={scrollEl} />}
-      {handle?.status === 'ready' && (mode === 'live' || mode === 'source') && view && originEl && scrollEl && (
-        <NoteCanvas key={`${handle.key}:${handle.generation}`} tab={tab} view={view} scrollEl={scrollEl} innerEl={innerEl} originEl={originEl} stageEl={stageEl} mode={mode} />
+      {handle?.status === 'ready' && (mode === 'live' || mode === 'source' || readingDrawings) && view && originEl && scrollEl && (
+        <NoteCanvas key={`${handle.key}:${handle.generation}`} tab={tab} view={view} scrollEl={scrollEl} innerEl={innerEl} originEl={originEl} stageEl={stageEl} mode={readingDrawings ? 'live' : mode} viewOnly={readingDrawings} />
       )}
       {view && !readOnly && mode !== 'read' && mode !== 'board' && <MobileToolbar view={view} handle={handle} />}
     </div>

@@ -25,8 +25,9 @@ export function createBoardStore(handle) {
 
   const store = {
     handle,
+    viewOnly: false, // shown to read (a note's reading view), even to someone who could change it
     get readOnly() {
-      return handle.role === 'viewer'
+      return handle.role === 'viewer' || store.viewOnly
     },
     subscribe(fn) {
       listeners.add(fn)

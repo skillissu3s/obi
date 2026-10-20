@@ -57,10 +57,12 @@ const DRAW_TOOLS = new Set(['rect', 'ellipse', 'diamond', 'arrow', 'line', 'pen'
 /**
  * The canvas that floats around a note: drawings, sticky notes, images, links and
  * references anchored to the text. The markdown file itself never changes.
+ * `viewOnly`: the note's reading view, where the drawings are shown but not changed.
  */
-export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mode }) {
+export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mode, viewOnly = false }) {
   const handle = useLayerHandle(tab.ws, tab.path)
   const store = useBoardStore(handle)
+  if (store) store.viewOnly = viewOnly
   const prefs = usePrefs()
   // The note is shown scaled by `zoom` (see ZoomFrame in NoteView). Canvas
   // elements live inside it, so they are placed in unscaled "world" pixels; the
@@ -677,6 +679,13 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     setPlacingState(on)
     if (!on) setGuide(null)
   }, [])
+  // reading: no tool in hand, nothing selected, no room being made
+  useEffect(() => {
+    if (!viewOnly || !ctl) return
+    ctl.setTool('select')
+    ctl.set({ selection: [] })
+    setPlacing(false)
+  }, [viewOnly, ctl, setPlacing])
   const lineAtY = useCallback(
     (clientY) => {
       const g = measure()
@@ -1127,42 +1136,45 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           </button>
         </div>
       )}
-      <StyleBudPanel ctl={ctl} />
-      <div className={`cv-dock ${open ? '' : 'is-tucked'}`}>
-        {(open || state.selection.length > 0) && <StyleBar ctl={ctl} />}
-        {open ? (
-          <Toolbar
-            ctl={ctl}
-            extra={
-              !readOnly && (
-                <button
-                  className={`cv-tool ${placing ? 'active' : ''}`}
-                  title="Make room: click under a line to open a drawing space there (no blank lines needed, the note's text stays as it is)"
-                  aria-pressed={placing}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    ctl.setTool('select')
-                    setPlacing(!placing)
-                  }}
-                >
-                  <UnfoldVertical />
-                </button>
-              )
-            }
-            onCollapse={() => {
-              ctl.setTool('select')
-              setPlacing(false)
-              usePrefs.getState().set({ canvasBar: false })
-            }}
-          />
-        ) : (
-          <button className="cv-pill" title="Draw, add sticky notes, images and links around this note (Alt C)" onClick={() => usePrefs.getState().set({ canvasBar: true })}>
-            <PencilRuler /> <span className="cv-pill-label">Canvas</span>
-            {count > 0 && <span className="cv-count">{count}</span>}
-            {readOnly && <span className="cv-count">view only</span>}
-          </button>
-        )}
-      </div>
+      {!viewOnly && <StyleBudPanel ctl={ctl} />}
+      {/* (reading: the drawings are there to look at, so no tools) */}
+      {!viewOnly && (
+        <div className={`cv-dock ${open ? '' : 'is-tucked'}`}>
+          {(open || state.selection.length > 0) && <StyleBar ctl={ctl} />}
+          {open ? (
+            <Toolbar
+              ctl={ctl}
+              extra={
+                !readOnly && (
+                  <button
+                    className={`cv-tool ${placing ? 'active' : ''}`}
+                    title="Make room: click under a line to open a drawing space there (no blank lines needed, the note's text stays as it is)"
+                    aria-pressed={placing}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      ctl.setTool('select')
+                      setPlacing(!placing)
+                    }}
+                  >
+                    <UnfoldVertical />
+                  </button>
+                )
+              }
+              onCollapse={() => {
+                ctl.setTool('select')
+                setPlacing(false)
+                usePrefs.getState().set({ canvasBar: false })
+              }}
+            />
+          ) : (
+            <button className="cv-pill" title="Draw, add sticky notes, images and links around this note (Alt C)" onClick={() => usePrefs.getState().set({ canvasBar: true })}>
+              <PencilRuler /> <span className="cv-pill-label">Canvas</span>
+              {count > 0 && <span className="cv-count">{count}</span>}
+              {readOnly && <span className="cv-count">view only</span>}
+            </button>
+          )}
+        </div>
+      )}
     </>
   )
 }
