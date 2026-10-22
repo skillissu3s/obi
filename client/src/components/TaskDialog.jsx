@@ -14,6 +14,7 @@ import { colorHex } from '../lib/colors.js'
 import { Modal } from './ui.jsx'
 import { PRIORITY_LABEL, TaskBox, TaskMeta } from './TaskParts.jsx'
 import { Label, StatusIcon, dueTone } from './CardParts.jsx'
+import { LinkSuggest } from './LinkSuggest.jsx'
 
 const STATUSES = [
   [' ', 'To do'],
@@ -197,6 +198,7 @@ function Tags({ task, change, known, colorOf }) {
 
 function Checklist({ task, list, today, readOnly }) {
   const [text, setText] = useState('')
+  const addEl = useRef(null)
   const add = async () => {
     const title = text.trim()
     if (!title) return
@@ -244,7 +246,8 @@ function Checklist({ task, list, today, readOnly }) {
       {!readOnly && (
         <div className="cd-item-add">
           <Plus />
-          <input aria-label="Add an item" placeholder="Add an item…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <input ref={addEl} aria-label="Add an item" placeholder="Add an item…  [[ links a note or board" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <LinkSuggest field={addEl} />
         </div>
       )}
     </section>
@@ -313,6 +316,7 @@ function TaskDialog({ at, onClose }) {
                 else if (next !== words) change({ title: joinTags(next, tags) })
               }}
             />
+            <LinkSuggest key={task.text} field={title} />
             {place ? (
               // a project's card: the list it is in (moving it there follows the project's rules), and its board
               <div className="cd-where">

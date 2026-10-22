@@ -90,6 +90,7 @@ export class GraphRenderer {
     this.opts = { nodeSize: 1, labels: 1, colorFolders: true, ...opts }
     this.nodes = []
     this.links = []
+    this.nodeById = new Map()
     this.positions = new Map()
     this.transform = { x: 0, y: 0, k: 1 }
     this.hover = null
@@ -166,18 +167,57 @@ export class GraphRenderer {
 
   setData({ nodes, links }, focus = null) {
     this.focus = focus
+    // a node keeps where it is (or was, when it was dragged) across updates
+    for (const n of this.nodes) this.positions.set(n.id, { x: n.x, y: n.y })
     const old = this.positions
+    // the same notes and links as shown (the index refreshed, a note saved): nothing moves
+    const linkKey = (l) => `${l.source?.id ?? l.source}>${l.target?.id ?? l.target}`
+    const same =
+      this.nodes.length === nodes.length &&
+      nodes.every((n) => this.nodeById.has(n.id)) &&
+      this.links.length === links.length &&
+      (() => {
+        const have = new Set(this.links.map(linkKey))
+        return links.every((l) => have.has(linkKey(l)))
+      })()
+    if (same) {
+      for (const n of nodes) Object.assign(this.nodeById.get(n.id), { ...n, x: this.nodeById.get(n.id).x, y: this.nodeById.get(n.id).y })
+      this.needsDraw = true
+      return
+    }
+    // a node new to a graph already shown starts beside one it links to, not anywhere
+    const near = new Map()
+    for (const l of links) {
+      const a = l.source?.id ?? l.source
+      const b = l.target?.id ?? l.target
+      if (old.has(a) && !near.has(b)) near.set(b, old.get(a))
+      if (old.has(b) && !near.has(a)) near.set(a, old.get(b))
+    }
+    const jitter = (r) => (Math.random() - 0.5) * r
     const prepared = nodes.map((n) => {
-      const p = old.get(n.id)
-      return { ...n, x: p?.x ?? (Math.random() - 0.5) * 300, y: p?.y ?? (Math.random() - 0.5) * 300, vx: 0, vy: 0 }
+      const p = old.get(n.id) || (near.has(n.id) ? { x: near.get(n.id).x + jitter(40), y: near.get(n.id).y + jitter(40) } : null)
+      return { ...n, x: p?.x ?? jitter(300), y: p?.y ?? jitter(300), vx: 0, vy: 0 }
     })
+    // every node new (the graph just opened): it is laid out before it is shown, then
+    // framed once — rather than spreading out on screen and being re-framed with a jump
+    // once it slows down
+    const fresh = prepared.length > 0 && prepared.every((n) => !old.has(n.id))
     this.nodes = prepared
     this.nodeById = new Map(prepared.map((n) => [n.id, n]))
     this.links = links.map((l) => ({ ...l }))
     this.sim.nodes(prepared)
     this.sim.force('link').links(this.links)
-    this.sim.alpha(0.9).restart()
-    this.autoFit = true
+    if (fresh) {
+      const ticks = prepared.length > 1500 ? 60 : prepared.length > 600 ? 120 : 260
+      this.sim.stop().alpha(1)
+      for (let i = 0; i < ticks; i++) this.sim.tick() // (no 'tick' events: nothing drawn yet)
+      this.sim.alpha(Math.max(0.02, this.sim.alpha())).restart()
+      this.autoFit = false
+      this.fit() // (with no size yet it waits, and frames the graph once there is one)
+    } else {
+      // the same graph, changed (a note edited): it moves a little, and stays framed as it is
+      this.sim.alpha(0.3).restart()
+    }
     this.needsDraw = true
   }
 
@@ -339,7 +379,8 @@ export class GraphRenderer {
     c.addEventListener('dblclick', () => this.fit())
   }
 
-  fit() {
+  /** Frames the whole graph. `smooth`: eases there rather than jumping. */
+  fit({ smooth = false } = {}) {
     if (!this.nodes.length) return
     // A tab that is laid out while hidden has no size yet; fitting against it
     // parks the whole graph in the top-left corner. Wait for a real size.
@@ -360,10 +401,23 @@ export class GraphRenderer {
     const w = Math.max(maxX - minX, 50)
     const h = Math.max(maxY - minY, 50)
     const k = Math.min(this.width / (w + 110), this.height / (h + 110), 1.5)
-    this.transform.k = k
-    this.transform.x = -((minX + maxX) / 2) * k
-    this.transform.y = -((minY + maxY) / 2) * k
-    this.needsDraw = true
+    const to = { k, x: -((minX + maxX) / 2) * k, y: -((minY + maxY) / 2) * k }
+    cancelAnimationFrame(this.fitRaf)
+    if (!smooth) {
+      Object.assign(this.transform, to)
+      this.needsDraw = true
+      return
+    }
+    const from = { ...this.transform }
+    const t0 = performance.now()
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / 320)
+      const e = 1 - (1 - t) ** 3
+      for (const key of ['k', 'x', 'y']) this.transform[key] = from[key] + (to[key] - from[key]) * e
+      this.needsDraw = true
+      if (t < 1 && this.running) this.fitRaf = requestAnimationFrame(step)
+    }
+    this.fitRaf = requestAnimationFrame(step)
   }
 
   refreshColors() {

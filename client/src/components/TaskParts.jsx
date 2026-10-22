@@ -14,6 +14,7 @@ import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
 import * as A from '../lib/actions.js'
+import { LinkSuggest } from './LinkSuggest.jsx'
 
 /** done ↔ open */
 export const toggleTask = (task) => A.updateTask(task, { status: isOpen(task.status) ? 'x' : ' ' })
@@ -423,6 +424,7 @@ export function QuickAdd({ day = null, autoFocus = false }) {
             }
           }}
         />
+        <LinkSuggest field={input} />
         {text.trim() && (
           <>
             {!day && (

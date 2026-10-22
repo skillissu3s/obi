@@ -12,6 +12,7 @@ import { PRIORITY_LABEL } from './TaskParts.jsx'
 import { DateField, REPEATS } from './TaskDialog.jsx'
 import { Colors, Label, PopHead, StatusIcon, dueTone } from './CardParts.jsx'
 import { colorHex, colorLabel } from '../lib/colors.js'
+import { LinkSuggest } from './LinkSuggest.jsx'
 
 const STATUSES = [
   [' ', 'To do'],
@@ -265,6 +266,7 @@ function Description({ text, ws, path, readOnly, onSave }) {
               }
             }}
           />
+          <LinkSuggest field={box} />
           <div className="cd-row">
             <button type="button" className="btn btn-primary btn-sm" onClick={save}>
               Save
@@ -302,6 +304,7 @@ function Description({ text, ws, path, readOnly, onSave }) {
 
 function Checklist({ items, readOnly, today, change }) {
   const [text, setText] = useState('')
+  const addEl = useRef(null)
   const ticked = items.filter((t) => !isOpen(t.status)).length
   const add = () => {
     const title = text.replace(/\s+/g, ' ').trim()
@@ -351,7 +354,8 @@ function Checklist({ items, readOnly, today, change }) {
       {!readOnly && (
         <div className="cd-item-add">
           <Plus />
-          <input aria-label="Add an item" placeholder="Add an item…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <input ref={addEl} aria-label="Add an item" placeholder="Add an item…  [[ links a note or board" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+          <LinkSuggest field={addEl} />
         </div>
       )}
     </section>
@@ -450,6 +454,7 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
                 else if (next !== title) retitle(next)
               }}
             />
+            <LinkSuggest key={title} field={titleEl} />
             <div className="cd-where">
               in list
               <select

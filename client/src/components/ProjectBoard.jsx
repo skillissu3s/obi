@@ -23,6 +23,7 @@ import { Colors, Label, PopHead, StatusIcon, dueTone } from './CardParts.jsx'
 import { Automation, ruleCount } from './Automation.jsx'
 import { useBoardDrag } from './boardDrag.js'
 import { colorHex } from '../lib/colors.js'
+import { LinkSuggest } from './LinkSuggest.jsx'
 
 export const LIST_COLORS = K.PROJECT_COLORS
 
@@ -244,6 +245,7 @@ function Composer({ onAdd, onClose }) {
           }
         }}
       />
+      <LinkSuggest field={input} />
       <ParsedChips found={parsed.found} onKeep={keep} />
       <div className="pb-composer-actions">
         <button type="button" className="btn btn-primary btn-sm" onMouseDown={(e) => e.preventDefault()} onClick={submit}>

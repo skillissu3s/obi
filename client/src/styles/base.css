@@ -1360,3 +1360,44 @@ kbd {
     transform: none;
   }
 }
+
+/* ---------- [[ suggestions in a card's or a task's text (LinkSuggest.jsx) ---------- */
+.link-suggest {
+  position: fixed;
+  z-index: 430; /* (over a dialog and its popovers) */
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
+  font-size: 13px;
+}
+.ls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+.ls-row.active {
+  background: var(--bg-active);
+}
+.ls-row > svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.ls-name {
+  min-width: 0;
+}
+.ls-detail {
+  margin-left: auto;
+  padding-left: 8px;
+  max-width: 45%;
+  color: var(--text-3);
+  font-size: 11.5px;
+}

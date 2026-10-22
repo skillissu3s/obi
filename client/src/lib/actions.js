@@ -8,7 +8,7 @@ import { basename, dirname, stripExt, joinPath, isNote, safeName, extname } from
 import { isBoardPath, emptyBoard } from '@shared/board.js'
 import { formatDate, isoDate, downloadUrl, copyText } from './util.js'
 import { MAX_TASK_EDITS, previewEdit, todayIso } from '@shared/tasks.js'
-import { newProjectContent } from '@shared/kanban.js'
+import { isBoardMeta, newProjectContent } from '@shared/kanban.js'
 import { isArchived, projectName, taskTarget } from './projects.js'
 import { fetchNote } from './render.js'
 import { conn } from './socket.js'
@@ -516,6 +516,8 @@ export function buildEditorCtx(ws, path) {
     },
     fileUrl: (p) => api.fileUrl(ws, p),
     files: () => app().tree.filter((e) => e.type === 'file'),
+    // a project board (a note in the Kanban format) or a whiteboard: 'project' | 'whiteboard' | null
+    boardKind: (p) => (isBoardPath(p) ? 'whiteboard' : isBoardMeta(app().notes.get(p)) ? 'project' : null),
     aliases: () => {
       const out = []
       for (const [p, meta] of app().notes) for (const a of meta.aliases || []) out.push({ alias: a, path: p })

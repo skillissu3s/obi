@@ -38,10 +38,9 @@ function useGraph(canvasRef, { focus, depth, options, onClick, compact }) {
     const r = rendererRef.current
     if (!r) return
     r.setData(data, focus)
-    if (compact || !r.fitted) {
-      setTimeout(() => r.fit(), 350)
-      r.fitted = true
-    }
+    // (a new graph frames itself once it is laid out; the local one eases over to the next note's)
+    if (compact && r.fitted) setTimeout(() => r.fit({ smooth: true }), 350)
+    r.fitted = true
   }, [data, focus])
 
   useEffect(() => {

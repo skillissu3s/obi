@@ -64,7 +64,8 @@ export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFo
     closeBrackets(),
     codeFolding(),
     highlightSelectionMatches({ minSelectionLength: 3 }),
-    search({ top: true }),
+    // (each match found is brought to the middle of the screen, as other editors do)
+    search({ top: true, scrollToMatch: (range) => EditorView.scrollIntoView(range, { y: 'center' }) }),
     autocompletion({
       override: [wikiCompletion, tagCompletion, slashCompletion, emojiCompletion],
       closeOnBlur: true,

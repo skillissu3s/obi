@@ -50,14 +50,16 @@ export function wikiCompletion(context) {
   const options = []
   for (const f of files) {
     const note = isNote(f.path)
-    if (!embed && !note) continue
+    // boards are linked like notes: a project board is a note, a whiteboard opens as one
+    const board = ctx.boardKind?.(f.path) || null
+    if (!embed && !note && board !== 'whiteboard') continue
     const name = note ? stripExt(basename(f.path)) : basename(f.path)
     const folder = dirname(f.path)
     options.push({
       label: name,
-      detail: folder || (note ? '' : extname(f.path)),
-      type: note ? 'note' : 'file',
-      boost: note ? 1 : 0,
+      detail: board === 'project' ? `board${folder ? ` · ${folder}` : ''}` : board === 'whiteboard' ? `whiteboard${folder ? ` · ${folder}` : ''}` : folder || (note ? '' : extname(f.path)),
+      type: note || board ? 'note' : 'file',
+      boost: note || board ? 1 : 0,
       apply: applyLink(ctx.linkTextFor ? ctx.linkTextFor(f.path) : name),
     })
     if (folder) options.push({ label: f.path.replace(/\.md$/, ''), detail: 'path', type: note ? 'note' : 'file', boost: -2, apply: applyLink(f.path.replace(/\.md$/, '')) })
