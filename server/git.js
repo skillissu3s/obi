@@ -202,15 +202,40 @@ function statusPaths(out) {
 }
 
 /**
+ * The name and email git itself would put on a commit made in `dir`: the
+ * repository's own config, else the person's global one ('' for one it hasn't).
+ */
+export async function gitIdentity(dir) {
+  const get = async (key) => {
+    const r = await runGit(dir, ['config', '--get', key]).catch(() => null)
+    return r?.code === 0 ? r.stdout.trim() : ''
+  }
+  const [name, email] = await Promise.all([get('user.name'), get('user.email')])
+  return { name, email }
+}
+
+/**
+ * Who a commit is by: the name and email chosen in the workspace's settings, else
+ * what git is set up with (the repository's config, then the global one), else
+ * `fallback` — so a commit never fails for want of an identity.
+ */
+async function identArgs(dir, { authorName, authorEmail, fallbackName, fallbackEmail }) {
+  const own = await gitIdentity(dir)
+  const name = authorName || (own.name ? null : fallbackName || 'Obi')
+  const email = authorEmail || (own.email ? null : fallbackEmail || 'obi@localhost')
+  return [...(name ? ['-c', `user.name=${name}`] : []), ...(email ? ['-c', `user.email=${email}`] : [])]
+}
+
+/**
  * Full sync cycle: commit local changes, fetch, merge (saving conflict copies), push.
  * `message` is the commit message, or a function of the paths being committed.
  * `skipIfClean`: when there is nothing to commit, stop there — no fetch, no push
  * (a save that changed nothing). Returns { changed: string[] | null (null =
  * unknown/all), pushed, conflicts, committed: string[], clean }
  */
-export async function syncRepo(dir, { url, branch, token, username, authorName, authorEmail, message, push = true, skipIfClean = false }) {
+export async function syncRepo(dir, { url, branch, token, username, authorName, authorEmail, fallbackName, fallbackEmail, message, push = true, skipIfClean = false }) {
   const auth = { token, username }
-  const ident = ['-c', `user.name=${authorName || 'Obi'}`, '-c', `user.email=${authorEmail || 'obi@localhost'}`]
+  const ident = await identArgs(dir, { authorName, authorEmail, fallbackName, fallbackEmail })
   await runGit(dir, ['remote', 'set-url', 'origin', url])
 
   await must(dir, ['add', '-A'])

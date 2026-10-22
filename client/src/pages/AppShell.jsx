@@ -74,6 +74,8 @@ export default function AppShell() {
   }, [])
 
   useEffect(() => installHotkeys(), [])
+  // the desktop app: Ctrl/⌘ W closes the tab in front (not the window)
+  useEffect(() => window.obiDesktop?.onCloseTab?.(() => runCommand('close-tab')), [])
 
   // the background picture kept on this device
   useEffect(() => {

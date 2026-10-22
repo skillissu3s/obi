@@ -82,6 +82,10 @@ export function Toolbar({ ctl, extra, onCollapse }) {
 
 // ---------- popovers ----------
 
+// A press in a panel leaves the focus where it was (on the canvas or the text),
+// except on a field: a slider can't be dragged, nor a box typed in, without it.
+const keepFocus = (e) => !e.target.closest('input, textarea, select') && e.preventDefault()
+
 function Popover({ anchor, onClose, side = false, avoid = null, children }) {
   const ref = useRef(null)
   const [pos, setPos] = useState(null)
@@ -132,7 +136,7 @@ function Popover({ anchor, onClose, side = false, avoid = null, children }) {
     }
   }, [anchor, onClose])
   return createPortal(
-    <div ref={ref} className="cv-pop" style={pos || { left: -9999, top: -9999 }} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.preventDefault()}>
+    <div ref={ref} className="cv-pop" style={pos || { left: -9999, top: -9999 }} onPointerDown={(e) => e.stopPropagation()} onMouseDown={keepFocus}>
       {children}
     </div>,
     document.body,

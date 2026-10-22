@@ -1,5 +1,6 @@
 /* ---------- Note view ---------- */
 .note-view {
+  position: relative; /* (the find bar floats in its top right corner) */
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -225,39 +226,80 @@
   padding: 0 6px;
   border-radius: var(--radius-xs);
 }
-.obi-editor .cm-panels {
+/* The find bar (Editor.jsx mounts CodeMirror's panels here): a card in the note's
+   top right corner, under its header. It stays put while the note scrolls and
+   takes no room from the text. */
+.obi-find {
+  position: absolute;
+  top: 46px;
+  right: 16px;
+  z-index: 30;
+  width: min(440px, calc(100% - 32px));
+}
+.obi-find:not(:has(.cm-panel)) {
+  display: none;
+}
+.obi-find .cm-panels {
+  border-radius: var(--radius-lg);
   background: var(--bg-elev);
   color: var(--text);
-  border-color: var(--border) !important;
-  position: sticky;
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
 }
-.obi-editor .cm-panel.cm-search {
-  padding: 8px 10px;
+.obi-find .cm-panel.cm-search {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
   align-items: center;
+  gap: 6px;
+  padding: 10px 40px 10px 10px;
   font-size: 12.5px;
 }
-.obi-editor .cm-panel.cm-search input,
-.obi-editor .cm-panel.cm-search button {
-  font: inherit;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: var(--bg-input);
-  padding: 3px 8px;
-  color: var(--text);
-  margin: 0;
+.obi-find .cm-panel.cm-search br {
+  flex-basis: 100%;
+  content: '';
 }
-.obi-editor .cm-panel.cm-search button[name='close'] {
+.obi-find .cm-panel.cm-search input,
+.obi-find .cm-panel.cm-search button {
+  height: 28px;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+}
+.obi-find .cm-panel.cm-search input[type='checkbox'] {
+  height: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.obi-find .cm-panel.cm-search .cm-textfield {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.obi-find .cm-panel.cm-search button {
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.obi-find .cm-panel.cm-search button:hover {
+  background: var(--bg-hover);
+}
+.obi-find .cm-panel.cm-search button[name='close'] {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 28px;
+  padding: 0;
   border: none;
   background: none;
+  color: var(--text-2);
   font-size: 18px;
 }
-.obi-editor .cm-panel.cm-search label {
+.obi-find .cm-panel.cm-search label {
   display: inline-flex;
-  gap: 4px;
   align-items: center;
+  gap: 4px;
   color: var(--text-2);
 }
 

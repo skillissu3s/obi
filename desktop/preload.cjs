@@ -12,6 +12,12 @@ contextBridge.exposeInMainWorld('obiDesktop', {
   reveal: (dir) => ipcRenderer.invoke('obi:reveal', dir),
   documentsFolder: () => ipcRenderer.invoke('obi:documents'),
   reauth: () => ipcRenderer.invoke('obi:reauth'),
+  // Ctrl/⌘ W, which the app keeps from closing the window: the page closes its tab
+  onCloseTab: (fn) => {
+    const listener = () => fn()
+    ipcRenderer.on('obi:close-tab', listener)
+    return () => ipcRenderer.removeListener('obi:close-tab', listener)
+  },
   // new releases: their state, checking now, restarting into one (desktop/updates.js)
   updates: {
     state: () => ipcRenderer.invoke('obi:update-state'),

@@ -613,6 +613,12 @@ wsRouter.get('/:id/sync', access('viewer'), async (req, res) => {
   res.json({ sync: rt.syncStatus() })
 })
 
+// who commits are by when the settings name nobody: what git is set up with
+wsRouter.get('/:id/git-identity', access('viewer'), async (req, res) => {
+  const rt = await getRuntime(req.ws.id)
+  res.json(await rt.gitDefaults())
+})
+
 wsRouter.post('/:id/sync', access('editor'), async (req, res) => {
   if (req.ws.type !== 'github') throw new HttpError(400, 'Not a GitHub workspace')
   const rt = await getRuntime(req.ws.id)

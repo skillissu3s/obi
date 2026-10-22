@@ -140,9 +140,19 @@ class WorkspaceRuntime {
       branch: this.row.github_branch || 'main',
       token: decrypt(this.row.github_token),
       username: s.gitUsername || undefined,
-      authorName: s.authorName || owner?.display_name || 'Obi',
-      authorEmail: s.authorEmail || `${owner?.username || 'obi'}@users.noreply.obi`,
+      // commits are by the name and email chosen in the settings, else by whoever
+      // git is set up as (git config user.name / user.email), else by the owner
+      authorName: s.authorName || undefined,
+      authorEmail: s.authorEmail || undefined,
+      fallbackName: owner?.display_name || 'Obi',
+      fallbackEmail: `${owner?.username || 'obi'}@users.noreply.obi`,
     }
+  }
+
+  /** Who commits are by when the settings name nobody: { name, email } from git's config */
+  async gitDefaults() {
+    if (this.type !== 'github') return { name: '', email: '' }
+    return git.gitIdentity(this.dir)
   }
 
   async scan() {

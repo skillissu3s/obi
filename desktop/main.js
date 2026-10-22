@@ -50,6 +50,14 @@ function createWindow() {
     },
   })
   win.once('ready-to-show', () => win.show())
+  // Ctrl/⌘ W closes the tab in front, as in a browser, not the whole app (the
+  // default menu has it close the window, and with it Obi)
+  win.webContents.on('before-input-event', (e, input) => {
+    const mod = process.platform === 'darwin' ? input.meta : input.control
+    if (input.type !== 'keyDown' || !mod || input.alt || input.shift || String(input.key).toLowerCase() !== 'w') return
+    e.preventDefault()
+    win.webContents.send('obi:close-tab')
+  })
 
   // links to the outside world open in the browser
   const inside = (url) => url === base || url.startsWith(base + '/')

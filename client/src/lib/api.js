@@ -106,6 +106,7 @@ export const api = {
   version: (id, path, vid, vpath) => request('GET', `${W(id)}/history/version${q({ path, id: vid, vpath })}`),
   restoreVersion: (id, path, vid, vpath) => request('POST', `${W(id)}/history/restore`, { path, id: vid, vpath }),
   sync: (id, message) => request('POST', `${W(id)}/sync`, message ? { message } : {}),
+  gitIdentity: (id) => request('GET', `${W(id)}/git-identity`),
   members: (id) => request('GET', `${W(id)}/members`),
   addMember: (id, username, role) => request('POST', `${W(id)}/members`, { username, role }),
   setMemberRole: (id, userId, role) => request('PATCH', `${W(id)}/members/${userId}`, { role }),

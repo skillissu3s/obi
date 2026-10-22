@@ -635,6 +635,20 @@ function GithubSection({ ws, isOwner }) {
   const [saving, setSaving] = useState(false)
   const [status, run] = useSaveStatus()
   const s = ws?.settings || {}
+  // who git is set up as (git config user.name / user.email): commits are by them unless a name is chosen here
+  const [gitId, setGitId] = useState(null)
+  useEffect(() => {
+    if (!ws?.id) return
+    let alive = true
+    api
+      .gitIdentity(ws.id)
+      .then((r) => alive && setGitId(r))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [ws?.id])
+  const byGit = gitId && (gitId.name || gitId.email) ? [gitId.name, gitId.email && `<${gitId.email}>`].filter(Boolean).join(' ') : null
 
   const save = (patch, key = Object.keys(patch.settings || patch)[0]) =>
     run(key, async () => {
@@ -703,10 +717,19 @@ function GithubSection({ ws, isOwner }) {
           className="input input-num"
         />
       </Setting>
-      <Setting name="Commit author" desc="Name and email used for commits Obi creates." status={status.authorName || status.authorEmail} stacked>
+      <Setting
+        name="Commit author"
+        desc={
+          byGit
+            ? `The name and email on the commits Obi makes. Left empty, they are your git config's: ${byGit}.`
+            : 'The name and email on the commits Obi makes. Left empty, they are your git config’s (user.name and user.email), or yours in Obi if git has none.'
+        }
+        status={status.authorName || status.authorEmail}
+        stacked
+      >
         <div className="field-row">
-          <input className="input" placeholder="Name" defaultValue={s.authorName || ''} onBlur={(e) => e.target.value !== (s.authorName || '') && save({ settings: { authorName: e.target.value } })} />
-          <input className="input" type="email" placeholder="email@example.com" defaultValue={s.authorEmail || ''} onBlur={(e) => e.target.value !== (s.authorEmail || '') && save({ settings: { authorEmail: e.target.value } })} />
+          <input className="input" placeholder={gitId?.name || 'Name'} aria-label="Commit author name" defaultValue={s.authorName || ''} onBlur={(e) => e.target.value.trim() !== (s.authorName || '') && save({ settings: { authorName: e.target.value.trim() } })} />
+          <input className="input" type="email" placeholder={gitId?.email || 'email@example.com'} aria-label="Commit author email" defaultValue={s.authorEmail || ''} onBlur={(e) => e.target.value.trim() !== (s.authorEmail || '') && save({ settings: { authorEmail: e.target.value.trim() } })} />
         </div>
       </Setting>
 

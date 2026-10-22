@@ -65,3 +65,18 @@ test('without skipIfClean (a pull), nothing to commit still fetches what others 
   assert.ok(fs.existsSync(path.join(work, 'c.md')))
   assert.deepEqual(r.changed, ['c.md'])
 })
+
+test('commits are by whoever git is set up as, unless the settings name someone', async () => {
+  const { work, opts } = setup()
+  git(work, 'config', 'user.name', 'Repo Person')
+  git(work, 'config', 'user.email', 'repo@example.com')
+  const { authorName, authorEmail, ...rest } = opts
+  void authorName
+  void authorEmail
+  fs.writeFileSync(path.join(work, 'b.md'), 'two\n')
+  await syncRepo(work, { ...rest, fallbackName: 'Fallback', fallbackEmail: 'fb@x', message: 'by git' })
+  assert.equal(git(work, 'log', '-1', '--format=%an <%ae>'), 'Repo Person <repo@example.com>')
+  fs.writeFileSync(path.join(work, 'c.md'), 'three\n')
+  await syncRepo(work, { ...rest, authorName: 'Chosen', authorEmail: 'chosen@example.com', message: 'chosen' })
+  assert.equal(git(work, 'log', '-1', '--format=%an <%ae>'), 'Chosen <chosen@example.com>')
+})

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { EditorView } from '@codemirror/view'
+import { EditorView, panels } from '@codemirror/view'
 import { ySyncAnnotation } from 'y-codemirror.next'
 import { EditorState } from '@codemirror/state'
 import { baseExtensions, compartments, collabExtensions, modeExtensions, readOnlyExtensions, prefsExtensions } from '../editor/setup.js'
@@ -35,6 +35,13 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
     const comps = compartments()
     compsRef.current = comps
     const ctx = buildEditorCtx(handle.ws, handle.path)
+    // The find bar (Ctrl/⌘ F) floats at the top right of the note, outside the text:
+    // it neither pushes the lines (and the drawings pinned to them) down nor scrolls
+    // away with them.
+    // (CodeMirror styles the box it is handed as its own, so it gets one inside ours)
+    const findHost = document.createElement('div')
+    findHost.className = 'obi-find'
+    const findPanels = findHost.appendChild(document.createElement('div'))
     const state = EditorState.create({
       doc: handle.ytext.toString(),
       extensions: [
@@ -102,9 +109,11 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
             return true
           },
         }),
+        panels({ topContainer: findPanels }),
       ],
     })
     const view = new EditorView({ state, parent: host })
+    ;(host.closest('.note-view') || host).appendChild(findHost)
     view.obiComps = comps // lets the canvas layer plug its listeners in
     viewRef.current = view
     view.dispatch({
@@ -128,6 +137,7 @@ export function Editor({ handle, tabId, mode, readOnly, onStats, onViewReady, li
       if (scroller) scrollMemory.set(`${tabId}:${handle.key}`, scroller.scrollTop)
       onViewReady?.(null)
       view.destroy()
+      findHost.remove()
       viewRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

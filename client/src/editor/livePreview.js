@@ -453,17 +453,39 @@ class TableWidget extends WidgetType {
     div.className = 'cm-lp-table markdown'
     div.innerHTML = renderMarkdown(this.text, { ws: this.ws, path: this.path }).html
     div.addEventListener('mousedown', (e) => {
-      if (e.target.closest('a')) return
+      // a link in a cell opens, as one in the text does; the table stays a table (the
+      // press would otherwise put the cursor in its source, which shows the markdown
+      // before the click ever reaches the link)
+      const a = e.target.closest('a')
+      if (a) {
+        if (e.button !== 0 && e.button !== 1) return
+        e.preventDefault()
+        e.stopPropagation()
+        openTableLink(view, a, e.metaKey || e.ctrlKey || e.button === 1)
+        return
+      }
       const pos = view.posAtDOM(div)
       e.preventDefault()
       view.dispatch({ selection: { anchor: pos } })
       view.focus()
     })
+    // (it was opened on the press: the click mustn't follow the link's href too)
+    div.addEventListener('click', (e) => e.target.closest('a') && e.preventDefault())
     return div
   }
-  ignoreEvent() {
-    return false
+  ignoreEvent(e) {
+    return !!e.target?.closest?.('a')
   }
+}
+
+// What a link rendered in a table (a note, a #tag or a web address) opens
+function openTableLink(view, a, newTab) {
+  const ctx = view.state.facet(editorCtx)
+  if (a.classList.contains('tag')) return ctx.openTag?.(a.dataset.tag)
+  if (a.dataset.href != null) return ctx.openPath?.(null, { newTab, link: a.dataset.href })
+  const href = a.getAttribute('href') || ''
+  if (/^[a-z][a-z0-9+.-]*:|^www\./i.test(href)) window.open(/^www\./i.test(href) ? `https://${href}` : href, '_blank', 'noopener')
+  else if (href && href !== '#') ctx.openPath?.(null, { newTab, link: decodeURIComponent(href), md: true })
 }
 
 class MathWidget extends WidgetType {
