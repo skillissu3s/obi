@@ -75,6 +75,7 @@ export const DEFAULT_PREFS = {
   wallpaper: DEFAULT_WALLPAPER, // the app background; see lib/wallpaper.js
   bookmarks: {},
   boardOrder: {}, // { [workspace id]: board paths in the order they were dragged into }
+  places: {}, // your place in each note, to pick up where you left off: { 'ws:path': { line, text, at } } (lib/places.js)
 }
 
 let LS = {}

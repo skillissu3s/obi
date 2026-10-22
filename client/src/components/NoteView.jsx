@@ -3,9 +3,12 @@ import {
   ChevronLeft, ChevronRight, MoreHorizontal, Eye, Pencil, Code2, LayoutGrid, Share2, History, Star, Trash2, Copy, Link2,
   FolderInput, SplitSquareHorizontal, Info, Globe, AlertTriangle, FileWarning, Wifi, WifiOff, Bold, Italic, List, ListChecks,
   Heading1, Heading2, Quote, Link as LinkIcon, Image as ImageIcon, Undo2, Redo2, IndentIncrease, IndentDecrease, Hash, FileText,
-  ChevronDown, Printer, Download, PanelRight,
+  ChevronDown, Printer, Download, PanelRight, BookmarkCheck, BookmarkPlus, BookmarkX, CornerDownRight, X,
 } from 'lucide-react'
+import { EditorView } from '@codemirror/view'
 import { conn } from '../lib/socket.js'
+import { placeLine, plainLine, savePlace, usePlace } from '../lib/places.js'
+import { setPlace } from '../editor/place.js'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
 import { usePrefs } from '../store/prefs.js'
@@ -123,6 +126,37 @@ function useDrawingCount(ws, path, enabled) {
   return count
 }
 
+// ---- your place in a note, in the rendered reading view (lib/places.js) ----
+const READ_BLOCKS = '.markdown :is(p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, tr)'
+const firstWords = (el) => el.innerText.split('\n')[0].replace(/\s+/g, ' ').trim().slice(0, 60)
+
+// the rendered block that shows source line `n` (found by its words), else the nearest heading before it
+function blockForLine(scroller, lines, n) {
+  const want = plainLine(lines[n] || '').slice(0, 60)
+  if (want) {
+    const hit = [...scroller.querySelectorAll(READ_BLOCKS)].find((b) => firstWords(b).startsWith(want) || (want.startsWith(firstWords(b)) && firstWords(b).length > 8))
+    if (hit) return hit
+  }
+  let best = null
+  for (const h of scroller.querySelectorAll('.markdown [data-line]')) if (Number(h.dataset.line) <= n && (!best || Number(h.dataset.line) >= Number(best.dataset.line))) best = h
+  return best
+}
+
+// the source line a rendered block shows (by its words), else its nearest heading's, else -1
+function lineForBlock(scroller, el, lines) {
+  const text = firstWords(el)
+  if (text) {
+    const n = lines.findIndex((l) => {
+      const p = plainLine(l)
+      return p && (p.startsWith(text) || (text.startsWith(p) && p.length > 8))
+    })
+    if (n >= 0) return n
+  }
+  let line = -1
+  for (const h of scroller.querySelectorAll('.markdown [data-line]')) if (h === el || h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) line = Number(h.dataset.line)
+  return line
+}
+
 export function NoteView({ tab, paneId, active }) {
   // a note we just created isn't on the server yet — wait before joining its document
   const creating = useApp((s) => s.pending[`${tab.ws}:${tab.path}`]) === 'creating'
@@ -162,6 +196,97 @@ export function NoteView({ tab, paneId, active }) {
   const drawings = useDrawingCount(tab.ws, tab.path, mode === 'read' && !printing)
   const readingDrawings = mode === 'read' && !printing && drawings > 0
   const rendered = mode === 'read' && !readingDrawings
+
+  // ---- your place (lib/places.js): marked from the header, shown on its line, offered when you come back ----
+  const place = usePlace(tab.ws, tab.path)
+  const [offer, setOffer] = useState(false)
+  const offered = useRef(null)
+  const sourceLines = () => (handle?.status === 'ready' ? handle.ytext.toString().split('\n') : [])
+  // the line being read now: a little way down from the top of what is on screen
+  const lineHere = () => {
+    const lines = sourceLines()
+    if (!scrollEl || !lines.length) return null
+    const box = scrollEl.getBoundingClientRect()
+    const y = box.top + Math.min(140, box.height * 0.25)
+    if (!rendered && view) {
+      const c = view.contentDOM.getBoundingClientRect()
+      const line = view.state.doc.lineAt(view.posAtCoords({ x: c.left + 10, y }, false))
+      return { line: line.number - 1, text: line.text }
+    }
+    const el = [...scrollEl.querySelectorAll(READ_BLOCKS)].find((b) => b.getBoundingClientRect().bottom > y)
+    const n = Math.max(0, el ? lineForBlock(scrollEl, el, lines) : 0)
+    return { line: n, text: lines[n] }
+  }
+  const markHere = () => {
+    const at = lineHere()
+    if (!at) return
+    savePlace(tab.ws, tab.path, at)
+    setOffer(false)
+    toast.success(`Place marked at line ${at.line + 1} — it’ll be here next time`)
+  }
+  const goToPlace = () => {
+    setOffer(false)
+    if (!place) return
+    if (!rendered && view) {
+      const n = placeLine(view.state.doc.toString().split('\n'), place)
+      view.dispatch({ effects: EditorView.scrollIntoView(view.state.doc.line(n + 1).from, { y: 'start', yMargin: 90 }) })
+    } else if (scrollEl) {
+      const el = scrollEl.querySelector('.reading-place')
+      if (el) scrollEl.scrollTop += el.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top - 90
+    }
+  }
+  const placeMenu = (e) => {
+    if (!place) return markHere()
+    useUI.getState().showContextMenu(menuFromElement(e.currentTarget), [
+      { label: 'Go to my place', icon: CornerDownRight, run: goToPlace },
+      { label: 'Mark here instead', icon: BookmarkPlus, run: markHere },
+      { label: 'Remove my place', icon: BookmarkX, danger: true, run: () => savePlace(tab.ws, tab.path, null) },
+    ])
+  }
+  // shown on its line: in the editor…
+  useEffect(() => {
+    if (!view || rendered) return
+    const n = place ? placeLine(view.state.doc.toString().split('\n'), place) : null
+    view.dispatch({ effects: setPlace.of(n == null ? null : view.state.doc.line(n + 1).from) })
+  }, [view, rendered, place])
+  // …and in the rendered reading view (which may draw itself again: it is marked again)
+  useEffect(() => {
+    if (!rendered || !scrollEl) return undefined
+    const apply = () => {
+      for (const el of scrollEl.querySelectorAll('.reading-place')) el.classList.remove('reading-place')
+      if (!place) return
+      const lines = sourceLines()
+      const n = placeLine(lines, place)
+      if (n != null) blockForLine(scrollEl, lines, n)?.classList.add('reading-place')
+    }
+    apply()
+    const mo = new MutationObserver(() => place && !scrollEl.querySelector('.reading-place') && apply())
+    mo.observe(scrollEl, { childList: true, subtree: true })
+    return () => mo.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rendered, scrollEl, place, handle])
+  // coming back to a note whose place is further on: offer to go there
+  useEffect(() => {
+    if (!place || !scrollEl || handle?.status !== 'ready' || offered.current === `${tab.ws}:${tab.path}`) return undefined
+    offered.current = `${tab.ws}:${tab.path}`
+    const t = setTimeout(() => {
+      const r = scrollEl.querySelector('.cm-reading-place, .reading-place')?.getBoundingClientRect()
+      const box = scrollEl.getBoundingClientRect()
+      if (!r || r.top > box.bottom - 40 || r.bottom < box.top) setOffer(true)
+    }, 600)
+    return () => clearTimeout(t)
+  }, [place, scrollEl, handle?.status, tab.ws, tab.path])
+  // …which goes once the place is on screen
+  useEffect(() => {
+    if (!offer || !scrollEl) return undefined
+    const seen = () => {
+      const r = scrollEl.querySelector('.cm-reading-place, .reading-place')?.getBoundingClientRect()
+      const box = scrollEl.getBoundingClientRect()
+      if (r && r.top < box.bottom - 40 && r.bottom > box.top) setOffer(false)
+    }
+    scrollEl.addEventListener('scroll', seen, { passive: true })
+    return () => scrollEl.removeEventListener('scroll', seen)
+  }, [offer, scrollEl])
 
   // register the focused editor for global commands
   useEffect(() => {
@@ -382,6 +507,16 @@ export function NoteView({ tab, paneId, active }) {
             <WifiOff /> Offline
           </span>
         )}
+        {handle?.status === 'ready' && (
+          <button
+            className={`icon-btn place-btn ${place ? 'on' : ''}`}
+            title={place ? `Your place: line ${place.line + 1} — go there, move it, or remove it` : 'Mark my place — pick up here next time'}
+            aria-label={place ? 'Your place in this note' : 'Mark my place'}
+            onClick={placeMenu}
+          >
+            {place ? <BookmarkCheck /> : <BookmarkPlus />}
+          </button>
+        )}
         <div className="segmented">
           <button className={mode === 'live' ? 'active' : ''} onClick={() => setMode('live')} title="Live preview (Ctrl/⌘ E)">
             <Pencil />
@@ -435,6 +570,16 @@ export function NoteView({ tab, paneId, active }) {
         <NoteCanvas key={`${handle.key}:${handle.generation}`} tab={tab} view={view} scrollEl={scrollEl} innerEl={innerEl} originEl={originEl} stageEl={stageEl} mode={readingDrawings ? 'live' : mode} viewOnly={readingDrawings} />
       )}
       {view && !readOnly && mode !== 'read' && mode !== 'board' && <MobileToolbar view={view} handle={handle} />}
+      {offer && place && (
+        <div className="place-offer" role="status">
+          <button type="button" className="place-offer-go" onClick={goToPlace}>
+            <BookmarkCheck /> Continue where you left off
+          </button>
+          <button type="button" className="icon-btn sm" aria-label="Dismiss" title="Dismiss" onClick={() => setOffer(false)}>
+            <X />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

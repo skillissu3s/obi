@@ -16,6 +16,7 @@ import { wikiCompletion, tagCompletion, slashCompletion, emojiCompletion } from 
 import { markdownKeymapFor } from './commands.js'
 import { annotationField } from './annotations.js'
 import { spaceField } from './spaces.js'
+import { placeField } from './place.js'
 import { writingExtensions } from './writing.js'
 
 export const obiHighlight = HighlightStyle.define([
@@ -54,6 +55,7 @@ export const compartments = () => ({
 export function baseExtensions({ ctx, comps, handle, mode, prefs, onUpdate, onFocus, placeholderText }) {
   const exts = [
     editorCtx.of(ctx),
+    placeField,
     highlightSpecialChars(),
     drawSelection(),
     dropCursor(),
