@@ -9,6 +9,7 @@
 //   GITHUB_TOKEN               optional; only raises the API rate limit
 import express from 'express'
 import { DOWNLOAD_REPO, APP_NAME } from './config.js'
+import { all, one, run, now } from './db.js'
 
 export const downloadRouter = express.Router()
 
@@ -71,7 +72,10 @@ async function handle(req, res) {
   if (!patterns || !assets.length) return res.redirect(302, release ? release.html_url : releasesPage)
   for (const re of patterns) {
     const hit = assets.find((a) => re.test(a.name))
-    if (hit) return res.redirect(302, hit.browser_download_url)
+    if (hit) {
+      recordDownload(req, wanted, release.tag_name)
+      return res.redirect(302, hit.browser_download_url)
+    }
   }
   res
     .status(404)
@@ -103,6 +107,85 @@ downloadRouter.get('/info', async (req, res) => {
     ...builds,
   })
 })
+
+// ---------------- statistics (the admin console) ----------------
+
+// link checkers, crawlers and chat previews follow links too: they aren't downloads
+export const isBot = (req) => /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|whatsapp|discord|telegram|headless|lighthouse/i.test(req.get('user-agent') || '')
+
+/** A download through this site's links: when, and which build. Nothing about who. */
+function recordDownload(req, platform, tag) {
+  if (req.method !== 'GET' || isBot(req)) return
+  try {
+    run('INSERT INTO download_events (at, platform, version) VALUES (?, ?, ?)', now(), platform, String(tag || '').replace(/^v/, '') || null)
+  } catch {}
+}
+
+const DAY = 24 * 60 * 60 * 1000
+const platformOf = (name) => {
+  if (/\.blockmap$|\.ya?ml$|uninstaller/i.test(name)) return null
+  if (/\.exe$/i.test(name)) return 'windows'
+  if (/\.(dmg|pkg)$/i.test(name) || /mac.*\.zip$/i.test(name)) return 'mac'
+  if (/\.(appimage|deb|rpm)$/i.test(name)) return 'linux'
+  return null
+}
+
+let statsCache = { at: 0, value: null }
+/** GitHub's own count of every installer's downloads, release by release (it includes the app's updates) */
+async function githubDownloads() {
+  if (!DOWNLOAD_REPO) return null
+  if (statsCache.value && Date.now() - statsCache.at < CACHE_MS) return statsCache.value
+  const res = await fetch(`https://api.github.com/repos/${DOWNLOAD_REPO}/releases?per_page=100`, {
+    headers: { accept: 'application/vnd.github+json', 'user-agent': `${APP_NAME}-server`, ...(process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
+    signal: AbortSignal.timeout(10000),
+  })
+  if (!res.ok) throw new Error(`GitHub answered ${res.status}`)
+  const releases = (await res.json())
+    .filter((r) => !r.draft)
+    .map((r) => {
+      const row = { version: String(r.tag_name || '').replace(/^v/, ''), date: r.published_at, windows: 0, mac: 0, linux: 0 }
+      for (const a of r.assets || []) {
+        const p = platformOf(a.name)
+        if (p) row[p] += a.download_count || 0
+      }
+      row.total = row.windows + row.mac + row.linux
+      return row
+    })
+  const totals = { windows: 0, mac: 0, linux: 0, total: 0 }
+  for (const r of releases) for (const k of Object.keys(totals)) totals[k] += r[k]
+  const value = { releases, totals, repo: DOWNLOAD_REPO }
+  statsCache = { at: Date.now(), value }
+  return value
+}
+
+/** Downloads, for the admin console: this site's links (a count a day for 30 days, by platform) and GitHub's */
+export async function downloadStats() {
+  const t = now()
+  const since = (days) => one('SELECT COUNT(*) AS n FROM download_events WHERE at >= ?', t - days * DAY).n
+  const byPlatform = Object.fromEntries(all('SELECT platform, COUNT(*) AS n FROM download_events GROUP BY platform').map((r) => [r.platform, r.n]))
+  const start = new Date(t - 29 * DAY)
+  start.setHours(0, 0, 0, 0)
+  const counts = new Map()
+  for (const r of all('SELECT at FROM download_events WHERE at >= ?', start.getTime())) {
+    const d = new Date(r.at)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+  const days = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(start.getTime() + i * DAY + 12 * 60 * 60 * 1000)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return { day: key, n: counts.get(key) || 0 }
+  })
+  const site = { total: one('SELECT COUNT(*) AS n FROM download_events').n, last7: since(7), last30: since(30), byPlatform, days, since: one('SELECT MIN(at) AS t FROM download_events').t }
+  let github = null
+  let githubError = null
+  try {
+    github = await githubDownloads()
+  } catch (e) {
+    githubError = e.message
+  }
+  return { configured: !!DOWNLOAD_REPO, site, github, githubError }
+}
 
 downloadRouter.get('/', handle)
 downloadRouter.get('/:platform', handle)

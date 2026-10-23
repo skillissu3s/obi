@@ -1909,3 +1909,18 @@
   height: 13px;
   flex: none;
 }
+
+/* the admin console's downloads: four numbers in a row, and right-aligned counts in its tables */
+.dl-stats {
+  padding: 0 18px 4px;
+}
+.table th.num,
+.table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.stat.stat-small .stat-value {
+  font-size: 16px;
+  line-height: 1.4;
+  padding-top: 6px;
+}

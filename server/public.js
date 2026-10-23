@@ -1,5 +1,6 @@
 import express from 'express'
-import { one, all } from './db.js'
+import { one, all, run } from './db.js'
+import { isBot } from './download.js'
 import { getRuntime } from './runtime.js'
 import { createMarkdown, escapeHtml } from '../shared/markdown.js'
 import { absPath, mimeFor, safePath, INLINE_SAFE } from './fsutil.js'
@@ -174,6 +175,12 @@ publicRouter.get('/:slug', async (req, res) => {
   if (!data) return res.status(404).send(page('Not found', '<h1>Not found</h1><p>This page is not published.</p>', ''))
   const title = noteTitle(data.row.path)
   const board = isBoardPath(data.row.path)
+  // a view, for the admin console (the page's own refreshes, and link previews, aren't)
+  if (!isBot(req)) {
+    try {
+      run('UPDATE published SET views = views + 1, last_viewed_at = ? WHERE slug = ?', Date.now(), data.row.slug)
+    } catch {}
+  }
   res.setHeader('Cache-Control', 'no-cache')
   res.send(
     page(title, board ? boardPageHtml(data) : bodyHtml(title, renderFor(data).html), data.row.slug, {

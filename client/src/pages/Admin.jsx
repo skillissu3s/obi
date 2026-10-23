@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Laptop, Users, FolderGit2, Globe, Activity, UserPlus, HardDrive, Link2, MoreHorizontal, ShieldCheck, Trash2, KeyRound, Ban, CheckCircle2, ArrowLeft, RefreshCw, Copy, Cloud, Cpu, Radio } from 'lucide-react'
+import { Laptop, Users, FolderGit2, Globe, Activity, UserPlus, HardDrive, Link2, MoreHorizontal, ShieldCheck, Trash2, KeyRound, Ban, CheckCircle2, ArrowLeft, RefreshCw, Copy, Cloud, Cpu, Radio, Download, Eye } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { useApp } from '../store/app.js'
 import { navigate } from '../lib/router.js'
@@ -16,9 +16,15 @@ export default function AdminPage() {
   const [invite, setInvite] = useState(null)
   const [loading, setLoading] = useState(false)
   const [busyRow, setBusyRow] = useState(null)
+  const [downloads, setDownloads] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    // (the downloads ask GitHub, which can be slow: they come in on their own)
+    api
+      .adminDownloads()
+      .then(setDownloads)
+      .catch(() => setDownloads({ error: true }))
     try {
       setData(await api.adminOverview())
     } catch (e) {
@@ -162,7 +168,7 @@ export default function AdminPage() {
               <Stat icon={Radio} label="Online now" value={s.online} sub={`${s.active7} active this week`} />
               <Stat icon={Cloud} label="Workspaces" value={s.workspaces} />
               <Stat icon={FolderGit2} label="GitHub synced" value={s.github} />
-              <Stat icon={Globe} label="Published notes" value={s.publishedNotes} />
+              <Stat icon={Globe} label="Published notes" value={s.publishedNotes} sub={s.publishedViews ? `${s.publishedViews} views in all` : undefined} />
               <Stat icon={Laptop} label="Desktop apps" value={s.devices} sub={s.pendingSignups ? `${s.pendingSignups} sign-up(s) unconfirmed` : undefined} />
               <Stat icon={Cpu} label="Memory" value={formatBytes(s.memory)} />
               <Stat
@@ -173,6 +179,9 @@ export default function AdminPage() {
                 tone={data.storage.persistent ? null : 'danger'}
               />
             </div>
+
+            <DownloadsCard data={downloads} />
+            {data.published?.length > 0 && <PublishedCard notes={data.published} />}
 
             <div className="card">
               <div className="card-head">
@@ -394,6 +403,139 @@ export default function AdminPage() {
           </div>
         </Modal>
       )}
+    </div>
+  )
+}
+
+const fmt = (n) => (n == null ? '—' : n.toLocaleString())
+const PLATFORM_NAMES = { windows: 'Windows', mac: 'macOS', linux: 'Linux', appimage: 'Linux (AppImage)', deb: 'Linux (.deb)' }
+
+/**
+ * Downloads of the desktop app: GitHub's own count of every installer (all of them,
+ * the app's updates included), and the clicks on this site's download links (counted
+ * here: when and which build, nothing about who).
+ */
+function DownloadsCard({ data }) {
+  const gh = data?.github
+  const site = data?.site
+  const latest = gh?.releases?.[0]
+  const peak = Math.max(1, ...(site?.days || []).map((d) => d.n))
+  return (
+    <div className="card">
+      <div className="card-head">
+        <Download size={16} />
+        <h3>Downloads</h3>
+        {gh && <span className="badge">{fmt(gh.totals.total)}</span>}
+      </div>
+      {!data ? (
+        <div className="row" style={{ justifyContent: 'center', padding: 24 }}>
+          <Spinner />
+        </div>
+      ) : data.error || data.configured === false ? (
+        <p className="muted" style={{ padding: '0 18px 16px' }}>
+          {data.error ? 'The download numbers couldn’t be fetched.' : 'No releases are published from this server (DOWNLOAD_REPO isn’t set).'}
+        </p>
+      ) : (
+        <>
+          <div className="stats dl-stats">
+            <Stat icon={Download} label="All downloads" value={fmt(gh?.totals.total)} sub={gh ? `from GitHub, every release · updates included` : data.githubError || 'GitHub didn’t answer'} />
+            <Stat icon={CheckCircle2} label={latest ? `This version (${latest.version})` : 'This version'} value={fmt(latest?.total)} sub={latest ? `released ${timeAgo(new Date(latest.date).getTime())}` : undefined} />
+            <Stat icon={Globe} label="From this site · 30 days" value={fmt(site?.last30)} sub={`${fmt(site?.last7)} this week · ${fmt(site?.total)} since ${site?.since ? new Date(site.since).toLocaleDateString() : 'counting began'}`} />
+            {gh && (
+              <Stat
+                icon={Laptop}
+                label="By platform"
+                tone="small"
+                value={['windows', 'mac', 'linux'].filter((k) => gh.totals[k]).map((k) => `${PLATFORM_NAMES[k]} ${fmt(gh.totals[k])}`).join(' · ') || '—'}
+              />
+            )}
+          </div>
+          {site?.days?.some((d) => d.n) && (
+            <div className="trend">
+              <div className="trend-head">
+                <span>Downloads from this site, last 30 days</span>
+                <span className="faint">{Object.entries(site.byPlatform).map(([k, n]) => `${PLATFORM_NAMES[k] || k} ${n}`).join(' · ')}</span>
+              </div>
+              <div className="trend-bars">
+                {site.days.map((d) => (
+                  <div className="trend-day" key={d.day} title={`${d.day}: ${d.n} download${d.n === 1 ? '' : 's'}`}>
+                    <div className="trend-bar signups" style={{ height: `${(d.n / peak) * 100}%` }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {gh?.releases?.length > 0 && (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Release</th>
+                    <th>Published</th>
+                    <th className="num">Windows</th>
+                    <th className="num">macOS</th>
+                    <th className="num">Linux</th>
+                    <th className="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gh.releases.slice(0, 12).map((r) => (
+                    <tr key={r.version}>
+                      <td className="mono">v{r.version}</td>
+                      <td className="muted">{r.date ? new Date(r.date).toLocaleDateString() : ''}</td>
+                      <td className="num">{fmt(r.windows)}</td>
+                      <td className="num">{fmt(r.mac)}</td>
+                      <td className="num">{fmt(r.linux)}</td>
+                      <td className="num">
+                        <b>{fmt(r.total)}</b>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Published notes, most read first: how often each page has been opened */
+function PublishedCard({ notes }) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <Eye size={16} />
+        <h3>Published notes</h3>
+        <span className="badge">{notes.length}</span>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Note</th>
+              <th>Workspace</th>
+              <th className="num">Views</th>
+              <th>Last opened</th>
+            </tr>
+          </thead>
+          <tbody>
+            {notes.map((n) => (
+              <tr key={n.slug}>
+                <td>
+                  <a href={`/p/${n.slug}`} target="_blank" rel="noreferrer">
+                    {n.path.replace(/\.md$/i, '')}
+                  </a>
+                </td>
+                <td className="muted">{n.workspace || '—'}</td>
+                <td className="num">{fmt(n.views)}</td>
+                <td className="muted">{n.lastViewedAt ? timeAgo(n.lastViewedAt) : 'not yet'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

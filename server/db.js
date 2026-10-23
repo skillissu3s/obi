@@ -193,6 +193,21 @@ CREATE TABLE IF NOT EXISTS sync_base (
 // a registration that came from an invite link spends it once confirmed
 addColumn('pending_signups', 'invite_hash', 'TEXT')
 
+// Statistics for the admin console. A download of the desktop app through this
+// site's links (when, which build — nothing about who), and how often each
+// published note is opened.
+db.exec(`
+CREATE TABLE IF NOT EXISTS download_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  platform TEXT NOT NULL,
+  version TEXT
+);
+CREATE INDEX IF NOT EXISTS download_events_at ON download_events(at);
+`)
+addColumn('published', 'views', 'INTEGER NOT NULL DEFAULT 0')
+addColumn('published', 'last_viewed_at', 'INTEGER')
+
 export const now = () => Date.now()
 
 export function one(sql, ...params) {

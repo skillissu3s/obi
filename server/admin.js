@@ -12,6 +12,7 @@ import { repoLabel } from './git.js'
 import { storageReport } from './storage.js'
 import { EMAIL_RE } from './otp.js'
 import { DATA_DIR } from './config.js'
+import { downloadStats } from './download.js'
 
 export const adminRouter = express.Router()
 adminRouter.use(requireAdmin)
@@ -59,10 +60,15 @@ adminRouter.get('/overview', (req, res) => {
   const invites = all(
     `SELECT i.*, u.username AS used_by_username FROM invites i LEFT JOIN users u ON u.id = i.used_by ORDER BY i.created_at DESC LIMIT 50`,
   ).map((i) => ({ id: i.token_hash.slice(0, 16), note: i.note, createdAt: i.created_at, expiresAt: i.expires_at, usedBy: i.used_by_username, usedAt: i.used_at }))
+  // published notes, most read first
+  const published = all(
+    `SELECT p.slug, p.path, p.views, p.last_viewed_at, p.created_at, w.name AS ws_name FROM published p LEFT JOIN workspaces w ON w.id = p.workspace_id ORDER BY p.views DESC, p.created_at DESC LIMIT 50`,
+  ).map((p) => ({ slug: p.slug, path: p.path, workspace: p.ws_name, views: p.views || 0, lastViewedAt: p.last_viewed_at, createdAt: p.created_at }))
   res.json({
     users,
     workspaces,
     invites,
+    published,
     stats: {
       users: users.length,
       online: online.size,
@@ -70,6 +76,7 @@ adminRouter.get('/overview', (req, res) => {
       github: workspaces.filter((w) => w.type === 'github').length,
       sessions: one('SELECT COUNT(*) AS n FROM sessions WHERE expires_at > ?', now()).n,
       publishedNotes: one('SELECT COUNT(*) AS n FROM published').n,
+      publishedViews: one('SELECT COALESCE(SUM(views), 0) AS n FROM published').n,
       // who is actually using it, not just who signed up once
       newUsers7: since('users', 'created_at', 7),
       newUsers30: since('users', 'created_at', 30),
@@ -140,6 +147,11 @@ function workspaceBytes(id) {
 }
 
 // lightweight check the app shell uses to warn admins about non-persistent storage
+// downloads of the desktop app: through this site's links, and GitHub's own count
+adminRouter.get('/downloads', async (req, res) => {
+  res.json(await downloadStats())
+})
+
 adminRouter.get('/storage', (req, res) => {
   res.json({ storage: storageReport(DATA_DIR) })
 })
