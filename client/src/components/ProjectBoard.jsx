@@ -24,6 +24,7 @@ import { Automation, ruleCount } from './Automation.jsx'
 import { useBoardDrag } from './boardDrag.js'
 import { colorHex } from '../lib/colors.js'
 import { LinkSuggest } from './LinkSuggest.jsx'
+import { useSettle } from '../lib/celebrate.js'
 
 export const LIST_COLORS = K.PROJECT_COLORS
 
@@ -116,9 +117,12 @@ const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, cover
   const ticked = checklist.filter((t) => !isOpen(t.status)).length
   const done = !isOpen(status)
   const tone = dueTone(task?.due, status, today)
+  // done: a celebration around the tick and a moment to see it struck through, then it is (and moves)
+  const [settling, settle] = useSettle(onToggle)
+  const toggle = (from) => (done ? onToggle() : settle(from))
   return (
     <article
-      className={`pb-card ${done ? 'done' : ''} ${status === '/' ? 'doing' : ''} ${hidden ? 'is-dragging' : ''}`}
+      className={`pb-card ${done ? 'done' : ''} ${status === '/' ? 'doing' : ''} ${settling ? 'settling' : ''} ${hidden ? 'is-dragging' : ''}`}
       data-card={card.id}
       tabIndex={0}
       aria-label={`${title}${task?.due ? `, due ${dueLabel(task.due)}` : ''}${done ? ', done' : ''}`}
@@ -139,7 +143,7 @@ const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, cover
           onOpen()
         } else if (e.key === ' ' && !readOnly) {
           e.preventDefault()
-          onToggle()
+          toggle(e.currentTarget.querySelector('.pb-check'))
         }
       }}
       onContextMenu={onMenu}
@@ -167,11 +171,13 @@ const Card = memo(function Card({ card, today, ws, path, readOnly, hidden, cover
           disabled={readOnly}
           aria-label={done ? 'Mark not done' : 'Mark done'}
           title={done ? 'Mark not done' : status === '/' ? 'In progress — mark done' : 'Mark done'}
-          onClick={onToggle}
+          onClick={(e) => toggle(e.currentTarget)}
         >
-          <StatusIcon status={status} />
+          <StatusIcon status={settling ? 'x' : status} />
         </button>
-        <span className="pb-words" dangerouslySetInnerHTML={{ __html: wordsHtml(title || 'Untitled card', ws, path) }} />
+        <span className="pb-words">
+          <span className="pb-strike" dangerouslySetInnerHTML={{ __html: wordsHtml(title || 'Untitled card', ws, path) }} />
+        </span>
       </div>
       {(task?.due || task?.priority || description || checklist.length > 0 || task?.recurrence) && (
         <div className="pb-badges">

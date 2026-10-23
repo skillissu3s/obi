@@ -6,6 +6,7 @@ import { IMAGE_EXT, AUDIO_EXT, VIDEO_EXT, extname, basename, stripExt } from '@s
 import { splitFrontmatter } from '@shared/parse.js'
 import { nextBlock, toggleTaskLine, todayIso } from '@shared/tasks.js'
 import { computeChanges } from '@shared/textdiff.js'
+import { celebrate } from '../lib/celebrate.js'
 
 export const editorCtx = Facet.define({ combine: (v) => v[0] || {} })
 export const refreshEffect = StateEffect.define()
@@ -101,6 +102,7 @@ class CheckboxWidget extends WidgetType {
       e.preventDefault()
       e.stopPropagation()
       if (view.state.readOnly) return
+      if (!this.checked) celebrate(input)
       const pos = view.posAtDOM(wrap)
       toggleTaskAt(view, pos)
     })

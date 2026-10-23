@@ -13,6 +13,7 @@ import { DateField, REPEATS } from './TaskDialog.jsx'
 import { Colors, Label, PopHead, StatusIcon, dueTone } from './CardParts.jsx'
 import { colorHex, colorLabel } from '../lib/colors.js'
 import { LinkSuggest } from './LinkSuggest.jsx'
+import { celebrate } from '../lib/celebrate.js'
 
 const STATUSES = [
   [' ', 'To do'],
@@ -329,7 +330,7 @@ function Checklist({ items, readOnly, today, change }) {
           const done = !isOpen(t.status)
           return (
             <li key={`${t.at}:${t.text}`} className={`cd-item ${done ? 'done' : ''}`} style={t.depth ? { paddingLeft: t.depth * 22 } : undefined}>
-              <input type="checkbox" className="task-cb" checked={done} disabled={readOnly} aria-label={done ? 'Mark not done' : 'Mark done'} onChange={() => change((b, c) => K.editChecklistItem(c, t.at, { status: done ? ' ' : 'x' }, { today }))} />
+              <input type="checkbox" className="task-cb" checked={done} disabled={readOnly} aria-label={done ? 'Mark not done' : 'Mark done'} onChange={(e) => (!done && celebrate(e.currentTarget), change((b, c) => K.editChecklistItem(c, t.at, { status: done ? ' ' : 'x' }, { today })))} />
               <input
                 className="cd-item-text"
                 aria-label="Checklist item"
@@ -430,7 +431,7 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
     <Modal title={null} label="Card" onClose={onClose} className={`card-dialog ${cover ? 'has-cover' : ''}`} style={cover ? { '--cover': colorHex(cover) } : undefined} bodyClass="cd-shell">
       <div className="cd">
         <header className="cd-head">
-          <button type="button" className={`pb-check cd-check ${isOpen(status) ? '' : 'on'}`} disabled={readOnly} aria-label={isOpen(status) ? 'Mark done' : 'Mark not done'} onClick={() => change((b, c) => K.setCardStatus(b, c, isOpen(status) ? 'x' : ' ', opts))}>
+          <button type="button" className={`pb-check cd-check ${isOpen(status) ? '' : 'on'}`} disabled={readOnly} aria-label={isOpen(status) ? 'Mark done' : 'Mark not done'} onClick={(e) => (isOpen(status) && celebrate(e.currentTarget), change((b, c) => K.setCardStatus(b, c, isOpen(status) ? 'x' : ' ', opts)))}>
             <StatusIcon status={status} />
           </button>
           <div className="cd-head-main">

@@ -6,13 +6,13 @@
     <title>Obi — scribble outside the lines</title>
     <meta
       name="description"
-      content="Plain markdown files in your own folders, with a canvas around every page for sticky notes, arrows and sketches pinned to the text. Self-hosted, real-time, and a desktop app that works offline."
+      content="Plain markdown files in your own folders or a GitHub repo, with a canvas around every page, boards and a calendar for your plans, real-time sharing, and a desktop app that works offline. Self-hosted."
     />
     <meta name="theme-color" content="#121211" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta property="og:title" content="Obi — scribble outside the lines" />
-    <meta property="og:description" content="Plain .md files with a canvas around every page. Self-hosted, real-time, offline on the desktop." />
+    <meta property="og:description" content="Plain .md files with a canvas around every page, and boards and a calendar made of markdown. Self-hosted, real-time, offline on the desktop." />
     <meta property="og:type" content="website" />
     <link rel="stylesheet" href="./landing.css" />
   </head>
@@ -22,6 +22,7 @@
         <a class="brand" href="/welcome"><img src="/favicon.svg" alt="" /> obi</a>
         <nav class="nav">
           <a href="#canvas">canvas</a>
+          <a href="#plan">plan</a>
           <a href="#writing">writing</a>
           <a href="#sharing">sharing</a>
           <a href="#desktop">desktop</a>
@@ -40,8 +41,8 @@
           <p class="kicker"><span class="dot"></span>self-hosted · works offline · plain files</p>
           <h1>Scribble outside the lines.<span class="caret" aria-hidden="true"></span></h1>
           <p class="sub">
-            Your notes are plain <code>.md</code> files. Everything you draw lives beside them — sticky notes, arrows,
-            sketches — and moves when the text does.
+            Your notes are plain <code>.md</code> files. Everything you draw lives beside them and moves when the text
+            does — and your plans are markdown too: boards, tasks and a calendar, in the same folder.
           </p>
           <div class="cta">
             <a class="btn btn-solid" href="/register">create an account <span class="arr">→</span></a>
@@ -88,35 +89,63 @@
         </div>
       </section>
 
+      <section id="plan">
+        <div class="wrap">
+          <p class="label"><span>02</span> plan</p>
+          <h2>Plans that are still just markdown</h2>
+          <p class="lede">
+            A board is a note: headings are lists, task lines are cards. Drag a card and the file changes — open it anywhere
+            else and it's a tidy checklist.
+          </p>
+          <div class="cells">
+            <div class="cell">
+              <h3>Boards, the Trello way</h3>
+              <p>Coloured labels, covers, due dates, checklists and priorities. Rules move a card when it's done or due, and a tick gets a little celebration.</p>
+            </div>
+            <div class="cell">
+              <h3>Every task in one place</h3>
+              <p>All tasks from every note and board, a calendar to drag them onto a day, a plan for what's next, and repeats that come back on their own.</p>
+            </div>
+            <div class="cell">
+              <h3>Linked to your notes</h3>
+              <p>Type <code>[[</code> in a card or a task to link a note or a board; links in notes reach boards just the same.</p>
+            </div>
+          </div>
+          <figure class="shot crop-soft">
+            <img src="./shot-board.jpg" width="1600" height="853" alt="A project board in Obi with To do, Doing and Review lists: cards with coloured labels, covers, due dates, a checklist count and priority flags, over a purple and orange background" loading="lazy" />
+          </figure>
+          <figure class="shot crop-soft gap">
+            <img src="./shot-calendar.jpg" width="1600" height="853" alt="The calendar in Obi: a month of tasks from every board, with today's tasks listed beside it" loading="lazy" />
+          </figure>
+          <p class="caption">One file per board, in your Projects folder. The calendar and All tasks read every note and board in the workspace.</p>
+        </div>
+      </section>
+
       <section id="writing">
         <div class="wrap">
-          <p class="label"><span>02</span> writing</p>
+          <p class="label"><span>03</span> writing</p>
           <h2>Rendered as you type</h2>
           <p class="lede">No preview pane to keep in sync, and nothing proprietary to export your way out of later.</p>
           <div class="cells">
             <div class="cell">
               <h3>Plain files</h3>
-              <p>One note, one <code>.md</code> file. Open the same folder in any other editor; nothing is locked in.</p>
+              <p>One note, one <code>.md</code> file. Tables, code and maths take shape while you write; the markdown is there the moment you need it.</p>
             </div>
             <div class="cell">
-              <h3>Tables, code, maths</h3>
-              <p>They take shape while you write, with the markdown still there the moment you need it.</p>
+              <h3>Pick up where you left off</h3>
+              <p>Mark your place in a long note and it's waiting next time, on any device. Find in a note walks you through every match.</p>
             </div>
             <div class="cell">
-              <h3>Links, tags, tasks</h3>
-              <p>Wiki links and backlinks, daily notes, every task in one place, and a graph of how it all connects.</p>
+              <h3>Links, tags, graph</h3>
+              <p>Wiki links and backlinks, daily notes, tags, and a graph of how it all connects. Make it yours with a background of your own.</p>
             </div>
           </div>
-          <figure class="shot crop-soft">
-            <img src="./shot-board.png" width="1500" height="620" alt="A markdown file shown as a kanban board with four lists of cards" loading="lazy" />
-          </figure>
-          <p class="caption">A markdown file seen as a board — headings are lists, task lines are cards. Drag one and the file changes.</p>
         </div>
       </section>
 
       <section id="sharing">
         <div class="wrap">
-          <p class="label"><span>03</span> sharing</p>
+          <p class="label"><span>04</span> sharing</p>
           <h2>Alone, or with other people</h2>
           <p class="lede">The same notes, shared as far as you want them to go.</p>
           <div class="cells">
@@ -126,7 +155,7 @@
             </div>
             <div class="cell">
               <h3>Publish a link</h3>
-              <p>A read-only page that looks exactly like your note, drawings included, and updates when you edit.</p>
+              <p>A read-only page that looks exactly like your note, drawings included, and updates when you edit — even from a GitHub workspace.</p>
             </div>
             <div class="cell">
               <h3>History and trash</h3>
@@ -139,13 +168,13 @@
       <section id="desktop">
         <div class="wrap split">
           <div>
-            <p class="label"><span>04</span> desktop</p>
+            <p class="label"><span>05</span> desktop</p>
             <h2>Works with no connection</h2>
             <p class="lede">Every workspace is a folder you choose — a new one, or one that already holds notes. An Obsidian vault works as it is.</p>
             <ul class="list">
               <li>Write offline; it catches up when you're back</li>
               <li>Edits on both sides merge; collisions keep both copies</li>
-              <li>Optional GitHub sync — on save, on a timer, or by hand</li>
+              <li>Optional GitHub sync — on save, on a timer, or by hand, signed with your own git name and email</li>
             </ul>
             <div class="dls">
               <a class="dl" href="/download/windows" data-os="windows">
@@ -183,9 +212,9 @@
       <section id="host">
         <div class="wrap split">
           <div>
-            <p class="label"><span>05</span> self-host</p>
+            <p class="label"><span>06</span> self-host</p>
             <h2>One container, one folder</h2>
-            <p class="lede">Your notes sit on your own disk as markdown. The database only remembers who you are and what you shared.</p>
+            <p class="lede">Your notes sit on your own disk as markdown — or in a private GitHub repo, which Obi keeps in step and commits to as you. The database only remembers who you are and what you shared.</p>
           </div>
           <pre><code>services:
   obi:

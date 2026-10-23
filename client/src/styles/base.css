@@ -1454,3 +1454,120 @@ kbd {
   height: 16px;
   color: var(--accent);
 }
+
+/* ---------- a task done (lib/celebrate.js) ---------- */
+/* a ring and a burst of dots around the tick, over the page (nothing moves) */
+.celebrate {
+  position: fixed;
+  z-index: 1000;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.celebrate-ring {
+  position: absolute;
+  left: -13px;
+  top: -13px;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--success);
+  border-radius: 50%;
+  animation: celebrate-ring 560ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes celebrate-ring {
+  from {
+    transform: scale(0.45);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+.celebrate-dot {
+  position: absolute;
+  left: -2.5px;
+  top: -2.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  animation: celebrate-dot 680ms cubic-bezier(0.15, 0.75, 0.3, 1) forwards;
+}
+.celebrate-dot.long {
+  left: -4px;
+  top: -1.25px;
+  width: 8px;
+  height: 2.5px;
+  border-radius: 2px;
+}
+@keyframes celebrate-dot {
+  0% {
+    transform: translate(0, 0) rotate(var(--rot)) scale(0.5);
+    opacity: 1;
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.35);
+    opacity: 0;
+  }
+}
+@keyframes settle-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* A board's card settling into done: the tick fills, the words are struck through
+   from the left, line by line, and the card fades a little — before it moves. */
+.pb-strike {
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 58% / 0% 1.5px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-size 380ms var(--ease) 60ms;
+}
+.pb-card.settling .pb-strike {
+  background-size: 100% 1.5px;
+}
+.pb-card.settling .pb-words {
+  color: var(--text-3);
+  transition: color 360ms var(--ease) 120ms;
+}
+.pb-card.settling {
+  opacity: 0.82;
+  transition: opacity 420ms var(--ease) 220ms, box-shadow var(--t-fast);
+}
+.pb-card.settling .pb-check {
+  opacity: 1;
+  color: var(--success);
+  transform: none;
+  animation: settle-pop 340ms var(--ease-spring);
+}
+/* a task's row, card or chip settling into done: the strike fades in, the words grey */
+.pl-row .task-text,
+.pl-card .pl-card-title,
+.pl-chip .pl-chip-text,
+.cd-item .cd-item-text {
+  text-decoration-line: line-through;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 320ms var(--ease) 60ms, color 320ms var(--ease) 60ms;
+}
+:is(.pl-row, .pl-card, .pl-chip, .cd-item).settling :is(.task-text, .pl-card-title, .pl-chip-text, .cd-item-text) {
+  text-decoration-color: currentColor;
+  color: var(--text-3);
+}
+:is(.pl-row, .pl-card, .pl-chip, .cd-item).settling .task-cb {
+  animation: settle-pop 340ms var(--ease-spring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pb-card.settling .pb-check,
+  :is(.pl-row, .pl-card, .pl-chip, .cd-item).settling .task-cb {
+    animation: none;
+  }
+}

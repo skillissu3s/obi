@@ -198,14 +198,22 @@
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+/* A list taller than the board scrolls its cards; a card keeps its own height (as a
+   flex item it would otherwise be squeezed to fit, its words cut off). */
 .pb-cards {
   position: relative; /* (boardDrag measures cards from it) */
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 2px 8px 4px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   min-height: 6px;
+  scrollbar-width: thin;
+}
+.pb-cards > * {
+  flex-shrink: 0;
 }
 .pb-hidden {
   padding: 4px 4px 2px;

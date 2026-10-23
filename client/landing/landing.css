@@ -239,6 +239,10 @@ h1 {
 .shot.crop-soft img {
   aspect-ratio: 1500 / 560;
 }
+/* a second picture under the first */
+.shot.gap {
+  margin-top: 16px;
+}
 
 /* ---------- sections ---------- */
 section {

@@ -15,6 +15,7 @@ import { useLayout } from '../store/layout.js'
 import { useUI } from '../store/ui.js'
 import * as A from '../lib/actions.js'
 import { LinkSuggest } from './LinkSuggest.jsx'
+import { useSettle } from '../lib/celebrate.js'
 
 /** done ↔ open */
 export const toggleTask = (task) => A.updateTask(task, { status: isOpen(task.status) ? 'x' : ' ' })
@@ -94,19 +95,25 @@ export function ParsedChips({ found, onKeep }) {
 // The checkbox. In progress shows as a dash; cancelled as ticked and struck out.
 export function TaskBox({ task, disabled }) {
   const ref = useRef(null)
+  // done: a celebration around the box and a moment to see it struck through, then it is
+  const [settling, settle] = useSettle(() => toggleTask(task))
   useEffect(() => {
-    if (ref.current) ref.current.indeterminate = task.status === '/'
-  }, [task.status])
+    if (ref.current) ref.current.indeterminate = task.status === '/' && !settling
+  }, [task.status, settling])
+  // (its row, card or chip is drawn done meanwhile)
+  useEffect(() => {
+    ref.current?.closest('.pl-row, .pl-card, .pl-chip, .cd-item')?.classList.toggle('settling', settling)
+  }, [settling])
   return (
     <input
       ref={ref}
       type="checkbox"
       className="task-cb"
-      checked={!isOpen(task.status)}
+      checked={settling || !isOpen(task.status)}
       disabled={disabled}
       aria-label={isOpen(task.status) ? 'Mark done' : 'Reopen'}
       title={task.status === '/' ? 'In progress — click to finish' : task.status === '-' ? 'Cancelled — click to reopen' : undefined}
-      onChange={() => toggleTask(task)}
+      onChange={() => (isOpen(task.status) ? settle(ref.current) : toggleTask(task))}
     />
   )
 }
