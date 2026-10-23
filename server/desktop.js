@@ -369,6 +369,71 @@ desktopRouter.post('/vaults/:id/cloud/sync', async (req, res) => {
   res.json({ status: await e.syncNow() })
 })
 
+// ---- a synced vault's note, shared and published ----
+// That happens on the server the vault syncs with — so a published page, and a note
+// shared with someone, keep working when this computer is off. The note has the same
+// path there. These ask the server for us, as the account the vault syncs through.
+function syncedVault(req) {
+  const w = ownVault(req)
+  const c = parseJSON(w.settings).cloud
+  if (!c) throw new HttpError(400, 'This vault isn’t synced with an Obi account')
+  const a = accountRow(c.account)
+  if (!a) throw new HttpError(401, 'Sign in to that account again — Settings → Accounts')
+  const remote = (rest) => `/api/workspaces/${encodeURIComponent(c.remoteId)}${rest}`
+  return { w, c, a, remote }
+}
+const sharedPath = (v) => String(v || '').replace(/^\/+/, '')
+
+// A note just written (or written offline) may not be on the server yet: sync, then ask once more
+async function onceSynced(w, ask) {
+  try {
+    return await ask()
+  } catch (e) {
+    if (e.status !== 404) throw e
+    const engine = engineFor(w.id) || (await startCloudSync(w.id))
+    await engine?.syncNow().catch(() => {})
+    try {
+      return await ask()
+    } catch (e2) {
+      if (e2.status === 404) throw new HttpError(409, 'This note hasn’t reached the server yet. It will with the next sync — try again in a moment.')
+      throw e2
+    }
+  }
+}
+
+desktopRouter.get('/vaults/:id/cloud/share', async (req, res) => {
+  const { c, a, remote } = syncedVault(req)
+  const p = sharedPath(req.query.path)
+  const [shares, people] = await Promise.all([
+    cloudCall(c.account, remote(`/shares?path=${encodeURIComponent(p)}`)),
+    cloudCall(c.account, '/api/users').catch(() => ({ users: [] })),
+  ])
+  res.json({ ...shares, users: people?.users || [], server: a.url, remoteId: c.remoteId, remoteName: c.remoteName })
+})
+
+desktopRouter.post('/vaults/:id/cloud/publish', async (req, res) => {
+  const { w, c, remote } = syncedVault(req)
+  const p = sharedPath(req.body?.path)
+  res.json(await onceSynced(w, () => cloudCall(c.account, remote('/publish'), { method: 'POST', json: { path: p, theme: req.body?.theme } })))
+})
+
+desktopRouter.delete('/vaults/:id/cloud/publish', async (req, res) => {
+  const { c, remote } = syncedVault(req)
+  res.json(await cloudCall(c.account, remote(`/publish?path=${encodeURIComponent(sharedPath(req.query.path))}`), { method: 'DELETE' }))
+})
+
+desktopRouter.post('/vaults/:id/cloud/shares', async (req, res) => {
+  const { w, c, remote } = syncedVault(req)
+  const body = { path: sharedPath(req.body?.path), username: req.body?.username, role: req.body?.role }
+  res.json(await onceSynced(w, () => cloudCall(c.account, remote('/shares'), { method: 'POST', json: body })))
+})
+
+desktopRouter.delete('/vaults/:id/cloud/shares', async (req, res) => {
+  const { c, remote } = syncedVault(req)
+  const q = `?path=${encodeURIComponent(sharedPath(req.query.path))}&userId=${encodeURIComponent(String(req.query.userId || ''))}`
+  res.json(await cloudCall(c.account, remote(`/shares${q}`), { method: 'DELETE' }))
+})
+
 // the network is back (the page saw it first)
 desktopRouter.post('/online', (req, res) => {
   nudgeAll()

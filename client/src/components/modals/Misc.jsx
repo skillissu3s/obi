@@ -4,7 +4,7 @@ import {
   RotateCcw, FileText, Folder, Search, Upload, Info, Share2, Eye, Pencil,
 } from 'lucide-react'
 import { Modal, Spinner, Avatar, Switch, EmojiPicker } from '../ui.jsx'
-import { isDesktop, useDesktop } from '../../lib/desktop.js'
+import { isDesktop, dapi } from '../../lib/desktop.js'
 import { api } from '../../lib/api.js'
 import { themeSnapshot } from '../../lib/themesnapshot.js'
 import { useApp } from '../../store/app.js'
@@ -181,80 +181,85 @@ export function NewWorkspaceModal() {
 
 // ---------------- Share & publish ----------------
 
-function DesktopShare({ ws, path, onClose }) {
-  const info = useDesktop((s) => s.info)
-  useEffect(() => {
-    useDesktop.getState().refresh()
-  }, [])
-  const account = ws.cloud && info?.accounts?.find((a) => a.id === ws.cloud.account)
-  const host = account?.url.replace(/^https?:\/\//, '')
-  const url = account && `${account.url}/w/${ws.cloud.remoteId}/${path.split('/').map(encodeURIComponent).join('/')}`
+// A desktop vault that isn't synced with an Obi account: there is nowhere for a
+// published page, or a shared note, to live while this computer is off
+function DesktopShare({ path, onClose }) {
   return (
     <Modal title={`Share “${stripExt(basename(path))}”`} center onClose={onClose} icon={<Share2 size={18} />}>
-      {ws.cloud ? (
-        <>
-          <div className="hint">
-            This vault syncs with <b>{ws.cloud.remoteName}</b>{host ? ` on ${host}` : ''}. Sharing with people and publishing a read-only link happen there, so the link keeps working when this computer is off.
-          </div>
-          <div className="setting-actions">
-            <button
-              className="btn btn-primary"
-              disabled={!url}
-              onClick={() => {
-                window.open(url, '_blank', 'noopener')
-                onClose()
-              }}
-            >
-              <ExternalLink /> Open this note on {host || 'your server'}
-            </button>
-          </div>
-          {!account && <div className="hint">Sign in to that account again first — Settings → Accounts.</div>}
-        </>
-      ) : (
-        <>
-          <div className="hint">
-            This vault lives only on this computer, so there is nothing for other people to open. Sync it with your Obi account and you can share notes and publish links from there.
-          </div>
-          <div className="setting-actions">
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                onClose()
-                useUI.getState().openModal('settings', { section: 'sync' })
-              }}
-            >
-              <Cloud /> Set up syncing
-            </button>
-          </div>
-        </>
-      )}
+      <div className="hint">
+        This vault lives only on this computer, so there is nothing for other people to open. Sync it with your Obi account and you can share notes and publish links right here.
+      </div>
+      <div className="setting-actions">
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            onClose()
+            useUI.getState().openModal('settings', { section: 'sync' })
+          }}
+        >
+          <Cloud /> Set up syncing
+        </button>
+      </div>
     </Modal>
   )
 }
+
+// a synced vault's note, opened on the server it syncs with
+const serverNoteUrl = (data, path) => `${data.server}/w/${data.remoteId}/${path.split('/').map(encodeURIComponent).join('/')}`
+
+// What the share dialog does, on the web (this server) or, for a synced desktop vault,
+// on the server the vault syncs with (the desktop app asks it, as the synced account)
+const webShare = (wsId) => ({
+  load: async (path) => {
+    const [d, u] = await Promise.all([api.shares(wsId, path), api.users().catch(() => ({ users: [] }))])
+    return { ...d, users: u.users || [], server: location.origin }
+  },
+  share: (path, username, role) => api.shareNote(wsId, path, username, role),
+  unshare: (path, userId) => api.unshareNote(wsId, path, userId),
+  publish: (path, theme) => api.publish(wsId, path, theme),
+  unpublish: (path) => api.unpublish(wsId, path),
+})
+const syncedShare = (wsId) => ({
+  load: (path) => dapi.cloudShare(wsId, path),
+  share: (path, username, role) => dapi.cloudShareNote(wsId, path, username, role),
+  unshare: (path, userId) => dapi.cloudUnshareNote(wsId, path, userId),
+  publish: (path, theme) => dapi.cloudPublish(wsId, path, theme),
+  unpublish: (path) => dapi.cloudUnpublish(wsId, path),
+})
 
 export function ShareModal({ ws: wsId, path }) {
   const close = useUI((s) => s.closeModal)
   const workspaces = useApp((s) => s.workspaces)
   const ws = workspaces.find((w) => w.id === wsId)
-  if (isDesktop && ws) return <DesktopShare ws={ws} path={path} onClose={close} />
+  if (isDesktop && ws && !ws.cloud) return <DesktopShare path={path} onClose={close} />
+  return <ShareDialog key={`${wsId}:${path}`} ws={ws} wsId={wsId} path={path} close={close} synced={isDesktop && !!ws?.cloud} />
+}
+
+function ShareDialog({ ws, wsId, path, close, synced }) {
+  const ops = useMemo(() => (synced ? syncedShare(wsId) : webShare(wsId)), [synced, wsId])
   const [data, setData] = useState(null)
-  const [users, setUsers] = useState([])
   const [username, setUsername] = useState('')
   const [role, setRole] = useState('editor')
   const [busy, setBusy] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [removing, setRemoving] = useState(null)
+  const [failed, setFailed] = useState(null)
+  const users = data?.users || []
 
-  const load = () => api.shares(wsId, path).then(setData).catch((e) => toast.error(e))
+  const load = () =>
+    ops
+      .load(path)
+      .then((d) => (setData(d), setFailed(null)))
+      .catch((e) => (synced ? setFailed(e.message) : toast.error(e)))
   useEffect(() => {
     load()
-    api.users().then((r) => setUsers(r.users)).catch(() => {})
-  }, [wsId, path])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ops, path])
 
   const share = async () => {
     setBusy(true)
     try {
-      await api.shareNote(wsId, path, username.replace(/^@/, ''), role)
+      await ops.share(path, username.replace(/^@/, ''), role)
       setUsername('')
       await load()
     } catch (e) {
@@ -264,11 +269,25 @@ export function ShareModal({ ws: wsId, path }) {
     }
   }
 
-  const publicUrl = data?.published ? `${location.origin}/p/${data.published.slug}` : null
+  const publicUrl = data?.published ? `${data.server}/p/${data.published.slug}` : null
+  const host = data?.server?.replace(/^https?:\/\//, '')
+  // people can be given a note only in an online workspace (a synced vault's is one)
+  const people = synced || ws?.type === 'online'
 
   return (
     <Modal title={`Share “${stripExt(basename(path))}”`} center onClose={close} icon={<Share2 size={18} />}>
-      {ws?.type === 'online' ? (
+      {synced && (
+        <div className="hint" style={{ marginBottom: 14 }}>
+          {failed ? (
+            <>Couldn’t reach {ws.cloud.remoteName || 'the server'}: {failed}</>
+          ) : (
+            <>
+              Shared and published from <b>{host || 'your server'}</b>, where this vault syncs — so links keep working when this computer is off.
+            </>
+          )}
+        </div>
+      )}
+      {people ? (
         <>
           <div className="row" style={{ marginBottom: 14 }}>
             <input className="input grow" list="obi-share-users" placeholder="Username to share with" value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && share()} />
@@ -304,7 +323,7 @@ export function ShareModal({ ws: wsId, path }) {
                 onClick={async () => {
                   setRemoving(s.id)
                   try {
-                    await api.unshareNote(wsId, path, s.id)
+                    await ops.unshare(path, s.id)
                     await load()
                   } catch (e) {
                     toast.error(e)
@@ -317,14 +336,14 @@ export function ShareModal({ ws: wsId, path }) {
               </button>
             </div>
           ))}
-          {!data && (
+          {!data && !failed && (
             <div className="row faint" style={{ gap: 8, padding: '6px 0' }}>
               <Spinner size="sm" /> Loading who has access…
             </div>
           )}
           {data && !data.shares.length && <div className="hint">Not shared with anyone yet. People you share with see only this note.</div>}
           <div className="hint" style={{ marginTop: 10 }}>
-            Want to share everything? Add members to the workspace in <b>Settings → Members</b>.
+            Want to share everything? Add members to the workspace in <b>Settings → Members</b>{synced ? ` on ${host || 'your server'}` : ''}.
           </div>
         </>
       ) : (
@@ -345,12 +364,12 @@ export function ShareModal({ ws: wsId, path }) {
           {publishing && <Spinner size="sm" />}
           <Switch
             checked={!!publicUrl}
-            disabled={publishing}
+            disabled={publishing || !data}
             onChange={async (v) => {
               setPublishing(true)
               try {
-                if (v) await api.publish(wsId, path, themeSnapshot())
-                else await api.unpublish(wsId, path)
+                if (v) await ops.publish(path, themeSnapshot())
+                else await ops.unpublish(path)
                 await load()
                 toast.success(v ? 'Published — link copied below' : 'Unpublished')
               } catch (e) {
@@ -384,12 +403,23 @@ export function ShareModal({ ws: wsId, path }) {
         <div className="row">
           <Link2 size={16} style={{ color: 'var(--text-3)' }} />
           <div className="grow">
-            <div className="setting-name">Copy internal link</div>
+            <div className="setting-name">{synced ? `Open on ${host || 'your server'}` : 'Copy internal link'}</div>
             <div className="setting-desc">For people who already have access.</div>
           </div>
-          <button className="btn btn-sm" onClick={() => A.copyNoteLink(wsId, path)}>
-            <Copy /> Copy
-          </button>
+          {synced ? (
+            <>
+              <button className="btn btn-sm" disabled={!data} onClick={() => (copyText(serverNoteUrl(data, path)), toast.success('Link copied'))}>
+                <Copy /> Copy
+              </button>
+              <a className="btn btn-sm" href={data ? serverNoteUrl(data, path) : undefined} target="_blank" rel="noreferrer">
+                <ExternalLink />
+              </a>
+            </>
+          ) : (
+            <button className="btn btn-sm" onClick={() => A.copyNoteLink(wsId, path)}>
+              <Copy /> Copy
+            </button>
+          )}
         </div>
       </div>
     </Modal>

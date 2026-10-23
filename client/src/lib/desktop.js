@@ -29,6 +29,13 @@ export const dapi = {
   cloudSyncNow: (wsId) => request('POST', `${D}/vaults/${wsId}/cloud/sync`, {}),
   online: () => request('POST', `${D}/online`, {}),
 
+  // a synced vault's note, shared and published on the server it syncs with
+  cloudShare: (wsId, path) => request('GET', `${D}/vaults/${wsId}/cloud/share?path=${encodeURIComponent(path)}`),
+  cloudPublish: (wsId, path, theme) => request('POST', `${D}/vaults/${wsId}/cloud/publish`, { path, theme }),
+  cloudUnpublish: (wsId, path) => request('DELETE', `${D}/vaults/${wsId}/cloud/publish?path=${encodeURIComponent(path)}`),
+  cloudShareNote: (wsId, path, username, role) => request('POST', `${D}/vaults/${wsId}/cloud/shares`, { path, username, role }),
+  cloudUnshareNote: (wsId, path, userId) => request('DELETE', `${D}/vaults/${wsId}/cloud/shares?path=${encodeURIComponent(path)}&userId=${encodeURIComponent(userId)}`),
+
   githubConnect: (wsId, body) => request('POST', `${D}/vaults/${wsId}/github`, body),
   githubDisconnect: (wsId) => request('DELETE', `${D}/vaults/${wsId}/github`),
   githubPull: (wsId) => request('POST', `${D}/vaults/${wsId}/github/pull`, {}),
