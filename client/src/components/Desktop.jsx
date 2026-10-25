@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, Cloud, CloudOff, FolderOpen, FolderPlus, HardDrive, RefreshCw, Check, AlertTriangle, LogOut,
-  FolderGit2, Download, Upload, ExternalLink, Laptop, Link2Off,
+  FolderGit2, Download, Upload, ExternalLink, Laptop, Link2Off, KeyRound,
 } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useUI, toast, confirmDialog } from '../store/ui.js'
@@ -663,9 +663,24 @@ function GithubCard({ ws, info }) {
   const [form, setForm] = useState({ repoUrl: '', token: '', branch: '' })
   const [busy, setBusy] = useState(null)
   const [message, setMessage] = useState('')
+  const [token, setToken] = useState('')
   const s = ws.settings || {}
   const mode = s.syncMode || (s.autoSync === false ? 'manual' : 'save')
   const sync = useApp((st) => (st.wsId === ws.id ? st.sync : null))
+  // who git is set up as (git config user.name / user.email): commits are by them unless a name is chosen here
+  const [gitId, setGitId] = useState(null)
+  useEffect(() => {
+    if (!connected) return
+    let alive = true
+    api
+      .gitIdentity(ws.id)
+      .then((r) => alive && setGitId(r))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [ws.id, connected])
+  const byGit = gitId && (gitId.name || gitId.email) ? [gitId.name, gitId.email && `<${gitId.email}>`].filter(Boolean).join(' ') : null
 
   const save = (patch) =>
     api
@@ -787,6 +802,29 @@ function GithubCard({ ws, info }) {
           </button>
           <button className="btn" disabled={!!busy} onClick={() => act('pull', () => dapi.githubPull(ws.id), 'Pulled from GitHub')}>
             {busy === 'pull' ? <Spinner size="sm" /> : <Download />} Pull
+          </button>
+        </div>
+      </Row>
+      <Row name="Commit author" desc={byGit ? `Leave empty to commit as ${byGit}, from git’s config.` : 'The name and email on every commit.'} stacked>
+        <div className="dk-inline">
+          <input className="input" placeholder={gitId?.name || 'Name'} aria-label="Commit author name" defaultValue={s.authorName || ''} onBlur={(e) => e.target.value.trim() !== (s.authorName || '') && save({ authorName: e.target.value.trim() })} />
+          <input className="input" type="email" placeholder={gitId?.email || 'email@example.com'} aria-label="Commit author email" defaultValue={s.authorEmail || ''} onBlur={(e) => e.target.value.trim() !== (s.authorEmail || '') && save({ authorEmail: e.target.value.trim() })} />
+        </div>
+      </Row>
+      <Row name="Access token" desc="Expired, or changed? Paste a new fine-grained token (this repository → Contents: Read and write). Stored encrypted on this computer." stacked>
+        <div className="dk-inline">
+          <input className="input" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="github_pat_…" spellCheck={false} aria-label="New access token" />
+          <button
+            className="btn"
+            disabled={!token.trim() || !!busy}
+            onClick={() =>
+              act('token', async () => {
+                await api.updateWorkspace(ws.id, { github: { token: token.trim() } })
+                setToken('')
+              }, 'Token updated — syncing')
+            }
+          >
+            {busy === 'token' ? <Spinner size="sm" /> : <KeyRound />} {busy === 'token' ? 'Checking…' : 'Update'}
           </button>
         </div>
       </Row>
