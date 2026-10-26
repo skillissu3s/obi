@@ -991,13 +991,25 @@ svg.cv-el {
   height: 15px;
 }
 .cv-tray-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
   height: 18px;
   font-size: 11px;
   color: var(--text-2);
   white-space: nowrap;
+}
+.cv-tray-name > span {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 120ms var(--ease), transform 120ms var(--ease);
+}
+.cv-tray-name > span.on {
+  opacity: 1;
+  transform: none;
 }
 .cv-tray-name kbd {
   font: 500 10px var(--font-ui);

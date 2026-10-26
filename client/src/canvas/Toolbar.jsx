@@ -148,7 +148,9 @@ export function Toolbar({ ctl, extra, onCollapse }) {
   )
 }
 
-// A group's tools, in a row, the name of the one pointed at (or in hand) under them
+// A group's tools, in a row, the name of the one pointed at (or in hand) under
+// them. Every name is laid in the same spot and only one shows, so the tray is as
+// wide as its longest name from the start and never changes size under the pointer.
 function Tray({ ids, current, usable, onEnter, onLeave, onPick }) {
   const [hover, setHover] = useState(null)
   const named = TOOL_BY_ID[hover || (ids.includes(current) ? current : ids[0])]
@@ -176,8 +178,15 @@ function Tray({ ids, current, usable, onEnter, onLeave, onPick }) {
         })}
       </div>
       <div className="cv-tray-name">
-        <span>{named.label.split(' — ')[0]}</span>
-        <kbd>{named.key}</kbd>
+        {ids.map((id) => {
+          const t = TOOL_BY_ID[id]
+          return (
+            <span key={id} className={t === named ? 'on' : ''} aria-hidden={t !== named}>
+              <span>{t.label.split(' — ')[0]}</span>
+              <kbd>{t.key}</kbd>
+            </span>
+          )
+        })}
       </div>
     </div>
   )
