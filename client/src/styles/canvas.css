@@ -590,29 +590,43 @@ svg.cv-el {
   width: 15px;
   height: 15px;
 }
-/* a button holding more than one tool: a small caret in its corner opens them */
-.cv-tool .cv-caret {
+/* a button holding more than one tool: a small dot under its icon says so */
+.cv-tool .cv-more-dot {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 13px;
-  height: 13px;
-  cursor: pointer;
+  left: 50%;
+  bottom: 3px;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  transition: opacity var(--t-fast), transform var(--t-fast) var(--ease-spring);
 }
-.cv-tool .cv-caret::after {
-  content: '';
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  border-style: solid;
-  border-width: 0 0 4px 4px;
-  border-color: transparent transparent currentColor transparent;
-  opacity: 0.45;
-  transition: opacity var(--t-fast);
+.cv-tool:hover .cv-more-dot,
+.cv-tool.tray-open .cv-more-dot {
+  opacity: 0.8;
+  transform: scale(1.3);
 }
-.cv-tool:hover .cv-caret::after,
-.cv-tool .cv-caret:hover::after {
-  opacity: 0.9;
+.cv-tool.tray-open:not(.active) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+/* a group's button changing tool: the new icon settles in */
+.cv-tool .cv-tool-icon {
+  animation: cv-icon-in 220ms var(--ease-spring);
+}
+@keyframes cv-icon-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-12deg);
+  }
+}
+.cv-tool {
+  transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+.cv-tool:active:not(:disabled) {
+  transform: scale(0.92);
 }
 .cv-sep {
   width: 1px;
@@ -913,132 +927,93 @@ svg.cv-el {
   margin-top: 0;
 }
 
-/* a tool group's other tools */
-.cv-flyout {
+/* a tool group's tray: its tools in a row, lifted out of the button, and the
+   name of the one pointed at under them */
+.cv-tray {
   display: flex;
   flex-direction: column;
-  min-width: 190px;
-  margin: -4px -4px -2px;
-}
-.cv-flyout-item {
-  display: flex;
   align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 10px;
+  gap: 2px;
+  padding: 4px 4px 3px;
+  border-radius: 12px;
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-pop), 0 0 0 1px var(--border-strong);
+  transform-origin: 50% 100%;
+  animation: cv-tray-in 200ms var(--ease-spring);
+}
+@keyframes cv-tray-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.92);
+  }
+}
+.cv-tray-row {
+  display: flex;
+  gap: 2px;
+}
+.cv-tray-item {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: none;
-  color: var(--text);
-  font-size: 13px;
-  text-align: left;
+  color: var(--text-2);
   cursor: pointer;
+  animation: cv-tray-item-in 220ms var(--ease-spring) backwards;
+  transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--ease-spring);
 }
-.cv-flyout-item:hover {
+@keyframes cv-tray-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.cv-tray-item:hover {
   background: var(--bg-hover);
+  color: var(--text);
+  transform: translateY(-1px);
 }
-.cv-flyout-item.active {
+.cv-tray-item:active {
+  transform: scale(0.92);
+}
+.cv-tray-item.active {
   background: var(--accent-soft);
   color: var(--accent-text);
 }
-.cv-flyout-item:disabled {
-  opacity: 0.4;
+.cv-tray-item:disabled {
+  opacity: 0.35;
   cursor: default;
 }
-.cv-flyout-item svg {
+.cv-tray-item svg {
   width: 15px;
   height: 15px;
 }
-.cv-flyout-item span {
-  flex: 1;
+.cv-tray-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 18px;
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
 }
-.cv-flyout-item kbd {
-  font: 500 11px var(--font-ui);
+.cv-tray-name kbd {
+  font: 500 10px var(--font-ui);
   color: var(--text-faint);
   background: none;
   border: none;
   box-shadow: none;
   padding: 0;
 }
-.cv-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
+@media (prefers-reduced-motion: reduce) {
+  .cv-tray,
+  .cv-tray-item,
+  .cv-tool .cv-tool-icon {
+    animation: none;
+  }
 }
-.cv-swatch {
-  width: 24px;
-  height: 24px;
-  /* a <button> brings its own padding, which squeezed the dot's box and pushed
-     it off-centre */
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-.cv-swatch:hover {
-  background: var(--bg-hover);
-}
-.cv-swatch .cv-dot {
-  width: 16px;
-  height: 16px;
-}
-.cv-swatch.active {
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-/* a row of choices is one segmented track, the chosen one lit on it */
-.cv-opts {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 9px;
-  background: var(--bg-hover);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-.cv-opts .cv-sbtn {
-  flex: 1;
-  min-width: 0;
-  height: 26px;
-  padding: 0 4px;
-  border-radius: 7px;
-}
-.cv-opts .cv-sbtn:hover {
-  background: var(--bg-active);
-}
-.cv-opts .cv-sbtn.active {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-/* previews of a line, a head or a path: drawn at their own size, not the
-   15px of an icon */
-.cv-sbtn .cv-glyph {
-  width: 24px;
-  height: 14px;
-  flex: none;
-  display: block;
-}
-.cv-range-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cv-range {
-  flex: 1;
-  min-width: 0;
-  accent-color: var(--accent);
-}
-.cv-range-value {
-  flex: none;
-  width: 34px;
-  text-align: right;
-  font-size: 12px;
-  color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ---------- Standalone board ---------- */
 .board-view {
   flex: 1;

@@ -32,9 +32,11 @@ export const TOOLS = [
 
 const TOOL_BY_ID = Object.fromEntries(TOOLS.filter((t) => t !== 'sep').map((t) => [t.id, t]))
 
-// The bar shows one button per group; a group's other tools are in a little menu
-// above it (its corner caret, or the button again once its tool is in hand). The
-// button shows the group's tool last used. Every tool keeps its shortcut.
+// The bar shows one button per group, with the group's tool last used on it.
+// Pointing at the button lifts the group's tools into a small tray above it;
+// picking one there takes it (and brings up its settings). Clicking the button
+// takes the tool it shows. On a touch screen, with no pointing, tapping the
+// button of the tool in hand opens the tray. Every tool keeps its shortcut.
 const GROUPS = [
   ['select'], ['hand'], 'sep',
   ['rect', 'ellipse', 'diamond', 'line'], ['arrow'], 'sep',
@@ -42,17 +44,31 @@ const GROUPS = [
   ['text', 'mdtext'], ['sticky'], 'sep',
   ['image', 'note'], ['frame'],
 ]
+const OPEN_DELAY = 110 // pointing in passing, across the bar, opens nothing
+const CLOSE_DELAY = 220 // time to move from the button up into the tray
 
 export function Toolbar({ ctl, extra, onCollapse }) {
   const state = useController(ctl)
   const readOnly = ctl.readOnly
   // each group's tool last used
   const [last, setLast] = useState({})
-  const [flyout, setFlyout] = useState(null) // { group, anchor }
+  const [tray, setTray] = useState(null) // { group, anchor }
+  const timer = useRef(0)
   useEffect(() => {
     const g = GROUPS.findIndex((grp) => grp !== 'sep' && grp.length > 1 && grp.includes(state.tool))
     if (g >= 0 && last[g] !== state.tool) setLast((l) => ({ ...l, [g]: state.tool }))
   }, [state.tool, last])
+  // the tool's own settings bar steps aside while a tray is up (they share the space)
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('obi:tool-tray', { detail: { ctl, open: !!tray } }))
+  }, [tray, ctl])
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const later = (fn, ms) => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(fn, ms)
+  }
+  const hold = () => clearTimeout(timer.current)
+  const close = () => later(() => setTray(null), CLOSE_DELAY)
   const usable = (id) => !(readOnly && !['select', 'hand', 'laser'].includes(id))
   return (
     <div className="cv-toolbar" role="toolbar" aria-label="Canvas tools" onPointerDown={(e) => e.stopPropagation()}>
@@ -62,34 +78,37 @@ export function Toolbar({ ctl, extra, onCollapse }) {
         const t = TOOL_BY_ID[shown]
         const active = grp.includes(state.tool)
         const many = grp.length > 1
-        const openFly = (anchor) => setFlyout((f) => (f?.group === i ? null : { group: i, anchor }))
         return (
           <button
             key={i}
-            className={`cv-tool ${active ? 'active' : ''} ${many ? 'has-more' : ''}`}
-            title={`${t.label} (${t.key})${many ? ' — more in the corner' : ''}`}
+            className={`cv-tool ${active ? 'active' : ''} ${many ? 'has-more' : ''} ${tray?.group === i ? 'tray-open' : ''}`}
+            title={many ? undefined : `${t.label} (${t.key})`}
             aria-label={t.label}
+            aria-haspopup={many ? 'menu' : undefined}
             disabled={!usable(shown)}
+            onPointerEnter={(e) => {
+              if (e.pointerType === 'touch') return
+              const anchor = e.currentTarget
+              if (!many) return tray && close()
+              // from one open tray straight to the next; else after a moment's pointing
+              if (tray) {
+                hold()
+                setTray({ group: i, anchor })
+              } else later(() => setTray({ group: i, anchor }), OPEN_DELAY)
+            }}
+            onPointerLeave={(e) => e.pointerType !== 'touch' && (tray ? close() : hold())}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
-              if (many && active) return openFly(e.currentTarget)
+              if (many && active && e.nativeEvent.pointerType === 'touch') return setTray((f) => (f ? null : { group: i, anchor: e.currentTarget }))
               // picking the tool you already have shows or hides its settings
               if (state.tool === shown) window.dispatchEvent(new CustomEvent('obi:tool-settings', { detail: ctl }))
               ctl.setTool(shown)
-              setFlyout(null)
+              hold()
+              setTray(null)
             }}
           >
-            <t.icon />
-            {many && (
-              <span
-                className="cv-caret"
-                aria-hidden="true"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  openFly(e.currentTarget.parentElement)
-                }}
-              />
-            )}
+            <t.icon key={shown} className="cv-tool-icon" />
+            {many && <span className="cv-more-dot" aria-hidden="true" />}
           </button>
         )
       })}
@@ -108,32 +127,58 @@ export function Toolbar({ ctl, extra, onCollapse }) {
           <ChevronsDown />
         </button>
       )}
-      {flyout && flyout.anchor.isConnected && (
-        <Popover anchor={flyout.anchor} onClose={() => setFlyout(null)}>
-          <div className="cv-flyout" role="menu">
-            {GROUPS[flyout.group].map((id) => {
-              const t = TOOL_BY_ID[id]
-              return (
-                <button
-                  key={id}
-                  role="menuitem"
-                  className={`cv-flyout-item ${state.tool === id ? 'active' : ''}`}
-                  disabled={!usable(id)}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    ctl.setTool(id)
-                    setFlyout(null)
-                  }}
-                >
-                  <t.icon />
-                  <span>{t.label.split(' — ')[0]}</span>
-                  <kbd>{t.key}</kbd>
-                </button>
-              )
-            })}
-          </div>
+      {tray && tray.anchor.isConnected && (
+        <Popover anchor={tray.anchor} className="bare" onClose={() => setTray(null)}>
+          <Tray
+            key={tray.group}
+            ids={GROUPS[tray.group]}
+            current={state.tool}
+            usable={usable}
+            onEnter={hold}
+            onLeave={close}
+            onPick={(id) => {
+              ctl.setTool(id)
+              hold()
+              setTray(null)
+            }}
+          />
         </Popover>
       )}
+    </div>
+  )
+}
+
+// A group's tools, in a row, the name of the one pointed at (or in hand) under them
+function Tray({ ids, current, usable, onEnter, onLeave, onPick }) {
+  const [hover, setHover] = useState(null)
+  const named = TOOL_BY_ID[hover || (ids.includes(current) ? current : ids[0])]
+  return (
+    <div className="cv-tray" role="menu" onPointerEnter={onEnter} onPointerLeave={onLeave}>
+      <div className="cv-tray-row">
+        {ids.map((id, n) => {
+          const t = TOOL_BY_ID[id]
+          return (
+            <button
+              key={id}
+              role="menuitem"
+              className={`cv-tray-item ${current === id ? 'active' : ''}`}
+              style={{ animationDelay: `${n * 22}ms` }}
+              aria-label={t.label}
+              disabled={!usable(id)}
+              onPointerEnter={() => setHover(id)}
+              onPointerLeave={() => setHover(null)}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onPick(id)}
+            >
+              <t.icon />
+            </button>
+          )
+        })}
+      </div>
+      <div className="cv-tray-name">
+        <span>{named.label.split(' — ')[0]}</span>
+        <kbd>{named.key}</kbd>
+      </div>
     </div>
   )
 }
@@ -208,7 +253,13 @@ export function StyleBar({ ctl }) {
   const rootRef = useRef(null)
   const [toolAnchor, setToolAnchor] = useState(null)
   const [hidden, setHidden] = useState(null)
+  const [trayUp, setTrayUp] = useState(false)
   useEffect(() => setHidden(null), [state.tool])
+  useEffect(() => {
+    const on = (e) => e.detail.ctl === ctl && setTrayUp(e.detail.open)
+    window.addEventListener('obi:tool-tray', on)
+    return () => window.removeEventListener('obi:tool-tray', on)
+  }, [ctl])
   useEffect(() => {
     const flip = (e) => e.detail === ctl && setHidden((h) => (h ? null : ctl.getState().tool))
     window.addEventListener('obi:tool-settings', flip)
@@ -221,7 +272,7 @@ export function StyleBar({ ctl }) {
   })
   const { sel, subjects } = styleSubjects(ctl, state)
   const tool = state.tool
-  const show = !ctl.readOnly && !state.editing && !state.panning && !sel.length && subjects.length > 0 && hidden !== tool
+  const show = !ctl.readOnly && !state.editing && !state.panning && !sel.length && subjects.length > 0 && hidden !== tool && !trayUp
   return (
     <span ref={rootRef} style={{ display: 'contents' }}>
       {show && toolAnchor && (
