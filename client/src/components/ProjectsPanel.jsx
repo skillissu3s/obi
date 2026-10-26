@@ -173,8 +173,8 @@ function BoardRows({ adding, setAdding, label = true }) {
           }}
           onContextMenu={(e) => menu(e, p, i)}
         >
-          <span className="pj-tile" style={{ '--pj': p.color }}>
-            {p.inbox ? <Inbox /> : p.name.trim()[0]?.toUpperCase()}
+          <span className={`pj-tile ${p.emoji ? 'emoji' : ''}`} style={{ '--pj': p.color }}>
+            {p.emoji || (p.inbox ? <Inbox /> : p.name.trim()[0]?.toUpperCase())}
           </span>
           <span className="truncate">{p.name}</span>
           <span className="count" title={`${p.open} open of ${p.total}`}>

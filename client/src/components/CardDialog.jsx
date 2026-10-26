@@ -2,7 +2,7 @@
 // a Trello card. Each change is written to the board at once (`change` runs on a
 // copy of the board, see ProjectBoard), and the project's rules apply to it.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AlignLeft, Archive, Flag, ListChecks, Palette, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlignLeft, Archive, Flag, ListChecks, Palette, Pencil, Plus, Smile, Trash2, X } from 'lucide-react'
 import * as K from '@shared/kanban.js'
 import { PRIORITIES, cleanTag, isOpen, joinTags, parseRecurrence, splitTags } from '@shared/tasks.js'
 import { renderMarkdown } from '../lib/render.js'
@@ -14,6 +14,8 @@ import { Colors, Label, PopHead, StatusIcon, dueTone } from './CardParts.jsx'
 import { colorHex, colorLabel } from '../lib/colors.js'
 import { LinkSuggest } from './LinkSuggest.jsx'
 import { celebrate } from '../lib/celebrate.js'
+import { leadingEmoji } from '@shared/emoji.js'
+import { EmojiPicker } from './EmojiPicker.jsx'
 
 const STATUSES = [
   [' ', 'To do'],
@@ -426,6 +428,14 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
     if (t) retitle(t)
   })
   const cover = K.cardCover(board, card)
+  // a card's emoji is the one its title starts with: it stays plain text in the markdown
+  const [emojiAt, setEmojiAt] = useState(null)
+  const lead = leadingEmoji(title)
+  const setEmoji = (e) => {
+    setEmojiAt(null)
+    const next = (e ? `${e} ` : '') + lead.rest
+    if (next.trim() && next !== title) retitle(next.trim())
+  }
 
   return (
     <Modal title={null} label="Card" onClose={onClose} className={`card-dialog ${cover ? 'has-cover' : ''}`} style={cover ? { '--cover': colorHex(cover) } : undefined} bodyClass="cd-shell">
@@ -437,7 +447,7 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
           <div className="cd-head-main">
             <textarea
               ref={titleEl}
-              key={title}
+              key={`title:${title}`}
               className="cd-title"
               rows={1}
               aria-label="Title"
@@ -455,7 +465,18 @@ export function CardDialog({ board, hit, ws, path, readOnly, today, change, labe
                 else if (next !== title) retitle(next)
               }}
             />
-            <LinkSuggest key={title} field={titleEl} />
+            <LinkSuggest key={`suggest:${title}`} field={titleEl} />
+            {!readOnly && (
+              <button type="button" className={`cd-emoji ${lead.emoji ? 'has' : ''}`} title={lead.emoji ? 'Change the emoji' : 'Add an emoji'} aria-label={lead.emoji ? 'Change the emoji' : 'Add an emoji'} onClick={(e) => setEmojiAt(emojiAt ? null : e.currentTarget)}>
+                <Smile />
+              </button>
+            )}
+            {emojiAt && (
+              <Popover anchor={emojiAt} onClose={() => setEmojiAt(null)} className="emoji-pop">
+                <PopHead title="Card emoji" onClose={() => setEmojiAt(null)} />
+                <EmojiPicker value={lead.emoji} onPick={setEmoji} onClear={() => setEmoji(null)} />
+              </Popover>
+            )}
             <div className="cd-where">
               in list
               <select

@@ -2,6 +2,7 @@
 import { parse as parseYaml } from 'yaml'
 import { basename, dirname, extname, stripExt, joinPath, normalizePath } from './paths.js'
 import { parseTask } from './tasks.js'
+import { cleanEmoji } from './emoji.js'
 
 const WIKI_RE = /(!?)\[\[([^\[\]\n]+?)\]\]/g
 const MDLINK_RE = /(!?)\[([^\]\n]*)\]\(<?([^)\s>]+)>?(?:\s+"[^"]*")?\)/g
@@ -166,6 +167,8 @@ function boardInfo(body) {
     if (!obi || typeof obi !== 'object') return null
     const info = {}
     if (BOARD_COLORS.has(obi.color)) info.color = obi.color
+    const emoji = cleanEmoji(obi.emoji)
+    if (emoji) info.emoji = emoji
     const labels = colorsIn(obi.labels)
     if (labels) info.labels = labels
     const covers = colorsIn(obi.covers)

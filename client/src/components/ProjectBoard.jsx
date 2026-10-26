@@ -5,7 +5,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlignLeft, Archive, ArchiveRestore, ArrowRight, CalendarDays, CircleCheckBig, Flag, ListChecks, ListFilter, MoreHorizontal,
-  Palette, Pencil, Plus, Repeat, Search, SortAsc, Trash2, X, Zap, FileText, Share2,
+  Palette, Pencil, Plus, Repeat, Search, SortAsc, Trash2, X, Zap, FileText, Share2, Smile,
 } from 'lucide-react'
 import { applyToYText } from '@shared/textdiff.js'
 import * as K from '@shared/kanban.js'
@@ -24,6 +24,7 @@ import { Automation, ruleCount } from './Automation.jsx'
 import { useBoardDrag } from './boardDrag.js'
 import { colorHex } from '../lib/colors.js'
 import { LinkSuggest } from './LinkSuggest.jsx'
+import { EmojiPicker } from './EmojiPicker.jsx'
 import { useSettle } from '../lib/celebrate.js'
 
 export const LIST_COLORS = K.PROJECT_COLORS
@@ -334,6 +335,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
   const [panel, setPanel] = useState(null) // 'automation' | 'archive'
   const [filterAt, setFilterAt] = useState(null) // the filter button, while its card is open
   const [colorAt, setColorAt] = useState(null) // { el, lane } while a list's colours are open
+  const [emojiAt, setEmojiAt] = useState(null) // { el, board } or { el, lane }
   const lanesEl = useRef(null)
   const opts = useMemo(() => ({ today }), [today])
 
@@ -496,6 +498,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
       { label: 'Add a card', icon: Plus, run: () => setComposer(lane.id) },
       { label: 'Rename list', icon: Pencil, run: () => setRenaming(lane.id) },
       { label: 'Colour…', icon: Palette, run: () => setColorAt({ el, lane: lane.id }) },
+      { label: K.laneEmoji(board, lane) ? 'Change emoji…' : 'Emoji…', icon: Smile, run: () => setEmojiAt({ el, lane: lane.id }) },
       lane.items.length > 1 && { section: 'Sort cards by' },
       ...(lane.items.length > 1
         ? [
@@ -531,6 +534,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
       { label: 'Share…', icon: Share2, run: share },
       { label: 'Automation', icon: Zap, run: () => setPanel('automation') },
       !readOnly && { label: 'Board colour…', icon: Palette, run: () => setColorAt({ el: barMenu.current, board: true }) },
+      !readOnly && { label: K.boardEmoji(board) ? 'Change icon…' : 'Icon…', icon: Smile, run: () => setEmojiAt({ el: barMenu.current, board: true }) },
       { label: archived ? `Archived cards (${archived})` : 'Archived cards', icon: Archive, run: () => setPanel('archive') },
       'divider',
       onMarkdown && { label: 'Open as markdown', icon: FileText, run: onMarkdown },
@@ -590,6 +594,7 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
   let listSlot = 0 // lists drawn so far, but the one being dragged
   // (a board with no colour of its own has no tint; its dot keeps the colour its name gives it)
   const tint = colorHex(K.boardColor(board))
+  const boardIcon = K.boardEmoji(board)
   const color = tint || projectColor(path)
   const placeholder = (key, h) => <div key={key} className="pb-placeholder" style={{ height: h || 38 }} />
   const dragging = drag?.kind
@@ -597,7 +602,20 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
   return (
     <div className={`pb ${tint ? 'tinted' : ''}`} style={{ '--project': color }}>
       <div className="pb-bar">
-        <span className="pb-dot" />
+        {boardIcon ? (
+          <button type="button" className="pb-icon" title={readOnly ? undefined : 'Change the icon'} disabled={readOnly} onClick={(e) => setEmojiAt({ el: e.currentTarget, board: true })}>
+            {boardIcon}
+          </button>
+        ) : (
+          <span className="pb-dot-wrap">
+            <span className="pb-dot" />
+            {!readOnly && (
+              <button type="button" className="pb-icon-add" title="Give the board an icon" aria-label="Give the board an icon" onClick={(e) => setEmojiAt({ el: e.currentTarget, board: true })}>
+                <Smile />
+              </button>
+            )}
+          </span>
+        )}
         <h2 className="pb-name" title={readOnly ? title : 'Rename project'} onClick={() => !readOnly && onRename?.()}>
           {title}
         </h2>
@@ -693,9 +711,23 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
                       }}
                     />
                   ) : (
-                    <h3 onClick={() => !readOnly && !justDragged() && setRenaming(lane.id)} title={readOnly ? undefined : 'Rename list'}>
-                      {lane.title}
-                    </h3>
+                    <>
+                      {K.laneEmoji(board, lane) && (
+                        <button
+                          type="button"
+                          className="pb-list-emoji"
+                          title={readOnly ? undefined : 'Change the emoji'}
+                          disabled={readOnly}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => setEmojiAt({ el: e.currentTarget, lane: lane.id })}
+                        >
+                          {K.laneEmoji(board, lane)}
+                        </button>
+                      )}
+                      <h3 onClick={() => !readOnly && !justDragged() && setRenaming(lane.id)} title={readOnly ? undefined : 'Rename list'}>
+                        {lane.title}
+                      </h3>
+                    </>
                   )}
                   <span className="pb-count">{nFilters ? `${visible.length}/${lane.items.length}` : lane.items.length}</span>
                   {!readOnly && (
@@ -762,6 +794,22 @@ export function ProjectBoard({ handle, readOnly, title, onRename, onMarkdown, on
                   </button>
                 )}
               </div>
+            </Popover>
+          )
+        })()}
+      {emojiAt &&
+        (() => {
+          const lane = emojiAt.lane && board.lanes.find((l) => l.id === emojiAt.lane)
+          const current = emojiAt.board ? K.boardEmoji(board) : lane ? K.laneEmoji(board, lane) : null
+          const pick = (e) => {
+            if (emojiAt.board) mutate((b) => K.setBoardEmoji(b, e))
+            else mutate((b) => K.setLaneEmoji(b, b.lanes.find((l) => l.id === emojiAt.lane), e))
+            setEmojiAt(null)
+          }
+          return (
+            <Popover anchor={emojiAt.el} onClose={() => setEmojiAt(null)} align="left" className="emoji-pop">
+              <PopHead title={emojiAt.board ? 'Board icon' : `Emoji for “${lane?.title || 'list'}”`} onClose={() => setEmojiAt(null)} />
+              <EmojiPicker value={current} onPick={pick} onClear={() => pick(null)} />
             </Popover>
           )
         })()}

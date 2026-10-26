@@ -72,7 +72,7 @@ export function listsOf(path, notes = useApp.getState().notes) {
 }
 
 /**
- * The workspace's projects: { path, name, color, open, total } — `open` counts the
+ * The workspace's projects: { path, name, color, emoji, open, total } — `open` counts the
  * cards (top-level tasks) not done. In the order they were dragged into (`order`, a
  * list of paths), if they were; the rest by name after them, the Inbox first.
  */
@@ -83,7 +83,7 @@ export function projectsOf(notes, order = []) {
     if (!isBoardMeta(meta)) continue
     const stop = archiveLine(meta)
     const cards = (meta.tasks || []).filter((t) => t.parent == null && t.line < stop)
-    out.push({ path, name: projectName(path), color: projectColor(path, notes), open: cards.filter((t) => isOpen(t.status)).length, total: cards.length, inbox: path === inbox })
+    out.push({ path, name: projectName(path), color: projectColor(path, notes), emoji: meta.board?.emoji || null, open: cards.filter((t) => isOpen(t.status)).length, total: cards.length, inbox: path === inbox })
   }
   const at = new Map(order.map((p, i) => [p, i]))
   const rank = (p) => at.get(p.path) ?? Infinity

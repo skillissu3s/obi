@@ -35,6 +35,7 @@
 // rules when a card's task is changed from elsewhere (the Tasks page).
 
 import { TASK_LINE, addDays, editTaskLine, isDone, joinTags, parseTask, splitTags, todayIso, weekStartOf } from './tasks.js'
+import { cleanEmoji } from './emoji.js'
 
 // ---------- reading and writing ----------
 
@@ -382,6 +383,18 @@ export function setLaneColor(board, lane, color) {
 
 export const setBoardColor = (board, color) => setObi(board, { color: PROJECT_COLORS.includes(color) ? color : undefined })
 
+// An emoji for the board, and one for each list (kept by the list's name, like its colour)
+export const boardEmoji = (board) => cleanEmoji(obiOf(board).emoji)
+export const setBoardEmoji = (board, emoji) => setObi(board, { emoji: cleanEmoji(emoji) || undefined })
+export const laneEmoji = (board, lane) => cleanEmoji(obiOf(board).emojis?.[lane.title])
+export function setLaneEmoji(board, lane, emoji) {
+  const emojis = { ...(obiOf(board).emojis || {}) }
+  const e = cleanEmoji(emoji)
+  if (e) emojis[lane.title] = e
+  else delete emojis[lane.title]
+  setObi(board, { emojis: Object.keys(emojis).length ? emojis : undefined })
+}
+
 // A card's cover colour is kept by its title (without tags and fields, which
 // change while it is the same card): cards have no id of their own in markdown.
 export const cardKey = (c) => splitTags(cardTask(c)?.text ?? c.text).title.trim().toLowerCase()
@@ -526,7 +539,7 @@ export const rulesOf = (board) => (Array.isArray(obiOf(board).rules) ? obiOf(boa
 
 export const setRules = (board, rules) => setObi(board, { rules })
 
-/** A list was renamed: its colour and the rules that name it follow */
+/** A list was renamed: its colour, its emoji and the rules that name it follow */
 export function renameLane(board, lane, title) {
   const was = lane.title
   const explicit = Array.isArray(obiOf(board).rules)
@@ -538,6 +551,11 @@ export function renameLane(board, lane, title) {
   if (colors && was in colors) {
     const { [was]: c, ...rest } = colors
     setObi(board, { colors: { ...rest, [title]: c } })
+  }
+  const emojis = obiOf(board).emojis
+  if (emojis && was in emojis) {
+    const { [was]: e, ...rest } = emojis
+    setObi(board, { emojis: { ...rest, [title]: e } })
   }
 }
 

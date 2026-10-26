@@ -1799,3 +1799,211 @@ html:has(.boards-dock.resizing) * {
   border-radius: 4px;
   background: var(--lc);
 }
+
+/* ---------- emoji on boards, lists and cards ---------- */
+.pj-tile.emoji {
+  background: none;
+  font-size: 14px;
+  font-weight: 400;
+}
+/* the board's icon, where its colour dot was; with none, the dot offers one on hover */
+.pb-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: -4px -2px -4px -6px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+.pb-icon:hover:not(:disabled) {
+  background: var(--bg-hover);
+  transform: scale(1.08) rotate(-4deg);
+}
+.pb-icon:disabled {
+  cursor: default;
+}
+.pb-dot-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+}
+.pb-icon-add {
+  position: absolute;
+  inset: -6px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: var(--bg-elev);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+.pb-bar:hover .pb-icon-add,
+.pb-icon-add:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+.pb-icon-add svg {
+  width: 14px;
+  height: 14px;
+}
+.pb-list-emoji {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: -4px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+.pb-list-emoji:hover:not(:disabled) {
+  background: var(--bg-hover);
+  transform: scale(1.1);
+}
+.pb-list-emoji:disabled {
+  cursor: inherit;
+}
+/* a card's emoji: a button beside its title (the emoji itself is the title's first character) */
+.cd-head-main {
+  position: relative;
+}
+.cd-head-main .cd-title {
+  width: calc(100% - 28px);
+}
+.cd-emoji {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity var(--t-fast), background var(--t-fast), color var(--t-fast);
+}
+.cd-head:hover .cd-emoji,
+.cd-emoji:focus-visible {
+  opacity: 1;
+}
+.cd-emoji:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.cd-emoji svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* the picker */
+.emoji-pop {
+  width: 316px;
+  padding: 0 0 10px;
+}
+.emoji-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px;
+}
+.emoji-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+}
+.emoji-tabs button {
+  flex: 1;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.emoji-tabs button.active {
+  background: var(--bg-elev);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.emoji-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  animation: emoji-in 180ms var(--ease-spring) backwards;
+  transition: background var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+@keyframes emoji-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+.emoji-cell:hover {
+  background: var(--bg-hover);
+  transform: scale(1.18);
+}
+.emoji-cell.active {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.emoji-foot {
+  display: flex;
+  gap: 6px;
+}
+.emoji-own {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .emoji-cell {
+    animation: none;
+  }
+}
