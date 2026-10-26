@@ -377,16 +377,19 @@ function AppearanceSection() {
           </h3>
           <div className="palette-grid">
             {PALETTES.filter((p) => p.home === group.home).map((p) => {
-              // cards preview the theme in the mode it was designed for
-              const [bg, fg, accent] = p[group.home]
-              const active = prefs.palette === p.id && mode === group.home
+              // The theme in use is marked whichever mode it is in. Cards preview
+              // the mode a theme was designed for — except the one in use, which
+              // shows the version on screen now (Sumi in light mode: its light version).
+              const active = prefs.palette === p.id
+              const other = active && mode !== group.home
+              const [bg, fg, accent] = p[other ? mode : group.home]
               return (
                 <button
                   key={p.id}
                   className={`palette-card ${active ? 'active' : ''}`}
-                  // a light card shows light and a dark card dark: from the other mode (System included) it switches
+                  // picking a theme shows the version it was designed for: from the other mode (System included) it switches
                   onClick={() => prefs.set(mode === group.home ? { palette: p.id } : { palette: p.id, theme: group.home })}
-                  title={`${p.note} (also has a ${group.home === 'light' ? 'dark' : 'light'} version)`}
+                  title={other ? `In use, in its ${mode} version. Click for the ${group.home} version it was designed for.` : `${p.note} (also has a ${group.home === 'light' ? 'dark' : 'light'} version)`}
                 >
                   <span className="palette-swatch" style={{ background: bg }}>
                     <i style={{ background: fg }} />
@@ -395,7 +398,7 @@ function AppearanceSection() {
                   </span>
                   <span className="palette-meta">
                     <b>{p.name}</b>
-                    <em>{p.note}</em>
+                    <em>{other ? `${mode === 'light' ? 'Light' : 'Dark'} version` : p.note}</em>
                   </span>
                   {active && <Check className="palette-check" />}
                 </button>
@@ -404,7 +407,7 @@ function AppearanceSection() {
           </div>
         </div>
       ))}
-      <p className="setting-desc palette-hint">Every theme has a light and a dark version. Picking a theme from the other group switches the mode to match; System follows your device.</p>
+      <p className="setting-desc palette-hint">Every theme has a light and a dark version: Mode picks which one you see, and the theme in use stays ticked in either. Picking a theme from the other group switches the mode to match; System follows your device.</p>
 
       <Setting name="Accent colour" desc="Overrides the accent that comes with the theme.">
         <div className="accent-swatches">
