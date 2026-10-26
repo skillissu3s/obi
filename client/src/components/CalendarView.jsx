@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, FilePlus, FileText, Filter, PanelRight, Plus, Share2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FilePlus, FileText, Filter, PanelRight, Pin, Plus, Share2 } from 'lucide-react'
 import { addDays, addMonths, compareTasks, dateKeyOf, isIsoDate, isOpen, monthDays, taskDate, weekStartOf } from '@shared/tasks.js'
 import { basename, isNote, stripExt } from '@shared/paths.js'
 import { useApp } from '../store/app.js'
@@ -15,6 +15,9 @@ import { TaskFilters } from './TaskFilters.jsx'
 import { useTaskDialog } from './TaskDialog.jsx'
 import { PAGE } from './TaskBoard.jsx'
 import { shareWorkspace } from '../lib/projects.js'
+import { usePins } from '../lib/pins.js'
+import { PinChip, PinCountdown, PinEditor, UpcomingPins, usePinDays } from './CalendarPins.jsx'
+import { PIN_COLORS } from '@shared/pins.js'
 
 const MODES = [
   ['month', 'Month'],
@@ -59,16 +62,18 @@ function useDays(model, filter) {
 }
 
 const NONE = { tasks: [], notes: [] }
+const NO_PINS = []
 const openNote = (wsId, path) => useLayout.getState().openNote(wsId, path)
 
-function Cell({ iso, today, selected, dim, data, hasNote, limit, wsId, canEdit, onSelect, onOpenDay, onOpen, onAdd }) {
+function Cell({ iso, today, selected, dim, data, pins, hasNote, limit, wsId, canEdit, onSelect, onOpenDay, onOpen, onAdd, onPin, onOpenPin }) {
   const { over, drop } = useDayDrop(iso)
   const shown = data.tasks.slice(0, limit)
   const more = data.tasks.length - shown.length
   const date = dateOfIso(iso)
   return (
     <div
-      className={`calv-cell ${iso === today ? 'today' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${over ? 'over' : ''}`}
+      className={`calv-cell ${iso === today ? 'today' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${over ? 'over' : ''} ${pins.length ? 'pinned' : ''}`}
+      style={pins.length ? { '--pin': PIN_COLORS[pins[0].color] } : undefined}
       role="group"
       aria-label={`${formatDate(date, 'dddd D MMMM')}${data.tasks.length ? `, ${data.tasks.length} tasks` : ''}`}
       onClick={() => onSelect(iso)}
@@ -78,12 +83,22 @@ function Cell({ iso, today, selected, dim, data, hasNote, limit, wsId, canEdit, 
       <div className="calv-cell-head">
         <span className="calv-wd">{formatDate(date, 'ddd')}</span>
         <span className="calv-num">{date.getDate() === 1 ? formatDate(date, 'D MMM') : date.getDate()}</span>
+        {pins.length > 0 && (
+          <span className="calv-pin-marks" aria-hidden="true">
+            {pins.slice(0, 2).map((p) => p.emoji).join('')}
+          </span>
+        )}
         <span className="calv-dots" aria-hidden="true">
           {data.tasks.slice(0, 3).map((t) => (
             <i key={taskKey(t)} className={`${dueClass(t, today)} ${isOpen(t.status) ? '' : 'done'}`} />
           ))}
         </span>
         <span className="calv-actions">
+          {canEdit && (
+            <button type="button" className="calv-btn" title="Pin this day — a launch, a birthday, a deadline" aria-label="Pin this day" onClick={(e) => (e.stopPropagation(), onPin(iso, e.currentTarget))}>
+              <Pin />
+            </button>
+          )}
           {canEdit && (
             <button type="button" className="calv-btn" title="Add a task for this day" aria-label="Add a task for this day" onClick={(e) => (e.stopPropagation(), onAdd(iso, e.currentTarget))}>
               <Plus />
@@ -101,6 +116,9 @@ function Cell({ iso, today, selected, dim, data, hasNote, limit, wsId, canEdit, 
         </span>
       </div>
       <div className="calv-items">
+        {pins.map((p) => (
+          <PinChip key={p.id} pin={p} onOpen={canEdit ? onOpenPin : undefined} />
+        ))}
         {shown.map((t) => (
           <TaskChip key={taskKey(t)} task={t} today={today} canEdit={canEdit} onOpen={onOpen} />
         ))}
@@ -132,7 +150,7 @@ function Cell({ iso, today, selected, dim, data, hasNote, limit, wsId, canEdit, 
 
 // The selected day in full: its note, a way to add to it, what is planned, what
 // is dated, and what was written that day.
-function DayPanel({ iso, data, hasNote, wsId, today, canEdit, onOpen, edited, lists }) {
+function DayPanel({ iso, data, pins, allPins, hasNote, wsId, today, canEdit, onOpen, edited, lists, onPin, onOpenPin, onGo }) {
   const date = dateOfIso(iso)
   return (
     <>
@@ -153,6 +171,18 @@ function DayPanel({ iso, data, hasNote, wsId, today, canEdit, onOpen, edited, li
           )}
         </button>
       </div>
+      {(pins.length > 0 || canEdit) && (
+        <div className="calv-day-pins">
+          {pins.map((p) => (
+            <PinChip key={p.id} pin={p} onOpen={canEdit ? onOpenPin : undefined} />
+          ))}
+          {canEdit && (
+            <button type="button" className="calv-pin-add" onClick={(e) => onPin(iso, e.currentTarget)}>
+              <Pin /> {pins.length ? 'Pin another' : 'Pin this day'}
+            </button>
+          )}
+        </div>
+      )}
       {canEdit && <QuickAdd day={iso} />}
       <div className="calv-side-title">Tasks</div>
       {data.tasks.length ? (
@@ -168,6 +198,12 @@ function DayPanel({ iso, data, hasNote, wsId, today, canEdit, onOpen, edited, li
               <FileText /> {stripExt(basename(p))}
             </button>
           ))}
+        </>
+      )}
+      {allPins.length > 0 && (
+        <>
+          <div className="calv-side-title">Coming up</div>
+          <UpcomingPins pins={allPins} today={today} onGo={onGo} onOpen={canEdit ? onOpenPin : () => {}} />
         </>
       )}
       {edited.length > 0 && (
@@ -246,7 +282,7 @@ function PlanPanel({ overdue, unscheduled, today, wsId, canEdit, onOpen, lists }
   )
 }
 
-function AgendaDay({ iso, today, data, wsId, canEdit, onOpen, onOpenDay, lists }) {
+function AgendaDay({ iso, today, data, pins, wsId, canEdit, onOpen, onOpenDay, lists, onOpenPin }) {
   const { over, drop } = useDayDrop(iso)
   return (
     <div className={`calv-agenda-day ${iso === today ? 'today' : ''} ${over ? 'over' : ''}`} {...(canEdit ? drop : {})}>
@@ -254,6 +290,9 @@ function AgendaDay({ iso, today, data, wsId, canEdit, onOpen, onOpenDay, lists }
         <span className="calv-agenda-num">{dateOfIso(iso).getDate()}</span>
         <span>{iso === today ? 'Today' : iso === addDays(today, 1) ? 'Tomorrow' : formatDate(dateOfIso(iso), 'dddd')}</span>
         <span className="faint">{formatDate(dateOfIso(iso), 'D MMMM')}</span>
+        {pins.map((p) => (
+          <PinChip key={p.id} pin={p} onOpen={canEdit ? onOpenPin : undefined} />
+        ))}
       </div>
       {data.tasks.map((t) => (
         <TaskRow key={taskKey(t)} task={t} today={today} ws={wsId} canEdit={canEdit} onOpen={onOpen} done={lists.get(taskKey(t))?.done} total={lists.get(taskKey(t))?.total} />
@@ -263,7 +302,7 @@ function AgendaDay({ iso, today, data, wsId, canEdit, onOpen, onOpenDay, lists }
           <FileText /> {stripExt(basename(p))}
         </button>
       ))}
-      {!data.tasks.length && !data.notes.length && <div className="faint calv-empty">Nothing planned.</div>}
+      {!data.tasks.length && !data.notes.length && !pins.length && <div className="faint calv-empty">Nothing planned.</div>}
     </div>
   )
 }
@@ -285,9 +324,15 @@ export function CalendarView() {
   const [selected, setSelected] = useState(today)
   const [filtering, setFiltering] = useState(null) // the Filter button, while its card is open
   const [adding, setAdding] = useState(null) // { iso, anchor }
+  const [pinning, setPinning] = useState(null) // { iso, pin, anchor }
   const days = useDays(model, filter)
+  const pins = usePins()
 
   const shown = useMemo(() => daysOf(mode, selected, startDay), [mode, selected, startDay])
+  const pinDays = usePinDays(pins, useMemo(() => shown.concat(selected), [shown, selected]))
+  const pinsOn = (iso) => pinDays.get(iso) || NO_PINS
+  const onPin = (iso, anchor) => setPinning({ iso, pin: null, anchor })
+  const onOpenPin = (pin, anchor) => setPinning({ iso: pin.date, pin, anchor })
   const data = (iso) => days.get(iso) || NONE
   const hasNote = (iso) => treeMap.has(A.dailyNotePath(dateOfIso(iso)))
   const openDay = (iso) => A.openDailyNote(dateOfIso(iso), { announce: !hasNote(iso) })
@@ -338,6 +383,7 @@ export function CalendarView() {
       selected={iso === selected}
       dim={mode === 'month' && iso.slice(0, 7) !== selected.slice(0, 7)}
       data={data(iso)}
+      pins={pinsOn(iso)}
       hasNote={hasNote(iso)}
       limit={limit}
       wsId={wsId}
@@ -346,9 +392,11 @@ export function CalendarView() {
       onOpenDay={openDay}
       onOpen={openTask}
       onAdd={(day, anchor) => setAdding({ iso: day, anchor })}
+      onPin={onPin}
+      onOpenPin={onOpenPin}
     />
   )
-  const agenda = shown.filter((d) => d === today || d === selected || data(d).tasks.length || data(d).notes.length)
+  const agenda = shown.filter((d) => d === today || d === selected || data(d).tasks.length || data(d).notes.length || pinsOn(d).length)
 
   return (
     <div className="calv" tabIndex={0} onKeyDown={onKeyDown}>
@@ -356,6 +404,7 @@ export function CalendarView() {
         <div className="calv-main">
           <div className="calv-bar">
             <h2>{title}</h2>
+            <PinCountdown pins={pins} today={today} onGo={setSelected} />
             <div className="calv-nav">
               <button className="icon-btn" title="Previous" aria-label="Previous" onClick={() => go(-1)}>
                 <ChevronLeft />
@@ -399,7 +448,7 @@ export function CalendarView() {
           {mode === 'agenda' && (
             <div className="calv-agenda">
               {agenda.map((iso) => (
-                <AgendaDay key={iso} iso={iso} today={today} data={data(iso)} wsId={wsId} canEdit={canEdit} onOpen={openTask} onOpenDay={openDay} lists={model.lists} />
+                <AgendaDay key={iso} iso={iso} today={today} data={data(iso)} pins={pinsOn(iso)} wsId={wsId} canEdit={canEdit} onOpen={openTask} onOpenDay={openDay} lists={model.lists} onOpenPin={onOpenPin} />
               ))}
             </div>
           )}
@@ -418,7 +467,22 @@ export function CalendarView() {
               </div>
             )}
             {tab === 'day' ? (
-              <DayPanel iso={selected} data={data(selected)} hasNote={hasNote(selected)} wsId={wsId} today={today} canEdit={canEdit} onOpen={openTask} edited={edited} lists={model.lists} />
+              <DayPanel
+                iso={selected}
+                data={data(selected)}
+                pins={pinsOn(selected)}
+                allPins={pins}
+                hasNote={hasNote(selected)}
+                wsId={wsId}
+                today={today}
+                canEdit={canEdit}
+                onOpen={openTask}
+                edited={edited}
+                lists={model.lists}
+                onPin={onPin}
+                onOpenPin={onOpenPin}
+                onGo={setSelected}
+              />
             ) : (
               <PlanPanel overdue={plan.overdue} unscheduled={plan.unscheduled} today={today} wsId={wsId} canEdit={canEdit} onOpen={openTask} lists={model.lists} />
             )}
@@ -434,6 +498,11 @@ export function CalendarView() {
       {adding && (
         <Popover anchor={adding.anchor} onClose={() => setAdding(null)} align="left" className="pl-dayadd">
           <QuickAdd day={adding.iso} autoFocus />
+        </Popover>
+      )}
+      {pinning && pinning.anchor.isConnected && (
+        <Popover anchor={pinning.anchor} onClose={() => setPinning(null)} align="left" className="pin-pop">
+          <PinEditor key={pinning.pin?.id || pinning.iso} iso={pinning.iso} pin={pinning.pin} pins={pins} onDone={() => setPinning(null)} />
         </Popover>
       )}
       {dialog}

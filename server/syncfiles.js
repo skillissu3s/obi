@@ -8,12 +8,14 @@ import crypto from 'node:crypto'
 import { absPath } from './fsutil.js'
 import { isNote } from '../shared/paths.js'
 import { LAYER_DIR, notePathForLayer } from '../shared/board.js'
+import { CALENDAR_FILE } from '../shared/pins.js'
 
 const JUNK = new Set(['Thumbs.db', 'desktop.ini'])
 
-/** Notes, attachments and canvas layers — not .git, .trash or other dot-files */
+/** Notes, attachments, canvas layers and calendar pins — not .git, .trash or other dot-files */
 export function isSyncPath(p) {
   if (!p || p.length > 1024) return false
+  if (p === CALENDAR_FILE) return true
   if (p.startsWith(LAYER_DIR + '/')) return p.endsWith('.json') && !p.slice(LAYER_DIR.length + 1).split('/').some((s) => s.startsWith('.') || !s)
   const parts = p.split('/')
   return !parts.some((s) => !s || s.startsWith('.')) && !JUNK.has(parts.at(-1))
@@ -88,6 +90,7 @@ export async function readSynced(rt, p) {
 
 /** Writes a synced file through the runtime, so open documents update live */
 export async function writeSynced(rt, p, buf, { userId = null } = {}) {
+  if (p === CALENDAR_FILE) return rt.importCalendar(buf.toString('utf8'))
   const layerOf = notePathForLayer(p)
   if (layerOf != null) return rt.importLayer(layerOf, buf.toString('utf8'))
   // a note replaced from another device keeps its previous text as a version
@@ -98,6 +101,7 @@ export async function writeSynced(rt, p, buf, { userId = null } = {}) {
 
 /** Removes a synced file: notes and attachments go to the trash, not away */
 export async function deleteSynced(rt, p, { userId = null } = {}) {
+  if (p === CALENDAR_FILE) return rt.importCalendar(null)
   const layerOf = notePathForLayer(p)
   if (layerOf != null) {
     return rt.lock.run(async () => {

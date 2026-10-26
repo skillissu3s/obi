@@ -15,6 +15,7 @@ import { cloudStatus } from './cloudsync.js'
 import { extname, isNote, basename, dirname, safeName, joinPath } from '../shared/paths.js'
 import { isBoardPath, isLayerPath, notePathForLayer, parseBoard, BoardParseError } from '../shared/board.js'
 import { scanDir } from './fsutil.js'
+import { cleanPin, MAX_PINS } from '../shared/pins.js'
 import { MAX_TASK_EDITS, MAX_RESTORE_LINES, addSubtask, applyTaskEdit, applyTaskEdits, appendTask, insertNext, newTaskLine, isIsoDate, toggleTaskLine, removeTask, restoreTaskBlock, TaskChangedError } from '../shared/tasks.js'
 import { isBoardContent, applyStatusRules, addCardToText, moveCardInText } from '../shared/kanban.js'
 import path from 'node:path'
@@ -565,6 +566,47 @@ wsRouter.post('/:id/tasks/restore', async (req, res) => {
 })
 
 // ---------------- history ----------------
+// ---- calendar pins: a day marked with a badge ("Launch day") ----
+wsRouter.get('/:id/calendar', access('viewer'), async (req, res) => {
+  const rt = await getRuntime(req.ws.id)
+  res.json(await rt.readCalendar())
+})
+
+wsRouter.post('/:id/calendar/pins', access('editor'), async (req, res) => {
+  const pin = cleanPin({ ...req.body, id: newId(12).toLowerCase() })
+  if (!pin) throw new HttpError(400, 'A pin needs a day and a name')
+  const rt = await getRuntime(req.ws.id)
+  const cal = await rt.updateCalendar((pins) => {
+    if (pins.length >= MAX_PINS) throw new HttpError(400, 'That’s as many pins as a calendar holds')
+    return [...pins, pin]
+  })
+  res.json({ pin, pins: cal.pins })
+})
+
+wsRouter.patch('/:id/calendar/pins/:pinId', access('editor'), async (req, res) => {
+  const rt = await getRuntime(req.ws.id)
+  let changed = null
+  const cal = await rt.updateCalendar((pins) =>
+    pins.map((p) => {
+      if (p.id !== req.params.pinId) return p
+      // fields left out stay as they were; `until`, `repeat` and `note` set to null are cleared
+      const merged = { ...p, ...req.body, id: p.id }
+      for (const k of ['until', 'repeat', 'note']) if (req.body?.[k] === null) delete merged[k]
+      changed = cleanPin(merged)
+      if (!changed) throw new HttpError(400, 'A pin needs a day and a name')
+      return changed
+    }),
+  )
+  if (!changed) throw new HttpError(404, 'That pin is gone')
+  res.json({ pin: changed, pins: cal.pins })
+})
+
+wsRouter.delete('/:id/calendar/pins/:pinId', access('editor'), async (req, res) => {
+  const rt = await getRuntime(req.ws.id)
+  const cal = await rt.updateCalendar((pins) => pins.filter((p) => p.id !== req.params.pinId))
+  res.json({ pins: cal.pins })
+})
+
 wsRouter.get('/:id/history', access('viewer'), async (req, res) => {
   const p = safePath(req.query.path)
   const rt = await getRuntime(req.ws.id)

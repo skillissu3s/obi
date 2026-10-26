@@ -10,6 +10,7 @@ import * as git from './git.js'
 import { parseNote, LinkResolver, relativePath, parseQuery } from '../shared/parse.js'
 import { basename, dirname, extname, isNote, noteTitle, stripExt, joinPath } from '../shared/paths.js'
 import { isBoardPath, layerPathFor, notePathForLayer, BoardParseError, LAYER_DIR } from '../shared/board.js'
+import { CALENDAR_FILE, parseCalendar, serializeCalendar } from '../shared/pins.js'
 
 const MAX_INDEX_BYTES = 2 * 1024 * 1024
 const VERSION_INTERVAL = 10 * 60 * 1000
@@ -303,6 +304,41 @@ class WorkspaceRuntime {
     } finally {
       this._opening.delete(openKey)
     }
+  }
+
+  // ---------- calendar pins (.obi/calendar.json) ----------
+  async readCalendar() {
+    return parseCalendar(await fs.readFile(absPath(this.dir, CALENDAR_FILE), 'utf8').catch(() => ''))
+  }
+
+  // change the pins: `fn` gets the current list and returns the new one
+  updateCalendar(fn) {
+    return this.lock.run(async () => {
+      const cal = await this.readCalendar()
+      const next = { pins: fn(cal.pins) }
+      await this._writeCalendar(next.pins.length ? serializeCalendar(next) : null)
+      return next
+    })
+  }
+
+  // the file as it came from another device (null: it was removed there)
+  importCalendar(text) {
+    return this.lock.run(() => this._writeCalendar(text == null ? null : serializeCalendar(parseCalendar(text))))
+  }
+
+  async _writeCalendar(text) {
+    const abs = absPath(this.dir, CALENDAR_FILE)
+    this.written.set(CALENDAR_FILE, text == null ? null : sha256(text))
+    if (text == null) {
+      if (!(await exists(abs))) return
+      await fs.rm(abs, { force: true })
+    } else {
+      if ((await fs.readFile(abs, 'utf8').catch(() => null)) === text) return
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await atomicWrite(abs, text)
+    }
+    this.markDirty(CALENDAR_FILE)
+    this.emit({ t: 'calendar', ws: this.id })
   }
 
   async readLayer(notePath) {
@@ -987,11 +1023,16 @@ class WorkspaceRuntime {
         doc.applyExternal(await fs.readFile(absPath(this.dir, layerPathFor(doc.path)), 'utf8').catch(() => ''))
       }
       this.emit({ t: 'reindex', ws: this.id })
+      this.emit({ t: 'calendar', ws: this.id })
       this.emitTree()
       return
     }
     let treeChanged = false
     for (const rel of changed) {
+      if (rel === CALENDAR_FILE) {
+        this.emit({ t: 'calendar', ws: this.id })
+        continue
+      }
       const abs = absPath(this.dir, rel)
       const st = await fs.stat(abs).catch(() => null)
       const layerOf = notePathForLayer(rel)

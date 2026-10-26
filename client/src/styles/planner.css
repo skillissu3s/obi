@@ -1714,3 +1714,386 @@
 .pl-dayadd .qa-chips {
   margin: 2px 4px 4px;
 }
+
+/* ---------- calendar pins: a day marked with a badge ---------- */
+/* a pinned day: its colour washes down from the top, its mark beside the date */
+.calv-cell.pinned {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--pin) 13%, transparent), transparent 70%), var(--bg);
+}
+.calv-cell.pinned:hover {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--pin) 18%, transparent), transparent 70%), var(--bg-hover);
+}
+.calv-cell.pinned.dim {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--pin) 8%, transparent), transparent 70%), color-mix(in srgb, var(--bg) 70%, var(--bg-sidebar));
+}
+.calv-pin-marks {
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 1px;
+  animation: pin-pop 260ms var(--ease-spring);
+}
+@keyframes pin-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-20deg);
+  }
+}
+.calv-pin {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 1px 6px 1px 4px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--pin) 20%, var(--bg));
+  box-shadow: inset 2px 0 0 var(--pin);
+  color: color-mix(in srgb, var(--pin) 55%, var(--text));
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  animation: pin-in 220ms var(--ease-spring);
+  transition: background var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+@keyframes pin-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+.calv-pin:hover {
+  background: color-mix(in srgb, var(--pin) 30%, var(--bg));
+}
+.calv-pin:active {
+  transform: scale(0.97);
+}
+.calv-pin-mark {
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+}
+.calv-pin-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calv-pin-repeat {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  opacity: 0.6;
+}
+.calv-agenda-head .calv-pin {
+  flex: none;
+  max-width: 220px;
+}
+
+/* the next pin, counting down, in the bar */
+.calv-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 11px 0 8px;
+  border: none;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--pin) 16%, var(--bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pin) 35%, transparent);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  animation: pin-in 260ms var(--ease-spring);
+  transition: background var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+.calv-countdown b {
+  color: color-mix(in srgb, var(--pin) 50%, var(--text));
+  font-weight: 650;
+}
+.calv-countdown:hover {
+  background: color-mix(in srgb, var(--pin) 24%, var(--bg));
+  transform: translateY(-1px);
+}
+.calv-countdown.now .calv-pin-mark {
+  animation: pin-wiggle 1.6s var(--ease) infinite;
+}
+@keyframes pin-wiggle {
+  0%,
+  70%,
+  100% {
+    transform: none;
+  }
+  80% {
+    transform: rotate(-14deg) scale(1.15);
+  }
+  90% {
+    transform: rotate(10deg) scale(1.1);
+  }
+}
+
+/* the side panel: the day's pins, and the ones still to come */
+.calv-day-pins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 2px 0 10px;
+}
+.calv-day-pins .calv-pin {
+  font-size: 12.5px;
+  padding: 3px 9px 3px 7px;
+}
+.calv-pin-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+}
+.calv-pin-add:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.calv-pin-add svg {
+  width: 12px;
+  height: 12px;
+}
+.calv-upcoming {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.calv-upcoming-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: background var(--t-fast);
+}
+.calv-upcoming-row:hover {
+  background: var(--bg-hover);
+}
+.calv-upcoming-go {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.calv-upcoming-go .calv-pin-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pin) 18%, var(--bg));
+  font-size: 14px;
+}
+.calv-upcoming-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.calv-upcoming-text b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.calv-upcoming-text em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.calv-upcoming-when {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--pin) 55%, var(--text-2));
+}
+.calv-upcoming-edit {
+  opacity: 0;
+  margin-right: 4px;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+.calv-upcoming-row:hover .calv-upcoming-edit {
+  opacity: 1;
+}
+
+/* pinning a day */
+.pin-pop {
+  width: 340px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+}
+.pin-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pin-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pin-editor-title {
+  font-weight: 650;
+}
+.pin-preview {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--pin) 22%, var(--bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pin) 40%, transparent);
+  transition: background var(--t), box-shadow var(--t);
+}
+.pin-preview .calv-pin-mark {
+  font-size: 18px;
+}
+.pin-templates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+.pin-template {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  animation: pin-in 220ms var(--ease-spring) backwards;
+  transition: background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast) var(--ease-spring);
+}
+.pin-template span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pin-template:hover {
+  background: color-mix(in srgb, var(--pin) 16%, var(--bg-hover));
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.pin-template.active {
+  background: color-mix(in srgb, var(--pin) 22%, var(--bg));
+  box-shadow: inset 0 0 0 1.5px var(--pin);
+  color: var(--text);
+}
+.pin-template.mine {
+  font-style: italic;
+}
+.pin-fields {
+  display: flex;
+  gap: 6px;
+}
+.pin-emoji {
+  flex: 0 0 46px;
+  text-align: center;
+  font-size: 16px;
+  padding: 0 4px;
+}
+.pin-title {
+  flex: 1;
+  min-width: 0;
+}
+.pin-colors {
+  display: flex;
+  gap: 6px;
+}
+.pin-color {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--ease-spring), box-shadow var(--t-fast);
+}
+.pin-color:hover {
+  transform: scale(1.15);
+}
+.pin-color.active {
+  box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--text-2);
+}
+.pin-row {
+  display: flex;
+  gap: 8px;
+}
+.pin-row label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.pin-yearly {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.pin-yearly span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pin-yearly svg {
+  width: 13px;
+  height: 13px;
+  color: var(--text-3);
+}
+.pin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.pin-actions .danger {
+  margin-right: auto;
+  color: var(--danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .calv-pin,
+  .calv-pin-marks,
+  .calv-countdown,
+  .calv-countdown.now .calv-pin-mark,
+  .pin-template {
+    animation: none;
+  }
+}
