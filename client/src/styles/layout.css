@@ -154,6 +154,19 @@
 .sidebar.right .resizer {
   left: -3px;
 }
+/* while a panel is dragged wider: no slide behind the pointer, and nothing
+   selected or hovered along the way */
+.sidebar.resizing {
+  transition: none;
+}
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+.resizer {
+  touch-action: none;
+}
 .resizer:hover,
 .resizer.dragging {
   background: linear-gradient(90deg, transparent 2px, var(--accent) 2px, var(--accent) 4px, transparent 4px);

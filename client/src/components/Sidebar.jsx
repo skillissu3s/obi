@@ -21,6 +21,7 @@ import { ProjectsPanel, BoardsDock } from './ProjectsPanel.jsx'
 import { isBoardMeta } from '@shared/kanban.js'
 import { projectsFolder } from '../lib/projects.js'
 import { warmOnHover } from '../lib/socket.js'
+import { Resizer } from './Resizer.jsx'
 
 const ROW_H = 28
 
@@ -716,20 +717,6 @@ export function Sidebar({ user, closed }) {
   const workspaces = useApp((s) => s.workspaces)
   const prefs = usePrefs()
   const ws = workspaces.find((w) => w.id === wsId)
-  const [dragging, setDragging] = useState(false)
-
-  useEffect(() => {
-    if (!dragging) return
-    const left = rootRef.current?.getBoundingClientRect().left || 0
-    const onMove = (e) => useLayout.getState().setWidths({ leftWidth: Math.max(200, Math.min(460, e.clientX - left)) })
-    const onUp = () => setDragging(false)
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [dragging])
 
   const tabs = [
     { id: 'files', icon: FileText, title: 'Files' },
@@ -817,7 +804,7 @@ export function Sidebar({ user, closed }) {
           <Settings />
         </button>
       </div>
-      <div className={`resizer ${dragging ? 'dragging' : ''}`} onMouseDown={() => setDragging(true)} />
+      <Resizer panelRef={rootRef} side="left" min={200} max={460} onCommit={(w) => useLayout.getState().setWidths({ leftWidth: w })} />
     </div>
   )
 }

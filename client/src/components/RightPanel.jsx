@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { List, Link2, Network, CalendarDays, Info, FileText, ChevronLeft, ChevronRight, Plus, Clock, Users, PanelRightClose } from 'lucide-react'
 import { useApp } from '../store/app.js'
 import { useLayout } from '../store/layout.js'
@@ -7,6 +7,7 @@ import { api } from '../lib/api.js'
 import * as A from '../lib/actions.js'
 import { LocalGraph } from './GraphView.jsx'
 import { AvatarStack } from './ui.jsx'
+import { Resizer } from './Resizer.jsx'
 import { basename, dirname, stripExt, isNote } from '@shared/paths.js'
 import { isOpen, taskDate } from '@shared/tasks.js'
 import { formatDate, timeAgo, readingTime, formatBytes, plainSnippet } from '../lib/util.js'
@@ -14,19 +15,7 @@ import { formatDate, timeAgo, readingTime, formatBytes, plainSnippet } from '../
 export function RightPanel({ tab, closed }) {
   const rightTab = useLayout((s) => s.rightTab)
   const width = useLayout((s) => s.rightWidth)
-  const [dragging, setDragging] = useState(false)
-
-  useEffect(() => {
-    if (!dragging) return
-    const onMove = (e) => useLayout.getState().setWidths({ rightWidth: Math.max(220, Math.min(520, window.innerWidth - e.clientX)) })
-    const onUp = () => setDragging(false)
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-  }, [dragging])
+  const rootRef = useRef(null)
 
   const tabs = [
     { id: 'outline', icon: List, title: 'Outline' },
@@ -37,8 +26,8 @@ export function RightPanel({ tab, closed }) {
   ]
 
   return (
-    <div className={`sidebar right ${closed ? 'is-closed' : ''}`} style={{ width }} inert={closed || undefined}>
-      <div className={`resizer ${dragging ? 'dragging' : ''}`} onMouseDown={() => setDragging(true)} />
+    <div className={`sidebar right ${closed ? 'is-closed' : ''}`} style={{ width }} ref={rootRef} inert={closed || undefined}>
+      <Resizer panelRef={rootRef} side="right" min={220} max={520} onCommit={(w) => useLayout.getState().setWidths({ rightWidth: w })} />
       <div className="rp-tabs">
         {/* closing is on the edge the panel opens from */}
         <button className="icon-btn rp-close" title="Close panel (Ctrl/⌘ Shift \)" onClick={() => useLayout.getState().toggleRight(false)}>
