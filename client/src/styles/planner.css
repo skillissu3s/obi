@@ -1726,16 +1726,70 @@
 .calv-cell.pinned.dim {
   background: linear-gradient(to bottom, color-mix(in srgb, var(--pin) 8%, transparent), transparent 70%), color-mix(in srgb, var(--bg) 70%, var(--bg-sidebar));
 }
-.calv-pin-marks {
-  font-size: 13px;
+/* the pin's mark, stuck on the day's top-right corner: bigger than the text,
+   inside the date row, so it never covers the day's cards */
+.calv-cell {
+  position: relative;
+}
+.calv-cell.pinned .calv-cell-head {
+  padding-right: 28px;
+}
+.calv-cell.pinned.two .calv-cell-head {
+  padding-right: 38px;
+}
+.calv-sticker {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 24px;
+  height: 22px;
+  pointer-events: none;
+}
+.calv-sticker i {
+  position: absolute;
+  top: 0;
+  right: calc(var(--n) * 9px);
+  z-index: calc(2 - var(--n));
+  font-size: 19px;
+  font-style: normal;
   line-height: 1;
-  letter-spacing: 1px;
-  animation: pin-pop 260ms var(--ease-spring);
+  transform: rotate(10deg);
+  transform-origin: 50% 80%;
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.28));
+  animation: pin-pop 320ms var(--ease-spring) backwards;
+  animation-delay: calc(var(--n) * 60ms);
+  transition: transform 200ms var(--ease-spring);
+}
+.calv-sticker.two i + i {
+  top: 2px;
+  font-size: 15px;
+  opacity: 0.85;
+}
+.calv-cell:hover .calv-sticker i {
+  transform: rotate(-6deg) scale(1.12);
+}
+.calv-cell:hover .calv-sticker i + i {
+  transform: rotate(-14deg) scale(1.05) translateX(-3px);
+}
+/* a day too narrow for its buttons beside the mark: while they show, the mark
+   steps back (it lets clicks through to them either way) */
+.calv-cell {
+  container-type: inline-size;
+}
+@container (max-width: 150px) {
+  .calv-sticker i {
+    transition: transform 200ms var(--ease-spring), opacity 160ms var(--ease);
+  }
+  .calv-cell:is(:hover, .selected, :focus-within) .calv-sticker i,
+  .calv-cell:is(:hover, .selected, :focus-within) .calv-sticker i + i {
+    opacity: 0.22;
+    transform: translate(2px, -2px) rotate(10deg) scale(0.8);
+  }
 }
 @keyframes pin-pop {
   from {
     opacity: 0;
-    transform: scale(0.4) rotate(-20deg);
+    transform: scale(0.3) rotate(-30deg);
   }
 }
 .calv-pin {
@@ -2090,7 +2144,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .calv-pin,
-  .calv-pin-marks,
+  .calv-sticker i,
   .calv-countdown,
   .calv-countdown.now .calv-pin-mark,
   .pin-template {

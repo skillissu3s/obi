@@ -72,7 +72,7 @@ function Cell({ iso, today, selected, dim, data, pins, hasNote, limit, wsId, can
   const date = dateOfIso(iso)
   return (
     <div
-      className={`calv-cell ${iso === today ? 'today' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${over ? 'over' : ''} ${pins.length ? 'pinned' : ''}`}
+      className={`calv-cell ${iso === today ? 'today' : ''} ${selected ? 'selected' : ''} ${dim ? 'dim' : ''} ${over ? 'over' : ''} ${pins.length ? 'pinned' : ''} ${pins.length > 1 ? 'two' : ''}`}
       style={pins.length ? { '--pin': PIN_COLORS[pins[0].color] } : undefined}
       role="group"
       aria-label={`${formatDate(date, 'dddd D MMMM')}${data.tasks.length ? `, ${data.tasks.length} tasks` : ''}`}
@@ -80,14 +80,19 @@ function Cell({ iso, today, selected, dim, data, pins, hasNote, limit, wsId, can
       onDoubleClick={() => onOpenDay(iso)}
       {...(canEdit ? drop : {})}
     >
+      {pins.length > 0 && (
+        // the day's pin, stuck on its corner (a second one peeks out behind it)
+        <span className={`calv-sticker ${pins.length > 1 ? 'two' : ''}`} aria-hidden="true">
+          {pins.slice(0, 2).map((p, i) => (
+            <i key={p.id} style={{ '--n': i }}>
+              {p.emoji}
+            </i>
+          ))}
+        </span>
+      )}
       <div className="calv-cell-head">
         <span className="calv-wd">{formatDate(date, 'ddd')}</span>
         <span className="calv-num">{date.getDate() === 1 ? formatDate(date, 'D MMM') : date.getDate()}</span>
-        {pins.length > 0 && (
-          <span className="calv-pin-marks" aria-hidden="true">
-            {pins.slice(0, 2).map((p) => p.emoji).join('')}
-          </span>
-        )}
         <span className="calv-dots" aria-hidden="true">
           {data.tasks.slice(0, 3).map((t) => (
             <i key={taskKey(t)} className={`${dueClass(t, today)} ${isOpen(t.status) ? '' : 'done'}`} />
