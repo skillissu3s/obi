@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { SlidersHorizontal } from 'lucide-react'
-import { colorCss } from '@shared/boardsvg.js'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { unionBounds, isLinear, sampleSmooth, midPoint } from '@shared/boardgeom.js'
 import { ElementView } from './ElementView.jsx'
 import { visualBounds, visiblePoints, handlePoints, source } from './layout.js'
+import { QuickBar } from './QuickBar.jsx'
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
 const HANDLE_CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' }
@@ -58,6 +57,8 @@ function Overlay({ ctl, state, layout, zoom, peers }) {
   const single = selected.length === 1 ? selected[0] : null
   const readOnly = ctl.readOnly
   const showHandles = !readOnly && !state.editing && state.tool === 'select' && !state.panning
+  // writing in a text or a sticky: its bar stays, for its colour and size
+  const writing = !readOnly && single && state.editing?.id === single.id && (single.type === 'text' || single.type === 'sticky')
   const hover = state.hover && !state.selection.includes(state.hover) && state.tool === 'select' ? layout.byId.get(state.hover) : null
 
   let box = null
@@ -83,7 +84,7 @@ function Overlay({ ctl, state, layout, zoom, peers }) {
         })}
       {single && isLinear(single) && single.type !== 'pen' && <PointHandles el={single} show={showHandles && !single.locked} />}
       {showHandles && <ArrowBuds el={budTarget} inv={inv} />}
-      {showHandles && box && <StyleBud ctl={ctl} box={box} pad={pad} inv={inv} selected={selected} />}
+      {box && (showHandles || writing) && !ctl.gesture && <SelectionBar ctl={ctl} state={state} box={box} pad={pad} selected={selected} />}
       {state.marquee && <div className="cv-marquee" style={rectStyle(state.marquee)} />}
       {state.bindHint && <div className="cv-bind-hint" style={rectStyle(state.bindHint, 4 * inv)} />}
       {state.snapLines.map((l, i) => (
@@ -118,25 +119,38 @@ function ArrowBuds({ el, inv }) {
   )
 }
 
-// The way into a selection's style: a small round button just outside its
-// top-right corner, clear of the corner handle and the arrow buds, the same size
-// at any zoom. StyleBudPanel (Toolbar.jsx) opens the panel beside it.
-function StyleBud({ ctl, box, pad, inv, selected }) {
-  const stroke = selected.find((el) => el.stroke && el.type !== 'image')?.stroke
+// The selection's style, floating just above it (below it when there is no room
+// above): a short bar of what is changed most, and a ⋯ menu for the rest. It is
+// drawn in the canvas, so it follows the selection as the view pans and zooms,
+// and scaled against the zoom so it is the same size at any zoom.
+function SelectionBar({ ctl, state, box, pad, selected }) {
+  const ref = useRef(null)
+  const [below, setBelow] = useState(false)
+  const sel = selected.map(source)
+  const cx = box.x + box.w / 2
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    // the canvas's own frame (a note scrolls in its pane; a board is its view)
+    const frame = el.closest('.cm-scroller, .cv-viewport')?.getBoundingClientRect()
+    const top = Math.max(frame?.top ?? 0, 0) + 8
+    const r = el.getBoundingClientRect()
+    if (!below && r.top < top) setBelow(true)
+    else if (below) {
+      // back above once there is room for it there
+      const room = r.top - (box.h + pad * 2) * (r.height / (el.offsetHeight || 1)) - r.height - 40
+      if (room > top) setBelow(false)
+    }
+  })
   return (
-    <button
-      type="button"
-      className="cv-style-bud"
-      data-style-bud
-      title={selected.length > 1 ? `Style ${selected.length} items` : 'Style'}
-      aria-label="Style"
-      style={{ left: box.x + box.w + pad + 22 * inv, top: box.y - pad - 6 * inv }}
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={(e) => window.dispatchEvent(new CustomEvent('obi:style-bud', { detail: { ctl, anchor: e.currentTarget } }))}
+    <div
+      ref={ref}
+      className={`cv-ctx ${below ? 'below' : ''}`}
+      style={{ left: cx, top: below ? box.y + box.h + pad : box.y - pad }}
+      onPointerDown={(e) => e.stopPropagation()}
     >
-      <SlidersHorizontal />
-      {stroke && <i style={{ background: colorCss(stroke) }} />}
-    </button>
+      <QuickBar ctl={ctl} tool={state.tool} sel={sel} subjects={sel} />
+    </div>
   )
 }
 

@@ -21,7 +21,7 @@ import { setSpaces, spaceActions, onSpace } from '../editor/spaces.js'
 import { useBoardStore, useCanvasCtx, pickImageFiles } from './BoardCanvas.jsx'
 import { CanvasController } from './controller.js'
 import { CanvasLayer, useController } from './CanvasLayer.jsx'
-import { Toolbar, StyleBar, StyleBudPanel } from './Toolbar.jsx'
+import { Toolbar, StyleBar } from './Toolbar.jsx'
 import { AnchorTracker, makeAnchor, makeLineAnchor } from './anchors.js'
 import { newElementId, newSeed } from './store.js'
 import { visualBounds, source } from './layout.js'
@@ -716,7 +716,7 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
     // page's own scrolling (the scroll area is touch-action: pan-y)
     let swipe = null
     const onPointerDown = (e) => {
-      if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .nc-edge, .cv-pop, .cv-style-bud, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
+      if (e.target.closest?.('.cv-dock, .nc-bubble, .nc-recenter, .nc-edge, .cv-pop, .cv-ctx, .cm-board-embed, .cv-wikilink, .cv-card-open, .cv-link-mark')) return
       if (e.target.closest?.('.cv-edit, .cv-edit-frame, .cm-obi-space-x, .cm-obi-space-grip')) return
       if (placingRef.current && e.button === 0) {
         e.preventDefault()
@@ -1136,7 +1136,6 @@ export function NoteCanvas({ tab, view, scrollEl, innerEl, originEl, stageEl, mo
           </button>
         </div>
       )}
-      {!viewOnly && <StyleBudPanel ctl={ctl} />}
       {/* (reading: the drawings are there to look at, so no tools) */}
       {!viewOnly && (
         <div className={`cv-dock ${open ? '' : 'is-tucked'}`}>

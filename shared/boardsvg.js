@@ -229,6 +229,20 @@ export function penSize(el) {
   return el.tool === 'marker' ? sw * 5 + 8 : sw * 1.5 + 2
 }
 
+// How a stroke is inked. A stroke drawn since `ink: 2` uses the tuning of tldraw's
+// pen (the one under ClickUp's whiteboards): steadier lines, a stroke that swells
+// and thins with the speed of the hand, and real pressure from a stylus felt more.
+// Older strokes keep the tuning they were drawn with, so no drawing changes shape.
+const easeOutSine = (t) => Math.sin((t * Math.PI) / 2)
+const penEasing = (t) => t * 0.65 + Math.sin((t * Math.PI) / 2) * 0.35
+function inkOptions(el, marker, pressure) {
+  const size = penSize(el)
+  if (el.ink !== 2) return { size, thinning: marker ? 0 : 0.55, smoothing: 0.6, streamline: 0.45, simulatePressure: !pressure && !marker }
+  if (marker) return { size, thinning: 0, smoothing: 0.5, streamline: 0.5, simulatePressure: false }
+  if (pressure) return { size, thinning: 0.62, smoothing: 0.62, streamline: 0.62, easing: penEasing, simulatePressure: false }
+  return { size, thinning: 0.5, smoothing: 0.62, streamline: 0.64, easing: easeOutSine, simulatePressure: true }
+}
+
 function penDrawables(el) {
   const pts = el.points || []
   if (!pts.length) return []
@@ -237,11 +251,7 @@ function penDrawables(el) {
   const outline = getStroke(
     pts.map((p) => [p[0], p[1], p[2] ?? 0.5]),
     {
-      size: penSize(el),
-      thinning: marker ? 0 : 0.55,
-      smoothing: 0.6,
-      streamline: 0.45,
-      simulatePressure: !pressure && !marker,
+      ...inkOptions(el, marker, pressure),
       last: true,
       start: { cap: true, taper: 0 },
       end: { cap: true, taper: 0 },

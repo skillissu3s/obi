@@ -413,7 +413,7 @@ export class CanvasController {
       return true
     }
     if (tool === 'pen' || tool === 'marker') {
-      const draft = this.base('pen', { x: p.x, y: p.y, points: [[0, 0, pressureOf(e)]], tool: tool === 'marker' ? 'marker' : undefined })
+      const draft = this.base('pen', { x: p.x, y: p.y, points: [[0, 0, pressureOf(e)]], tool: tool === 'marker' ? 'marker' : undefined, ink: 2 })
       if (tool === 'marker') draft.stroke = this.styleFor('marker').markerStroke || 'yellow'
       this.startGesture({ type: 'draw', origin: p }, e)
       this.set({ draft, rawPoints: draft.points, selection: [] })
